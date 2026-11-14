@@ -1,0 +1,27 @@
+{% extends "auth_base.html" %}
+{% block title %}Apply{% endblock %}
+{% block authclass %}wide{% endblock %}
+{% block content %}
+{% if closed %}<h1>Recruitment closed</h1><p class="muted">We're not taking new drivers right now. Check back soon!</p>
+{% elif done %}<h1>Application sent 🚚</h1><p class="muted">Thanks! A manager will review it and get in touch using the contact you gave.</p><a class="btn" href="/login">Back</a>
+{% else %}
+<h1>Drive for {{ S.company_name or 'us' }}</h1>
+<p class="muted" style="white-space:pre-line">{{ S.recruitment_text }}</p>
+{% if error %}<div class="flash error">{{ error }}</div>{% endif %}
+<form method="post">
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+  <input name="website" style="display:none" tabindex="-1" autocomplete="off">
+  <div class="fields">
+    <div class="field"><label>Name / nickname *</label><input name="name" required maxlength="48" value="{{ f.name if f }}"></div>
+    <div class="field"><label>Contact (email or Discord) *</label><input name="contact" required maxlength="100" value="{{ f.contact if f }}"></div>
+    <div class="field"><label>Discord username</label><input name="discord" maxlength="64" value="{{ f.discord if f }}"></div>
+    <div class="field"><label>Age</label><input name="age" type="number" min="0" max="120" value="{{ f.age if f }}"></div>
+    <div class="field"><label>Country</label><input name="country" maxlength="48" value="{{ f.country if f }}"></div>
+    <div class="field"><label>Games</label><label class="check"><input type="checkbox" name="games" value="ats" checked> ATS</label><label class="check"><input type="checkbox" name="games" value="ets2"> ETS2</label></div>
+  </div>
+  <div class="field"><label>Driving experience</label><textarea name="experience" maxlength="1000" placeholder="Hours played, previous VTCs, TruckersMP…">{{ f.experience if f }}</textarea></div>
+  <div class="field"><label>Why do you want to join?</label><textarea name="message" maxlength="2000">{{ f.message if f }}</textarea></div>
+  <button class="btn primary">Send application</button> <a class="btn ghost" href="/login">Cancel</a>
+</form>
+{% endif %}
+{% endblock %}

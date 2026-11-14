@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf %}
+{% block title %}Announcements{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Announcements</h1><p>Company news. Posts are also sent to Discord when a webhook is set.</p></div></div>
+<div class="grid g3">
+  <div class="card span2">
+    {% for n in rows %}<div class="news {{ n.level }}"><div class="between"><b style="font-size:16px">{% if n.pinned %}📌 {% endif %}{{ n.title }}</b>
+      {% if can('dispatcher') %}<form method="post">{{ csrf() }}<button class="btn ghost sm" name="delete" value="{{ n.id }}" data-confirm="Delete this announcement?">Delete</button></form>{% endif %}</div>
+      <div class="small faint">{{ n.display_name or 'System' }} · {{ n.created_at|dt }}</div><p>{{ n.body }}</p></div>
+    {% else %}<p class="muted">Nothing posted yet.</p>{% endfor %}
+  </div>
+  {% if can('dispatcher') %}<form class="card" method="post">{{ csrf() }}<h2>Post announcement</h2>
+    <div class="field"><label>Title</label><input name="title" required maxlength="120"></div>
+    <div class="field"><label>Message</label><textarea name="body" required maxlength="5000" style="min-height:160px"></textarea></div>
+    <div class="field"><label>Style</label><select name="level"><option value="info">Info</option><option value="important">Important</option><option value="event">Event</option></select></div>
+    <label class="check"><input type="checkbox" name="pinned" value="1"> Pin to top</label>
+    <button class="btn primary">Post</button></form>{% endif %}
+</div>
+{% endblock %}

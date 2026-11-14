@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, status, who, csrf %}
+{% block title %}Logbook{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Logbook</h1><p>{{ total }} {{ game_scope()|upper if game_scope() }} jobs. Telemetry jobs log themselves; manual jobs need a manager's approval.</p></div>
+  <div class="actions">{% if demo[0] %}<form method="post" action="/jobs/clear-demo" style="display:inline">{{ csrf() }}<input type="hidden" name="confirm" value="1"><input type="hidden" name="back" value="/jobs">
+      <button class="btn" data-confirm="Delete {{ demo[0] }} demo job(s) from the simulator and the {{ demo[1] }} ledger entries they made? Real jobs aren't touched.">Clear demo jobs ({{ demo[0] }})</button></form>{% endif %}<a class="btn" href="/api/export/jobs.csv">{{ icon('download') }}Export CSV</a><a class="btn primary" href="/jobs/new">{{ icon('plus') }}Log a job</a></div>
+</div>
+<form class="filters card" method="get">
+  <div><label>Search</label><input name="q" value="{{ a.q }}" placeholder="Cargo or city"></div>
+  <div><label>Driver</label><select name="driver"><option value="">All</option>{% for d in drivers %}<option value="{{ d.id }}" {{ 'selected' if a.driver == d.id|string }}>{{ d.display_name }}</option>{% endfor %}</select></div>
+  <div><label>Status</label><select name="status"><option value="">All</option>{% for s in ['in_progress','delivered','pending_review','cancelled','abandoned','rejected'] %}<option value="{{ s }}" {{ 'selected' if a.status == s }}>{{ s|replace('_',' ') }}</option>{% endfor %}</select></div>
+  {% if not game_scope() %}<div><label>Game</label><select name="game"><option value="">All</option><option value="ats" {{ 'selected' if a.game=='ats' }}>ATS</option><option value="ets2" {{ 'selected' if a.game=='ets2' }}>ETS2</option></select></div>{% endif %}
+  <button class="btn navy">Filter</button>
+</form>
+<div class="card flush"><div class="table-wrap"><table>
+  <thead><tr><th>#</th><th>Driver</th><th>Route</th><th>Cargo</th><th class="num">Distance</th><th class="num">Revenue</th><th class="num">Profit</th><th class="num">Score</th><th>Status</th><th>Date</th></tr></thead>
+  <tbody>
+  {% for j in rows %}
+  <tr class="clickable" data-href="/jobs/{{ j.id }}">
+    <td class="muted">{{ j.id }}</td>
+    <td>{{ who(j.user_id, j.display_name, j.color) }}</td>
+    <td>{{ j.source_city or '?' }} → {{ j.destination_city or '?' }}<div class="small faint">{{ j.game|upper }} · {{ j.source }}</div></td>
+    <td>{{ j.cargo }}<div class="small faint">{{ j.cargo_mass|mass }}</div></td>
+    <td class="num">{{ j.driven_km|dist }}</td>
+    <td class="num">{{ (j.revenue or j.income)|money }}{% if j.deduction %}<div class="small neg" title="Offered {{ j.income|money }}, the game took {{ j.deduction|money }} off for {{ j.deduction_reason }}">−{{ j.deduction|money }} {{ 'damage' if j.deduction_reason == 'cargo damage' else 'late' if j.deduction_reason == 'late delivery' else 'deducted' }}</div>{% endif %}</td>
+    <td class="num {{ 'pos' if j.profit > 0 else 'neg' if j.profit < 0 }}">{{ j.profit|money if j.status == 'delivered' else '—' }}</td>
+    <td class="num">{{ j.score if j.status == 'delivered' else '—' }}</td>
+    <td>{{ status(j.status) }}{% set rf = (j.flags or '').split(',')|reject('in', ['', 'joined-late', 'demo'])|list %}{% if rf %} <span class="badge flag" title="{{ rf|join(', ') }}">flag</span>{% elif 'demo' in (j.flags or '') %} <span class="badge info">demo</span>{% endif %}</td>
+    <td class="small muted">{{ j.started_at|dt('%b %d %H:%M') }}</td>
+  </tr>
+  {% else %}<tr><td colspan="10" class="empty">No jobs match.</td></tr>{% endfor %}
+  </tbody></table></div></div>
+{% if pages > 1 %}<div class="row" style="margin-top:12px">
+  {% for p in range(1, pages + 1) %}{% if p <= 3 or p > pages - 2 or (p - page)|abs < 2 %}
+  <a class="btn sm {{ 'primary' if p == page }}" href="?{% for k, v in a.items() if k != 'page' %}{{ k }}={{ v|urlencode }}&amp;{% endfor %}page={{ p }}">{{ p }}</a>
+  {% endif %}{% endfor %}</div>{% endif %}
+{% endblock %}

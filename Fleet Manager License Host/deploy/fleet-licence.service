@@ -1,0 +1,28 @@
+# Fleet Manager licence server - systemd service.
+# Goes in: /etc/systemd/system/fleet-licence.service   (install.sh puts it there for you)
+# Listens on 127.0.0.1 only; Caddy is the one door in from the internet.
+
+[Unit]
+Description=Fleet Manager licence server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=fmlicence
+Group=fmlicence
+WorkingDirectory=/opt/fleet-licence
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 -u /opt/fleet-licence/license_server.py --host 127.0.0.1 --port 8750
+Restart=always
+RestartSec=5
+
+# Lock it down: it can only write its own folder.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/fleet-licence
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

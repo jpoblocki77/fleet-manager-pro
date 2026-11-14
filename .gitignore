@@ -1,0 +1,36 @@
+# Fleet Manager Final Release - files that must NEVER go to GitHub
+
+# Seller secrets: signing key, admin token, encryption key
+host_key.json
+server_config.json
+tls_key.pem
+
+# Buyers' purchases, your company data, backups, this PC's licence
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+licence.json
+issued/
+
+# Upload folder made by Prepare Upload.bat (contains a copy of the signing key)
+deploy/upload/
+
+# Zip files (they can contain any of the above)
+*.zip
+
+# Downloaded / generated files (rebuilt automatically)
+node_modules/
+__pycache__/
+*.pyc
+Buyer Builds (PRIVATE).csv
+_embedded_templates.py
+
+# Extra safety (added for the GitHub repository)
+data/
+deleted_purchases.jsonl
+*.pem
+*.key
+secret.key
+*.bak
+*.tmp

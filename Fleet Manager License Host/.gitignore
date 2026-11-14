@@ -1,0 +1,26 @@
+# Fleet Manager License Host - files that must NEVER go to GitHub
+
+# Your PRIVATE signing key and admin token
+host_key.json
+server_config.json
+
+# Buyers' purchases and PCs, and their backups
+deleted_purchases.jsonl
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+issued/
+
+# Upload folder made by Prepare Upload.bat (contains a copy of the signing key)
+deploy/upload/
+
+# Zip files (they can contain your signing key, admin token or buyer list)
+*.zip
+
+# Generated files
+__pycache__/
+*.pyc
+
+# Encryption key for the licence server (secret)
+tls_key.pem

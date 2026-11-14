@@ -1,0 +1,14 @@
+{% extends "auth_base.html" %}
+{% block title %}Licence agreement{% endblock %}
+{% block authclass %}wide{% endblock %}
+{% block content %}
+<div class="eula">
+  {% for kind, t in blocks %}
+  {% if kind == 'title' %}<h1>{{ t|title|replace('Fleet Manager Pro - ', 'Fleet Manager Pro · ') }}</h1>
+  {% elif kind == 'head' %}<h3>{{ t }}</h3>
+  {% elif kind == 'item' %}<p class="item">{{ t }}</p>
+  {% else %}<p>{{ t }}</p>{% endif %}
+  {% endfor %}
+</div>
+<p class="small muted" style="margin-top:12px"><a href="/">← Back to Fleet Manager Pro</a></p>
+{% endblock %}

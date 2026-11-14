@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Fleet Map{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Fleet Map <span class="badge info">{{ game|upper }}</span></h1>
+    <p>Real geography in the game's own map projection, the roads your company has driven, and every driver on the road right now. Scroll to zoom, drag to pan.</p></div>
+  <div class="actions">
+    {% if not scope %}<span class="seg"><a class="{{ 'on' if game == 'ats' }}" href="?game=ats">ATS</a><a class="{{ 'on' if game == 'ets2' }}" href="?game=ets2">ETS2</a></span>{% endif %}
+    <button class="btn" id="overview">Whole map</button><button class="btn" id="fit">Fit drivers</button></div>
+</div>
+<div class="grid" style="grid-template-columns: minmax(0,1fr) 300px">
+  <div class="map-wrap"><canvas id="map"></canvas>
+    <div class="map-legend">
+      <div><i style="display:inline-block;width:18px;height:2px;background:rgba(143,168,204,.7);vertical-align:middle"></i> Borders &nbsp;
+           <i style="display:inline-block;width:18px;height:3px;background:#e0a23a;vertical-align:middle"></i> Roads driven</div>
+      <div style="margin-top:4px"><i style="display:inline-block;width:8px;height:8px;border-radius:50%;border:1.5px solid #c8d6ec"></i> City (real-world position) &nbsp;
+           <i style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#e23552;border:1.5px solid #fff"></i> Visited (exact)</div>
+      <div class="small" style="color:#93a7c6;margin-top:6px" id="map-note"></div>
+    </div>
+  </div>
+  <div class="stack">
+    <div class="card"><div class="card-head"><h2>On the road</h2><span class="right badge" id="count">0</span></div><div id="list" class="stack"></div></div>
+    <div class="card"><h2>Map knowledge</h2><dl class="kv small"><dt>Road driven</dt><dd id="k-roads">—</dd><dt>Places visited</dt><dd id="k-places">—</dd></dl>
+      <p class="small muted">Roads and exact city positions are learned as your drivers drive: the map fills in the more you haul.</p></div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const GAME = {{ game|tojson }};
+const map = FMP.WorldMap(document.getElementById("map"));
+const bg = { lines: [], regions: [], cities: [], roads: [], places: [] };
+document.getElementById("fit").onclick = () => map.refit();
+document.getElementById("overview").onclick = () => map.overview();
+fetch("/static/map/" + GAME + ".json?v={{ VERSION }}").then(r => r.json()).then(d => {
+  Object.assign(bg, { lines: d.lines, regions: d.regions, cities: d.cities });
+  document.getElementById("map-note").textContent = d.note;
+  map.background(bg);
+}).catch(() => {});
+function learned() {
+  FMP.get("/api/map?game=" + GAME).then(d => {
+    bg.roads = d.roads; bg.places = d.places;
+    map.background(bg);
+    document.getElementById("k-roads").textContent = FMP.dist(d.road_points * 0.4 * (GAME === "ets2" ? 19 : 20), 0) + " (real-world)";
+    document.getElementById("k-places").textContent = d.places.length;
+  }).catch(() => {});
+}
+function tick() {
+  FMP.get("/api/live/all?game=" + GAME).then(d => {
+    const trails = d.drivers.map(x => ({ color: x.user.color, points: x.trail.concat([{ x: x.x, z: x.z }]) }));
+    const markers = d.drivers.map(x => ({ id: x.user.id, x: x.x, z: x.z, heading: x.heading, color: x.user.color, label: x.user.display_name }));
+    map.set(trails, markers);
+    document.getElementById("count").textContent = d.drivers.length;
+    document.getElementById("list").innerHTML = d.drivers.length ? d.drivers.map(x => `
+      <div style="cursor:pointer" onclick="map.focus(${x.user.id})"><div class="who"><span class="avatar sm" style="background:${FMP.esc(x.user.color)}">${FMP.esc(x.user.display_name[0])}</span><b>${FMP.esc(x.user.display_name)}</b>
+      <span class="small muted">${Math.round(FMP.speed(x.speed_kmh))} ${FMP.speedU()}</span></div>
+      <div class="small muted">${FMP.esc(x.truck)}${x.source === "agent" ? " · remote" : ""}</div>
+      ${x.job ? `<div class="small">${FMP.esc(x.job.cargo)}: ${FMP.esc(x.job.source_city)} → ${FMP.esc(x.job.destination_city)}</div>` : '<div class="small faint">Free roam</div>'}</div>`).join("")
+      : '<p class="muted">Nobody is driving ' + GAME.toUpperCase() + ' right now.</p>';
+  }).catch(() => {});
+}
+learned(); setInterval(learned, 30000);
+tick(); setInterval(tick, 2000);
+</script>
+{% endblock %}

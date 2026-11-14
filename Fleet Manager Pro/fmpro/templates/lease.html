@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, stat, status, csrf %}
+{% block title %}Lease #{{ l.id }}{% endblock %}
+{% set imp = current_units() == 'imperial' %}
+{% set du = 'mi' if imp else 'km' %}
+{% set live = l.status in ('active', 'matured') %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Lease #{{ l.id }} · {{ l.brand }} {{ l.model }}</h1>
+    <p>{{ l.plan_name }} plan · {{ l.plate or 'no plate' }} · started {{ l.started_at|dt('%b %d, %Y') }} · {{ status('pending' if l.status == 'matured' else l.status) }}</p></div>
+  <div class="actions"><a class="btn" href="/leasing">All leases</a>{% if l.truck_id %}<a class="btn" href="/fleet/truck/{{ l.truck_id }}">Truck page</a>{% endif %}</div>
+</div>
+
+{% if l.status == 'matured' %}<div class="card" style="margin-bottom:16px;border-color:rgba(240,169,46,.5)"><b>All {{ l.weeks }} payments are made.</b> Decide what happens to the truck: buy it for {{ l.residual|money(2) }}, return it{% if st.excess_cost %} (extra {{ 'miles' if imp else 'km' }}: {{ st.excess_cost|money(2) }}){% endif %}, or renew the lease.</div>{% endif %}
+
+<div class="grid g4" style="margin-bottom:16px">
+  {{ stat('Weekly payment', l.payment|money(2), (q.depreciation|money(2)) ~ ' truck value + ' ~ (q.finance|money(2)) ~ ' interest') }}
+  {{ stat('Payments', l.payments_made ~ ' / ' ~ l.weeks, (st.balance_left|money(2) ~ ' still to pay') if live else 'lease ended') }}
+  {{ stat(('Miles' if imp else 'Kilometres') ~ ' used', st.km_used|dist, 'of ' ~ (l.km_allowed|dist) ~ ' included') }}
+  {{ stat('Paid so far', paid_total|money(2), 'down payment, payments and fees') }}
+</div>
+
+<div class="grid g2" style="margin-bottom:16px">
+  <div class="card"><div class="card-head"><h2>What this lease costs</h2></div>
+  <table><tbody>
+    <tr><td>Truck price</td><td class="num">{{ l.price|money(2) }}</td></tr>
+    <tr><td>Down payment</td><td class="num">{{ l.down|money(2) }}</td></tr>
+    <tr><td>Amount financed (price − down payment)</td><td class="num">{{ q.capitalised|money(2) }}</td></tr>
+    <tr><td>End value (buyout price)</td><td class="num">{{ l.residual|money(2) }}</td></tr>
+    <tr><td>Interest rate</td><td class="num">{{ l.apr }}% APR</td></tr>
+    <tr><td>Length</td><td class="num">{{ l.weeks }} weeks · ends {{ st.ends_at|dt('%b %d, %Y') }}</td></tr>
+    <tr><td><b>Weekly payment</b></td><td class="num"><b>{{ l.payment|money(2) }}</b></td></tr>
+    <tr><td class="small muted">&nbsp;&nbsp;truck value used each week</td><td class="num small muted">{{ q.depreciation|money(2) }}</td></tr>
+    <tr><td class="small muted">&nbsp;&nbsp;interest each week</td><td class="num small muted">{{ q.finance|money(2) }}</td></tr>
+    <tr><td>Total over the lease (down + all payments)</td><td class="num">{{ q.total_payments|money(2) }}</td></tr>
+    <tr><td>Total interest</td><td class="num">{{ q.interest|money(2) }}</td></tr>
+    <tr><td>Total if you buy it at the end</td><td class="num">{{ q.buyout_total|money(2) }}</td></tr>
+    <tr><td>Extra {{ 'miles' if imp else 'km' }}</td><td class="num">{{ (l.excess_per_km * (km_per_mi if imp else 1))|money(2) }} per {{ du }}</td></tr>
+    <tr><td>Ending early</td><td class="num">{{ l.early_fee_pct|int }}% of the payments left</td></tr>
+  </tbody></table></div>
+
+  <div class="card"><div class="card-head"><h2>{{ 'Miles' if imp else 'Kilometres' }}</h2></div>
+    <div class="bar {{ 'ok' if st.pct < 80 else 'warn' if st.pct < 100 else '' }}" style="height:12px"><i style="width:{{ st.pct }}%"></i></div>
+    <p class="small" style="margin:6px 0 14px">{{ st.km_used|dist }} used · {{ st.km_left|dist }} left of {{ l.km_allowed|dist }}</p>
+    <table><tbody>
+      <tr><td>On pace to drive by the end</td><td class="num">{{ st.projected_km|dist }}</td></tr>
+      <tr><td>Projected extra {{ 'miles' if imp else 'km' }}</td><td class="num {{ 'neg' if st.projected_excess_km }}">{{ st.projected_excess_km|dist }}{% if st.projected_excess_km %} ≈ {{ (st.projected_excess_km * l.excess_per_km)|money(2) }}{% endif %}</td></tr>
+      <tr><td>Extra {{ 'miles' if imp else 'km' }} so far</td><td class="num {{ 'neg' if st.excess_cost }}">{{ st.excess_km|dist }} = {{ st.excess_cost|money(2) }}</td></tr>
+    </tbody></table>
+    {% if live %}
+    <div class="card-head" style="margin-top:18px"><h2>If you end it today</h2></div>
+    <table><tbody>
+      <tr><td>Buy the truck</td><td class="num"><b>{{ (st.balance_left + l.residual)|money(2) }}</b><div class="small faint">{% if st.balance_left %}{{ st.balance_left|money(2) }} payments left + {% endif %}{{ l.residual|money(2) }} end value</div></td></tr>
+      <tr><td>Return the truck</td><td class="num"><b>{{ ((0 if st.matured else st.early_fee) + st.excess_cost)|money(2) }}</b><div class="small faint">{% if not st.matured %}{{ st.early_fee|money(2) }} early fee{% else %}no early fee{% endif %} + {{ st.excess_cost|money(2) }} extra {{ du }}</div></td></tr>
+    </tbody></table>
+    {% else %}
+    <p class="small muted" style="margin-top:14px">Ended {{ l.ended_at|dt('%b %d, %Y') }} ({{ (l.end_reason or l.status)|replace('_', ' ') }}), costing {{ l.end_cost|money(2) }} at the end.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% if live and can('admin') %}
+<div class="card" style="margin-bottom:16px"><div class="card-head"><h2>End or renew</h2></div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+    <form method="post" action="/fleet/lease/{{ l.id }}/end" onsubmit="return confirm({{ ('Buy the truck for ' ~ (st.balance_left + l.residual)|money(2) ~ '?')|tojson|forceescape }})">{{ csrf() }}<input type="hidden" name="action" value="buyout"><button class="btn primary">Buy it · {{ (st.balance_left + l.residual)|money(2) }}</button></form>
+    <form method="post" action="/fleet/lease/{{ l.id }}/end" onsubmit="return confirm({{ ('Return the truck to the leasing company? It costs ' ~ ((0 if st.matured else st.early_fee) + st.excess_cost)|money(2) ~ ' and the truck leaves your fleet.')|tojson|forceescape }})">{{ csrf() }}<input type="hidden" name="action" value="return"><button class="btn">{{ 'Return it early' if not st.matured else 'Return it' }} · {{ ((0 if st.matured else st.early_fee) + st.excess_cost)|money(2) }}</button></form>
+    {% if st.matured %}
+    <form method="post" action="/fleet/lease/{{ l.id }}/end" style="display:flex;gap:8px;align-items:flex-end">{{ csrf() }}<input type="hidden" name="action" value="renew">
+      <div class="field" style="margin:0"><label>Renew on</label><select name="plan_id">{% for p in plans %}<option value="{{ p.id }}">{{ p.name }} - {{ p.weeks }} wk, {{ p.km_allowed|dist }}, {{ p.apr }}%</option>{% endfor %}</select></div>
+      <button class="btn">Renew</button></form>
+    <p class="hint" style="flex-basis:100%">Renewing leases the same truck again at its end value ({{ l.residual|money(2) }}); extra {{ 'miles' if imp else 'km' }} on this lease are charged first.</p>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<div class="card flush"><div class="card-head" style="padding:16px 18px 0"><h2>Payments and charges</h2></div>
+<div class="table-wrap"><table><thead><tr><th>Date</th><th>What</th><th class="num">Amount</th></tr></thead><tbody>
+{% for p in paid %}<tr><td class="small">{{ p.created_at|dt }}</td><td>{{ p.description }}</td><td class="num">{{ (-p.amount)|money(2) }}</td></tr>
+{% else %}<tr><td colspan="3" class="muted">Nothing paid yet.</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endblock %}

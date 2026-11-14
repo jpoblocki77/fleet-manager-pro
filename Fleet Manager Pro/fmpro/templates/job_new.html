@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf %}
+{% block title %}Log a job{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Log a job manually</h1>
+<p>For deliveries driven without telemetry (e.g. on another PC). {% if S.require_manual_approval == '1' and not can('admin') %}A manager approves it before it's paid.{% endif %}</p></div></div>
+<form method="post" class="card" style="max-width:900px">{{ csrf() }}<input type="hidden" name="units" value="{{ current_units() }}">{% set imp = current_units() == 'imperial' %}
+  <div class="fields">
+    {% if can('dispatcher') %}<div class="field"><label>Driver</label><select name="user_id">{% for d in drivers %}<option value="{{ d.id }}" {{ 'selected' if d.id == current_user().id }}>{{ d.display_name }}</option>{% endfor %}</select></div>{% endif %}
+    <div class="field"><label>Game</label><select name="game"><option value="ats" {{ 'selected' if S.default_game=='ats' }}>ATS</option><option value="ets2" {{ 'selected' if S.default_game=='ets2' }}>ETS2</option></select></div>
+    <div class="field"><label>Truck</label><select name="truck_id"><option value="">—</option>{% for t in trucks %}<option value="{{ t.id }}">{{ t.brand }} {{ t.model }} {{ t.plate }}</option>{% endfor %}</select></div>
+    <div class="field"><label>Cargo *</label><input name="cargo" required maxlength="64"></div>
+    <div class="field"><label>Weight ({{ 'lb' if imp else 'tonnes' }})</label><input name="cargo_mass" type="number" step="{{ 1 if imp else 0.1 }}" min="0" max="{{ 440000 if imp else 200 }}"></div>
+    <div class="field"><label>From city *</label><input name="source_city" required maxlength="64"></div>
+    <div class="field"><label>From company</label><input name="source_company" maxlength="64"></div>
+    <div class="field"><label>To city *</label><input name="destination_city" required maxlength="64"></div>
+    <div class="field"><label>To company</label><input name="destination_company" maxlength="64"></div>
+    <div class="field"><label>Distance</label><div class="row" style="flex-wrap:nowrap"><input name="driven_km" type="number" step="0.1" min="0" required>
+      <select name="dist_unit" style="width:80px">{% if imp %}<option value="mi" selected>mi</option>{% endif %}<option value="km">km</option></select></div></div>
+    <div class="field"><label>Revenue</label><input name="revenue" type="number" step="1" min="0" required></div>
+    <div class="field"><label>Fuel used ({{ 'gal' if imp else 'litres' }})</label><input name="fuel_used" type="number" step="1" min="0"></div>
+    <div class="field"><label>Tolls</label><input name="tolls" type="number" step="1" min="0"></div>
+    <div class="field"><label>Fines</label><input name="fines" type="number" step="1" min="0"></div>
+    <div class="field"><label>Cargo damage %</label><input name="cargo_damage_pct" type="number" step="0.1" min="0" max="100"></div>
+  </div>
+  <div class="field"><label>Notes / proof (screenshot link)</label><textarea name="notes" maxlength="1000"></textarea></div>
+  <button class="btn primary">Submit job</button> <a class="btn ghost" href="/jobs">Cancel</a>
+</form>
+{% endblock %}

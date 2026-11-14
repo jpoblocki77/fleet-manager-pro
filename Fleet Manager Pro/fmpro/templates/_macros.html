@@ -1,0 +1,61 @@
+{% macro icon(name) -%}
+{%- set p = {
+ 'dash': '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
+ 'live': '<path d="M12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/><path d="M16.2 7.8a6 6 0 0 1 0 8.4M7.8 16.2a6 6 0 0 1 0-8.4M19.1 4.9a10 10 0 0 1 0 14.2M4.9 19.1a10 10 0 0 1 0-14.2"/>',
+ 'data': '<path d="M4 6h16M4 12h16M4 18h10"/><circle cx="18" cy="18" r="2"/>',
+ 'map': '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/>',
+ 'jobs': '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/>',
+ 'dispatch': '<path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>',
+ 'truck': '<path d="M2 6h12v10H2zM14 9h4.5L22 12.5V16h-8z"/><circle cx="6.5" cy="17.5" r="2"/><circle cx="17.5" cy="17.5" r="2"/>',
+ 'money': '<rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="3"/><path d="M6 9.5v6M18 9.5v6"/>',
+ 'users': '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>',
+ 'apply': '<path d="M15 4h4v16H5V4h4"/><rect x="9" y="2.5" width="6" height="3" rx="1"/><path d="m9 13 2 2 4-4"/>',
+ 'cal': '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+ 'trophy': '<path d="M8 4h8v5a4 4 0 0 1-8 0V4zM8 6H4.5a3 3 0 0 0 3.5 4M16 6h3.5a3 3 0 0 1-3.5 4M12 13v4M8 21h8M9 17h6"/>',
+ 'medal': '<circle cx="12" cy="15" r="5"/><path d="m8.5 11-3-8h4l2.5 6M15.5 11l3-8h-4L12 9"/>',
+ 'megaphone': '<path d="M3 10v4h4l7 4V6L7 10H3zM17 9a4 4 0 0 1 0 6"/>',
+ 'chat': '<path d="M4 5h16v11H9l-5 4z"/>',
+ 'cog': '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+ 'bell': '<path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0"/>',
+ 'sun': '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+ 'menu': '<path d="M3 6h18M3 12h18M3 18h18"/>',
+ 'plus': '<path d="M12 5v14M5 12h14"/>',
+ 'out': '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
+ 'download': '<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>',
+ 'shield': '<path d="M12 3 4 6v6c0 5 3.4 8.3 8 9 4.6-.7 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/>',
+ 'user': '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+} -%}
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ p.get(name, '')|safe }}</svg>
+{%- endmacro %}
+
+{% macro logo(size=38) -%}
+<svg class="brand-mark" width="{{ size }}" height="{{ size }}" viewBox="0 0 48 48" aria-hidden="true">
+  <defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1d4278"/><stop offset="1" stop-color="#0a1a33"/></linearGradient></defs>
+  <path d="M24 2 44 10v13c0 12-8.5 20-20 23C12.5 43 4 35 4 23V10z" fill="url(#lg)" stroke="#c8102e" stroke-width="2.5"/>
+  <path d="M11 27h15v-9h5.5l5 5v4h1.5v3h-27z" fill="#fff"/>
+  <circle cx="16" cy="31" r="2.6" fill="#c8102e"/><circle cx="31" cy="31" r="2.6" fill="#c8102e"/>
+  <path d="M10 14h16M10 19h11" stroke="#c8102e" stroke-width="2.6" stroke-linecap="round"/>
+</svg>
+{%- endmacro %}
+
+{% macro avatar(name, color, cls='') -%}
+<span class="avatar {{ cls }}" style="background:{{ color or '#c8102e' }}">{{ (name or '?')[:1]|upper }}</span>
+{%- endmacro %}
+
+{% macro who(id, name, color) -%}
+<a class="who" href="/drivers/{{ id }}">{{ avatar(name, color, 'sm') }}<span>{{ name }}</span></a>
+{%- endmacro %}
+
+{% macro status(s) -%}
+<span class="badge {{ s }}">{{ (s or '')|replace('_', ' ') }}</span>
+{%- endmacro %}
+
+{% macro stat(label, value, sub='') -%}
+<div class="card stat"><div class="label">{{ label }}</div><div class="value">{{ value }}</div>{% if sub %}<div class="sub">{{ sub }}</div>{% endif %}</div>
+{%- endmacro %}
+
+{% macro csrf() -%}<input type="hidden" name="csrf" value="{{ csrf_token() }}">{%- endmacro %}
+
+{% macro lvl(prog) -%}
+<span class="level-badge" title="{{ prog.rank.name }}">{{ prog.level }}</span>
+{%- endmacro %}

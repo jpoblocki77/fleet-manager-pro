@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status, who, csrf %}
+{% block title %}{{ e.title }}{% endblock %}
+{% block content %}
+<div class="hero" style="margin-bottom:16px"><div style="position:relative;z-index:1">
+  <span class="badge crimson">{{ e.kind }}</span> {{ status(e.status) }}
+  {% if can('dispatcher') %}<button class="btn sm" style="margin-left:8px" data-open="dlg-edit-ev">Edit</button>{% endif %}
+  <h1 style="margin-top:8px">{{ e.title }}</h1>
+  <p>{{ e.start_at|dt('%A %B %d, %Y · %H:%M') }} ({{ e.start_at|ago }}) · hosted by {{ e.host }}</p></div></div>
+<div class="grid g3">
+  <div class="card span2">
+    <dl class="kv"><dt>Game</dt><dd>{{ e.game|upper }}</dd><dt>Server</dt><dd>{{ e.server or '—' }}</dd><dt>Meet-up</dt><dd>{{ e.meetup or '—' }}</dd>
+    <dt>Route</dt><dd>{{ e.departure or '?' }} → {{ e.destination or '?' }}</dd><dt>Required DLC</dt><dd>{{ e.dlc or 'none' }}</dd>
+    <dt>Minimum level</dt><dd>{{ e.min_level }}</dd><dt>Slots</dt><dd>{{ e.max_slots or 'unlimited' }}</dd><dt>XP for attending</dt><dd>{{ e.xp_reward }}</dd></dl>
+    {% if e.description %}<hr><p style="white-space:pre-line">{{ e.description }}</p>{% endif %}
+    {% if e.status == 'scheduled' %}<hr><form method="post" action="/events/{{ e.id }}/rsvp" class="row">{{ csrf() }}<b>Your RSVP:</b>
+      {% for s, l in [('going',"I'm going"),('maybe','Maybe'),('not_going',"Can't make it")] %}<button class="btn {{ 'primary' if mine == s }}" name="status" value="{{ s }}">{{ l }}</button>{% endfor %}</form>{% endif %}
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Attendees</h2><span class="right badge">{{ rsvps|selectattr('status','eq','going')|list|length }} going</span></div>
+    {% if can('dispatcher') and e.status != 'cancelled' %}<form method="post" action="/events/{{ e.id }}/manage">{{ csrf() }}{% endif %}
+    <ul class="feed">{% for r in rsvps %}<li>
+      {% if can('dispatcher') and e.status != 'cancelled' %}<input type="checkbox" name="attended" value="{{ r.user_id }}" {{ 'checked' if r.attended or (e.status == 'scheduled' and r.status == 'going') }} title="Attended">{% endif %}
+      {{ who(r.user_id, r.display_name, r.color) }}<span style="margin-left:auto">{{ status(r.status) }}{% if r.attended %} <span class="badge ok">attended</span>{% endif %}</span></li>
+    {% else %}<li class="muted">No RSVPs yet.</li>{% endfor %}</ul>
+    {% if can('dispatcher') and e.status != 'cancelled' %}
+      <div class="row" style="margin-top:10px"><button class="btn primary sm" name="action" value="complete">Save attendance &amp; award XP</button>
+      {% if e.status == 'scheduled' %}<button class="btn sm" name="action" value="cancel" data-confirm="Cancel this event?">Cancel event</button>{% endif %}
+      <button class="btn danger sm" name="action" value="delete" data-confirm="Delete this event?">Delete</button></div></form>{% endif %}
+  </div>
+</div>
+{% if can('dispatcher') %}
+<dialog id="dlg-edit-ev"{% if open_edit %} data-autoopen{% endif %}><form method="post" action="/events/{{ e.id }}/edit">{{ csrf() }}
+  <div class="dhead"><h2>Edit event</h2><button type="button" class="btn ghost sm" data-close>✕</button></div>
+  <div class="dbody"><div class="fields">
+    <div class="field" style="grid-column:1/-1"><label>Title *</label><input name="title" required maxlength="100" value="{{ e.title }}"></div>
+    <div class="field"><label>Type</label><select name="kind">{% for k in ['convoy','meeting','training','public','race'] %}<option {{ 'selected' if e.kind == k }}>{{ k }}</option>{% endfor %}</select></div>
+    <div class="field"><label>Starts *</label><input name="start_at" type="datetime-local" required value="{{ e.start_at|dt('%Y-%m-%dT%H:%M') }}"></div>
+    <div class="field"><label>Game</label><select name="game"><option value="ats" {{ 'selected' if e.game == 'ats' }}>ATS</option><option value="ets2" {{ 'selected' if e.game == 'ets2' }}>ETS2</option></select></div>
+    <div class="field"><label>Server</label><input name="server" maxlength="64" value="{{ e.server or '' }}"></div>
+    <div class="field"><label>Meet-up</label><input name="meetup" maxlength="100" value="{{ e.meetup or '' }}"></div>
+    <div class="field"><label>Departure</label><input name="departure" maxlength="100" value="{{ e.departure or '' }}"></div>
+    <div class="field"><label>Destination</label><input name="destination" maxlength="100" value="{{ e.destination or '' }}"></div>
+    <div class="field"><label>Required DLC</label><input name="dlc" maxlength="200" value="{{ e.dlc or '' }}"></div>
+    <div class="field"><label>Min. level</label><input name="min_level" type="number" min="0" value="{{ e.min_level or 0 }}"></div>
+    <div class="field"><label>Slots (0 = unlimited)</label><input name="max_slots" type="number" min="0" value="{{ e.max_slots or 0 }}"></div>
+    <div class="field"><label>XP for attending</label><input name="xp_reward" type="number" min="0" value="{{ e.xp_reward or 0 }}"></div>
+  </div><div class="field"><label>Description / route notes</label><textarea name="description" maxlength="3000">{{ e.description or '' }}</textarea></div>
+  <p class="hint">Drivers who said they're going or maybe are notified if the time, place or route changes.{% if e.status == 'completed' %} This event is completed: changing the XP won't change XP already awarded.{% endif %}</p></div>
+  <div class="dfoot"><button type="button" class="btn ghost" data-close>Cancel</button><button class="btn primary">Save changes</button></div></form></dialog>
+<script>document.querySelectorAll("dialog[data-autoopen]").forEach((d) => d.showModal());</script>
+{% endif %}
+{% endblock %}

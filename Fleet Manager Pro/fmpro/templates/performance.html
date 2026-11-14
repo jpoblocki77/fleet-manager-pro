@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% from "_macros.html" import stat, status, who %}
+{% block title %}Driver Performance{% endblock %}
+{% macro late_text(m) -%}{% if m is none %}after the contract deadline{% else %}{{ '%dh %02dm'|format(m // 60, m % 60) }} late{% endif %}{%- endmacro %}
+{% block content %}
+<div class="page-head banner banner-drivers" title="Photo: Bhargav Panchal / Unsplash">
+  <div><h1>Driver Performance</h1><p>Distance driven on jobs and whether each load arrived before its in-game deadline.{% if game_scope() %} {{ game_scope()|upper }} only.{% endif %}</p></div>
+  <div class="actions"><span class="seg">{% for p, l in periods %}<a class="{{ 'on' if period == p }}" href="?period={{ p }}{% if sel %}&amp;driver={{ sel.id }}{% endif %}">{{ l }}</a>{% endfor %}</span></div>
+</div>
+
+<div class="grid g4" style="margin-bottom:16px">
+  {{ stat('Loads delivered', fleet.loads, 'all drivers') }}
+  {{ stat('Distance driven', fleet.km|dist, 'on jobs') }}
+  {{ stat('On time', fleet.on_time, (fleet.pct ~ '% of timed loads') if fleet.pct is not none else 'no deadlines yet') }}
+  {{ stat('Late', fleet.late, 'delivered after the deadline') }}
+</div>
+
+<div class="card flush" style="margin-bottom:16px"><div class="table-wrap"><table>
+  <thead><tr><th>Driver</th><th class="num">Loads</th><th class="num">Distance</th><th class="num">On time</th><th class="num">Late</th><th style="min-width:150px">On-time rate</th>
+    <th class="num">Avg score</th><th class="num">Revenue</th><th class="num">Damage</th><th class="num">Fines</th><th>Last delivery</th></tr></thead>
+  <tbody>{% for d in rows %}
+  <tr class="clickable {{ 'sel' if sel and sel.id == d.id }}" data-href="?period={{ period }}&amp;driver={{ d.id }}">
+    <td>{{ who(d.id, d.display_name, d.color) }}</td>
+    <td class="num">{{ d.loads }}</td>
+    <td class="num"><b>{{ d.km|dist }}</b></td>
+    <td class="num pos">{{ d.on_time }}</td>
+    <td class="num {{ 'neg' if d.late }}">{{ d.late }}{% if d.none %}<div class="small faint">{{ d.none }} no deadline</div>{% endif %}</td>
+    <td>{% if d.on_time_pct is not none %}<div class="bar {{ 'ok' if d.on_time_pct >= 90 else 'warn' if d.on_time_pct >= 70 else '' }}"><i style="width:{{ d.on_time_pct }}%"></i></div>
+      <span class="small">{{ d.on_time_pct }}%</span>{% else %}<span class="small faint">—</span>{% endif %}</td>
+    <td class="num">{{ d.avg_score if d.avg_score is not none else '—' }}</td>
+    <td class="num">{{ d.revenue|money }}</td>
+    <td class="num">{{ d.avg_damage|pct(1) }}{% if d.deduction %}<div class="small neg">−{{ d.deduction|money }}</div>{% endif %}</td>
+    <td class="num">{{ d.fines|money }}</td>
+    <td class="small muted">{{ d.last|ago if d.last else '—' }}</td>
+  </tr>
+  {% else %}<tr><td colspan="11" class="empty">No deliveries in this period yet.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+
+{% if sel %}
+<div class="card flush"><div class="card-head" style="padding:16px 18px 0"><h2>{{ sel.display_name }} · loads</h2>
+  <span class="right small muted">{{ sel.loads }} delivered · {{ sel.km|dist }} · {{ sel.on_time }} on time · {{ sel.late }} late</span></div>
+<div class="table-wrap"><table>
+  <thead><tr><th>#</th><th>Delivered</th><th>Route</th><th>Cargo</th><th class="num">Distance</th><th>Deadline (game)</th><th>Arrived (game)</th><th>Result</th></tr></thead>
+  <tbody>{% for j in loads %}
+  <tr class="clickable" data-href="/jobs/{{ j.id }}">
+    <td class="muted">{{ j.id }}</td>
+    <td class="small">{{ j.finished_at|dt('%b %d %H:%M') }}</td>
+    <td>{{ j.source_city }} → {{ j.destination_city }}<div class="small faint">{{ j.game|upper }}{% if j.contract_id %} · contract #{{ j.contract_id }}{% endif %}</div></td>
+    <td>{{ j.cargo }}</td>
+    <td class="num">{{ (j.driven_km or j.planned_km)|dist }}</td>
+    <td class="small">{{ j.game_time_deadline|gametime if j.game_time_deadline else '—' }}</td>
+    <td class="small">{{ j.game_time_end|gametime if j.game_time_end else '—' }}</td>
+    <td>{% if j.timing == 'on_time' %}<span class="badge ok">on time</span>{% if j.late_min is not none %} <span class="small faint">{{ '%dh %02dm'|format((-j.late_min) // 60, (-j.late_min) % 60) }} early</span>{% endif %}
+      {% elif j.timing == 'late' %}<span class="badge bad">late</span> <span class="small">{{ late_text(j.late_min) }}</span>
+      {% else %}<span class="badge">no deadline</span>{% endif %}</td>
+  </tr>
+  {% else %}<tr><td colspan="8" class="empty">No deliveries for {{ sel.display_name }} in this period.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+{% else %}<p class="muted small">Click a driver to see each load with its deadline and arrival time.</p>{% endif %}
+{% endblock %}

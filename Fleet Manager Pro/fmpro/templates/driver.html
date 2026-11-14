@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status, avatar, stat, csrf, lvl %}
+{% block title %}{{ p.display_name }}{% endblock %}
+{% block content %}
+{% set me = current_user() %}
+{% set is_self = me.id == p.id %}
+<div class="hero" style="margin-bottom:16px">
+  <div class="row" style="position:relative;z-index:1">
+    {{ avatar(p.display_name, p.color, 'lg') }}
+    <div><h1>{{ p.display_name }} {% if live %}<span class="badge ok">● driving now</span>{% endif %}</h1>
+      <p>{{ ROLE_LABELS[p.role] }}{% if p.division %} · {{ p.division }}{% endif %} · @{{ p.username }}{% if p.country %} · {{ p.country }}{% endif %} · joined {{ p.created_at|dt('%b %Y') }}</p>
+      {% if p.bio %}<p style="margin-top:6px">{{ p.bio }}</p>{% endif %}</div>
+    <div style="margin-left:auto;text-align:right;min-width:220px">
+      <div class="row" style="justify-content:flex-end">{{ lvl(prog) }}<div><b style="color:{{ prog.rank.color }}">{{ prog.rank.name }}</b><div class="small" style="color:#c3d1e8">{{ "{:,}".format(prog.xp) }} / {{ "{:,}".format(prog.next) }} XP</div></div></div>
+      <div class="bar" style="margin-top:6px"><i style="width:{{ prog.pct }}%"></i></div>
+    </div>
+  </div>
+</div>
+<div class="grid g6" style="margin-bottom:16px">
+  {{ stat('Deliveries', st.jobs) }}{{ stat('Distance', st.km|dist) }}{{ stat('Revenue', st.revenue|money) }}
+  {{ stat('Avg. score', '%.0f'|format(st.score)) }}{{ stat('Tonnage', st.mass|mass) }}{{ stat('Wallet', wallet|money, 'driver earnings') }}
+</div>
+<div class="grid g3">
+  <div class="card span2 flush"><div class="card-head" style="padding:16px 18px 0"><h2>Recent jobs</h2><a class="right small" href="/jobs?driver={{ p.id }}">All →</a></div>
+    <div class="table-wrap"><table><thead><tr><th>Route</th><th>Cargo</th><th class="num">Distance</th><th class="num">Score</th><th>Status</th><th>Date</th></tr></thead><tbody>
+    {% for j in recent %}<tr class="clickable" data-href="/jobs/{{ j.id }}"><td>{{ j.source_city }} → {{ j.destination_city }}</td><td>{{ j.cargo }}</td><td class="num">{{ j.driven_km|dist }}</td><td class="num">{{ j.score if j.status == 'delivered' else '—' }}</td><td>{{ status(j.status) }}</td><td class="small muted">{{ j.started_at|dt('%b %d') }}</td></tr>
+    {% else %}<tr><td colspan="6" class="empty">No jobs yet.</td></tr>{% endfor %}</tbody></table></div>
+    <div class="grid g2" style="padding:16px">
+      <div><h3>Favourite cargo</h3><ul class="feed">{% for f in fav %}<li>{{ f.cargo }}<span style="margin-left:auto" class="muted">{{ f.n }}×</span></li>{% else %}<li class="muted">—</li>{% endfor %}</ul></div>
+      <div><h3>Top destinations</h3><ul class="feed">{% for c in cities %}<li>{{ c.c }}<span style="margin-left:auto" class="muted">{{ c.n }}×</span></li>{% else %}<li class="muted">—</li>{% endfor %}</ul></div>
+    </div>
+  </div>
+  <div class="stack">
+    <div class="card"><div class="card-head"><h2>Achievements</h2><a class="right small" href="/achievements?user={{ p.id }}">All →</a></div>
+      <div class="row" style="gap:6px;font-size:24px">{% for a in ach %}<span title="{{ a.name }} — {{ a|ach_desc }}">{{ a.icon }}</span>{% else %}<span class="muted small">None yet.</span>{% endfor %}</div></div>
+    <div class="card"><h2>Records</h2><dl class="kv"><dt>Longest job</dt><dd>{{ st.longest|dist }}</dd><dt>Fuel burnt</dt><dd>{{ st.fuel|liquid }}</dd><dt>Fines paid</dt><dd>{{ st.fines|money }}</dd>
+      {% if p.discord %}<dt>Discord</dt><dd>{{ p.discord }}</dd>{% endif %}{% if p.truckersmp_id %}<dt>TruckersMP</dt><dd>{{ p.truckersmp_id }}</dd>{% endif %}{% if p.steam_id %}<dt>Steam</dt><dd>{{ p.steam_id }}</dd>{% endif %}
+      <dt>Pay rate</dt><dd>{{ (p.pay_per_km if p.pay_per_km is not none else S.driver_pay_per_km|float)|money(2) }}/km</dd></dl></div>
+    {% if can_token %}
+    <div class="card accent"><h2>Remote telemetry</h2>
+      <p class="small muted">To log jobs from {{ 'your' if is_self else 'their' }} own PC, run this there in the Fleet Manager Pro folder (copied to that PC; no purchase key needed):</p>
+      <pre class="mono small" style="white-space:pre-wrap;word-break:break-all;background:var(--panel-2);padding:8px;border-radius:8px">{% if lan_pin %}{{ AGENT_CMD }} --server https://THIS-PC-IP:8760 --token {{ p.agent_token }} --pin {{ lan_pin }}{% else %}{{ AGENT_CMD }} --server http://THIS-PC-IP:8760 --token {{ p.agent_token }}{% endif %}</pre>{% if not lan_pin %}<p class="small muted">Start this PC in LAN mode once to get the encrypted https address and its fingerprint.</p>{% endif %}
+      <p class="small muted">Overlay for OBS: <code>/overlay?key={{ p.agent_token }}&amp;solid</code></p>
+      <form method="post" action="/drivers/{{ p.id }}/token">{{ csrf() }}<button class="btn sm" data-confirm="Generate a new token? The old one stops working.">New token</button></form></div>
+    {% endif %}
+  </div>
+</div>
+
+{% if is_self or can('admin') %}
+<div class="grid g2" style="margin-top:16px">
+  <form class="card" method="post" action="/drivers/{{ p.id }}/edit">{{ csrf() }}
+    <h2>Edit profile</h2>
+    <div class="fields">
+      <div class="field"><label>Display name</label><input name="display_name" value="{{ p.display_name }}" maxlength="48"></div>
+      <div class="field"><label>Colour</label><input name="color" type="color" value="{{ p.color }}"></div>
+      <div class="field"><label>Country</label><input name="country" value="{{ p.country }}" maxlength="48"></div>
+      <div class="field"><label>Discord</label><input name="discord" value="{{ p.discord }}" maxlength="64"></div>
+      <div class="field"><label>Steam ID</label><input name="steam_id" value="{{ p.steam_id }}" maxlength="32"></div>
+      <div class="field"><label>TruckersMP ID</label><input name="truckersmp_id" value="{{ p.truckersmp_id }}" maxlength="32"></div>
+    </div>
+    <div class="field"><label>Bio</label><textarea name="bio" maxlength="600">{{ p.bio }}</textarea></div>
+    {% if can('admin') and not is_self and p.role != 'owner' %}
+    <h3>Management</h3><div class="fields">
+      <div class="field"><label>Role</label><select name="role">{% for r in ROLES if r != 'owner' and (r != 'admin' or me.role == 'owner') %}<option value="{{ r }}" {{ 'selected' if r == p.role }}>{{ ROLE_LABELS[r] }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Status</label><select name="status">{% for s in ['active','on_leave','inactive'] %}<option value="{{ s }}" {{ 'selected' if s == p.status }}>{{ s|replace('_',' ') }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Division</label><select name="division_id"><option value="">—</option>{% for d in divisions %}<option value="{{ d.id }}" {{ 'selected' if d.id == p.division_id }}>{{ d.name }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Pay per km (blank = default)</label><input name="pay_per_km" type="number" step="0.01" min="0" value="{{ p.pay_per_km if p.pay_per_km is not none }}"></div>
+      <div class="field"><label>Reset password</label><input name="new_password" type="password" minlength="8" autocomplete="new-password"></div>
+    </div>{% endif %}
+    <button class="btn primary">Save</button>
+  </form>
+  <div class="stack">
+    {% if is_self %}<form class="card" method="post" action="/account/password">{{ csrf() }}<h2>Change password</h2>
+      <div class="field"><label>Current password</label><input name="current" type="password" required autocomplete="current-password"></div>
+      <div class="field"><label>New password</label><input name="new" type="password" minlength="8" required autocomplete="new-password"></div>
+      <button class="btn">Change password</button></form>{% endif %}
+    {% if can('admin') and not is_self and p.role != 'owner' %}{% if p.role != 'admin' or me.role == 'owner' %}<form class="card" method="post" action="/drivers/{{ p.id }}/fire">{{ csrf() }}<h2>Fire {{ ROLE_LABELS[p.role]|lower if p.role != 'driver' else 'driver' }}</h2>
+      <p class="small muted">Deletes {{ p.display_name }} from the database for good: their account, messages, notifications, achievements, hours-of-service logs, inspections and event sign-ups. Their deliveries and pay stay in the books under "Former driver", so the ledger still adds up. Contracts they had taken go back on the board. This can't be undone.</p>
+      <div class="field"><label>Type <b>{{ p.display_name }}</b> to confirm</label><input name="confirm" required autocomplete="off" maxlength="80"></div>
+      <button class="btn danger" data-confirm="Fire {{ p.display_name }} and delete them from the database? This can't be undone.">Fire {{ p.display_name }}</button></form>{% endif %}{% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

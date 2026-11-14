@@ -1,0 +1,19 @@
+{% from "_macros.html" import logo %}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{% endblock %} · {{ S.company_name or APP_NAME }}</title>
+<script>try{var t=localStorage.getItem("fmp-theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v={{ VERSION }}">
+</head>
+<body data-units="{{ current_units() }}" data-currency="{{ S.currency }}">
+<div class="auth-wrap">
+  <div class="auth {% block authclass %}{% endblock %}">
+    <div class="brand">{{ logo(44) }}<span class="brand-name">{{ S.company_name or APP_NAME }}<small>Fleet Manager Pro · {{ VERSION }}</small></span></div>
+    {% block content %}{% endblock %}
+    <p class="copyright">{{ COPYRIGHT }} · <a href="/licence-agreement">Licence agreement</a></p>
+  </div>
+</div>
+<div class="photo-credit">Photo: Josiah Farrow / Unsplash</div>
+</body>
+</html>

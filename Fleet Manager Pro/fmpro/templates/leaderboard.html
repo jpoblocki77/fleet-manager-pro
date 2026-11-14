@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "_macros.html" import who, avatar, lvl %}
+{% block title %}Leaderboard{% endblock %}
+{% block content %}
+{% macro fmtv(r) -%}
+{%- if metric == 'km' or metric == 'realism' -%}{{ r.value|dist }}{%- elif metric == 'revenue' -%}{{ r.value|money }}{%- elif metric == 'mass' -%}{{ (r.value * 1000)|mass }}{%- elif metric == 'score' -%}{{ '%.1f'|format(r.value or 0) }}{%- else -%}{{ "{:,}".format((r.value or 0)|int) }}{%- endif -%}
+{%- endmacro %}
+<div class="page-head">
+  <div><h1>Leaderboard</h1><p>{{ metrics[metric][0] }}{% if metric == 'realism' %} — distance weighted by driving score² and cargo condition, so careful beats fast{% endif %}.</p></div>
+  <div class="actions">
+    <span class="seg">{% for k, m in metrics.items() %}<a class="{{ 'on' if k == metric }}" href="?metric={{ k }}&amp;period={{ period }}&amp;game={{ game }}">{{ m[0] }}</a>{% endfor %}</span>
+    <span class="seg">{% for p, l in [('week','Week'),('month','Month'),('year','Year'),('all','All')] %}<a class="{{ 'on' if p == period }}" href="?metric={{ metric }}&amp;period={{ p }}&amp;game={{ game }}">{{ l }}</a>{% endfor %}</span>
+    {% if not game_scope() %}<span class="seg">{% for g, l in [('','Both'),('ats','ATS'),('ets2','ETS2')] %}<a class="{{ 'on' if g == game }}" href="?metric={{ metric }}&amp;period={{ period }}&amp;game={{ g }}">{{ l }}</a>{% endfor %}</span>{% endif %}
+  </div>
+</div>
+{% if rows|length >= 1 %}
+<div class="podium">
+  {% for idx in [1, 0, 2] %}{% if rows|length > idx %}{% set r = rows[idx] %}
+  <div class="p {{ 'first' if idx == 0 }}"><div class="medal">{{ ['🥇','🥈','🥉'][idx] }}</div>{{ avatar(r.display_name, r.color, 'lg') }}
+    <div style="margin-top:8px"><a href="/drivers/{{ r.id }}"><b>{{ r.display_name }}</b></a></div><div style="font-size:22px;font-weight:800">{{ fmtv(r) }}</div>
+    <div class="small muted">{{ r.jobs }} jobs · Lv {{ r.prog.level }}</div></div>
+  {% else %}<div></div>{% endif %}{% endfor %}
+</div>{% endif %}
+<div class="card flush"><div class="table-wrap"><table>
+  <thead><tr><th>#</th><th>Driver</th><th>Rank</th><th class="num">Jobs</th><th class="num">Distance</th><th class="num">{{ metrics[metric][0] }}</th></tr></thead>
+  <tbody>{% for r in rows %}<tr><td><b>{{ loop.index }}</b></td><td>{{ who(r.id, r.display_name, r.color) }}</td>
+    <td><span style="color:{{ r.prog.rank.color }};font-weight:700">{{ r.prog.rank.name }}</span> <span class="small faint">Lv {{ r.prog.level }}</span></td>
+    <td class="num">{{ r.jobs }}</td><td class="num">{{ r.km|dist }}</td><td class="num"><b>{{ fmtv(r) }}</b></td></tr>
+  {% else %}<tr><td colspan="6" class="empty">No deliveries in this period.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+{% endblock %}

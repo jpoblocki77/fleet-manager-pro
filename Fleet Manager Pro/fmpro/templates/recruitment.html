@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status, csrf %}
+{% block title %}Recruitment{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Recruitment</h1><p>Drivers apply on your online Apply page; their applications appear here.{% if S.recruitment_open != '1' %} Applications are currently <b>closed</b> — open them in Settings → Recruitment.{% endif %}</p></div>
+  <div class="actions"><form method="post" action="/recruitment/sync">{{ csrf() }}<button class="btn">Check now</button></form></div>
+</div>
+<div class="card" style="margin-bottom:16px">
+  <div class="card-head"><h2>Your Apply link</h2>{% if synced %}<span class="right small muted">checked {{ synced|ago }}</span>{% endif %}</div>
+  {% if apply_url %}
+  <div class="row" style="flex-wrap:nowrap"><input id="apply-url" value="{{ apply_url }}" readonly style="flex:1">
+    <button type="button" class="btn primary" id="copy-apply">Copy</button><a class="btn" href="{{ apply_url }}" target="_blank" rel="noopener">Open</a></div>
+  <p class="hint">Share this link on Discord, TruckersMP, your website or socials. It works from anywhere, even when this PC is off —
+    applications wait online and arrive here within about 10 minutes of Fleet Manager Pro running (or press <b>Check now</b>).</p>
+  {% else %}
+  <p class="muted">Your online Apply page is being set up{% if not sync_error %} — press <b>Check now</b> to get your link{% endif %}.</p>
+  {% endif %}
+  {% if sync_error %}<div class="flash error" style="margin-top:8px">Last check failed: {{ sync_error }}</div>{% endif %}
+</div>
+<div class="stack">
+{% for a in rows %}
+<div class="card {{ 'accent' if a.status == 'pending' }}">
+  <div class="between"><div><b style="font-size:16px">{{ a.name }}</b> {{ status(a.status) }}
+    <div class="small muted">{% if a.source == 'online' %}<span class="badge info">online</span> {% endif %}{{ a.contact }}{% if a.discord %} · Discord {{ a.discord }}{% endif %}{% if a.age %} · {{ a.age }} y/o{% endif %}{% if a.country %} · {{ a.country }}{% endif %} · {{ (a.games or '')|upper }} · {{ a.created_at|ago }}</div></div>
+    {% if a.reviewer %}<span class="small faint">reviewed by {{ a.reviewer }}</span>{% endif %}</div>
+  {% if a.experience %}<p><b class="small muted">Experience</b><br>{{ a.experience }}</p>{% endif %}
+  {% if a.message %}<p><b class="small muted">Message</b><br>{{ a.message }}</p>{% endif %}
+  <form method="post" action="/recruitment/{{ a.id }}" class="row" style="margin-top:8px">{{ csrf() }}
+    <input name="notes" placeholder="Internal notes" value="{{ a.notes }}" style="flex:1;min-width:200px">
+    {% if a.status != 'accepted' %}
+    <label class="check" style="margin:0"><input type="checkbox" name="create_account" value="1" checked> create account in</label>
+    <select name="division_id" style="width:auto"><option value="">no division</option>{% for d in divisions %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}</select>
+    <button class="btn primary sm" name="action" value="accepted">Accept</button>
+    <button class="btn sm" name="action" value="interview">Interview</button>
+    <button class="btn danger sm" name="action" value="rejected">Reject</button>{% endif %}
+  </form>
+</div>
+{% else %}<div class="card empty">No applications yet. Share your Apply link above with prospective drivers.</div>{% endfor %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const cp = document.getElementById("copy-apply");
+if (cp) cp.addEventListener("click", () => {
+  const i = document.getElementById("apply-url"); i.select();
+  (navigator.clipboard ? navigator.clipboard.writeText(i.value) : Promise.reject()).catch(() => document.execCommand("copy"));
+  cp.textContent = "Copied"; setTimeout(() => cp.textContent = "Copy", 1500);
+});
+</script>
+{% endblock %}

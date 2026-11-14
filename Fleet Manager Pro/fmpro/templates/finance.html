@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, stat, status, who, csrf %}
+{% block title %}Finance{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Finance</h1><p>Company ledger: freight income, fuel, tolls, fines, repairs, payroll, garages and loans.</p></div>
+  <div class="actions">
+    <span class="seg">{% for p, l in [('week','7 days'),('month','30 days'),('year','Year'),('all','All time')] %}<a class="{{ 'on' if period == p }}" href="?period={{ p }}">{{ l }}</a>{% endfor %}</span>
+    {% if can('admin') %}<a class="btn" href="/api/export/ledger.csv">{{ icon('download') }}CSV</a><button class="btn" data-open="dlg-entry">{{ icon('plus') }}Entry</button>{% endif %}
+    {% if can('owner') %}<button class="btn primary" data-open="dlg-loan">Take a loan</button>{% endif %}
+  </div>
+</div>
+<div class="grid g4" style="margin-bottom:16px">
+  {{ stat('Balance', balance|money, 'company account') }}
+  {{ stat('Income', income|money, 'selected period') }}
+  {{ stat('Expenses', expense|money, 'selected period') }}
+  {{ stat('Net', (income + expense)|money, 'selected period') }}
+</div>
+<div class="grid g3" style="margin-bottom:16px">
+  <div class="card span2"><div class="card-head"><h2>Cash flow · 30 days</h2><div class="right legend"><span><i style="background:#2fb67c"></i>Income</span><span><i style="background:#c8102e"></i>Expenses</span></div></div>
+    <div id="chart-flow" style="height:240px"></div></div>
+  <div class="card"><div class="card-head"><h2>By category</h2></div>
+    <div class="row" style="justify-content:center"><div id="donut"></div></div>
+    <table style="margin-top:8px"><tbody>{% for c in cats %}<tr><td><i class="cat-dot" data-cat="{{ c.category }}" style="display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px"></i>{{ c.category|title }}</td><td class="num {{ 'pos' if c.total > 0 else 'neg' }}">{{ c.total|money }}</td></tr>
+    {% else %}<tr><td class="empty">No transactions.</td></tr>{% endfor %}</tbody></table></div>
+</div>
+<div class="grid g3">
+  <div class="card span2 flush"><div class="card-head" style="padding:16px 18px 0"><h2>Transactions</h2><span class="right small muted">latest 60</span></div>
+    <div class="table-wrap"><table><thead><tr><th>Date</th><th>Category</th><th>Description</th><th class="num">Amount</th></tr></thead><tbody>
+    {% for e in entries %}<tr><td class="small muted">{{ e.created_at|dt('%b %d %H:%M') }}</td><td>{{ status(e.category|replace(' ','_')) }}</td>
+      <td>{{ e.description }}{% if e.job_id %} <a class="small" href="/jobs/{{ e.job_id }}">#{{ e.job_id }}</a>{% endif %}</td>
+      <td class="num {{ 'pos' if e.amount > 0 else 'neg' }}">{{ e.amount|money(2) }}</td></tr>
+    {% else %}<tr><td colspan="4" class="empty">No transactions.</td></tr>{% endfor %}</tbody></table></div></div>
+  <div class="stack">
+    <div class="card"><div class="card-head"><h2>Loans</h2></div>
+      {% for l in loans %}<div style="padding:8px 0;border-bottom:1px solid var(--line-soft)"><div class="between"><b>#{{ l.id }} · {{ l.principal|money }} @ {{ l.apr }}%</b>{{ status(l.status) }}</div>
+        <div class="small muted">{{ l.installment|money(2) }} weekly · {{ l.payments_made }}/{{ l.weeks }} paid · owed {{ l.balance|money }}{% if l.status == 'active' %} · next {{ l.next_due|ago }}{% endif %}</div>
+        <div class="bar navy" style="margin-top:4px"><i style="width:{{ l.payments_made / l.weeks * 100 }}%"></i></div>
+        {% if l.status == 'active' and can('owner') %}<form method="post" action="/finance/loan/{{ l.id }}/payoff" style="margin-top:6px">{{ csrf() }}<button class="btn sm" data-confirm="Pay off {{ l.balance|money }} now?">Pay off now</button></form>{% endif %}</div>
+      {% else %}<p class="muted">No loans. Owners can borrow to expand the fleet.</p>{% endfor %}</div>
+    <div class="card"><div class="card-head"><h2>Driver earnings</h2><span class="right small muted">period</span></div>
+      <ul class="feed">{% for p in payroll if p.earned %}<li>{{ who(p.id, p.display_name, p.color) }}<span style="margin-left:auto">{{ p.earned|money }}</span></li>{% else %}<li class="muted">No pay this period.</li>{% endfor %}</ul></div>
+  </div>
+</div>
+
+<dialog id="dlg-entry"><form method="post" action="/finance/entry">{{ csrf() }}
+  <div class="dhead"><h2>Manual ledger entry</h2><button class="btn ghost sm" data-close>✕</button></div>
+  <div class="dbody"><div class="fields">
+    <div class="field"><label>Type</label><select name="direction"><option value="income">Income</option><option value="expense">Expense</option></select></div>
+    <div class="field"><label>Amount</label><input name="amount" type="number" min="0" step="0.01" required></div>
+    <div class="field"><label>Category</label><input name="category" maxlength="40" placeholder="sponsorship, event prize…" list="cats"></div>
+  </div><datalist id="cats">{% for c in cats %}<option value="{{ c.category }}">{% endfor %}</datalist>
+  <div class="field"><label>Description</label><input name="description" maxlength="200"></div></div>
+  <div class="dfoot"><button class="btn ghost" data-close>Cancel</button><button class="btn primary">Record</button></div></form></dialog>
+<dialog id="dlg-loan"><form method="post" action="/finance/loan">{{ csrf() }}
+  <div class="dhead"><h2>Business loan</h2><button class="btn ghost sm" data-close>✕</button></div>
+  <div class="dbody"><div class="field"><label>Plan</label><select name="plan">{% for k, p in plans.items() %}<option value="{{ k }}">{{ p.label }}</option>{% endfor %}</select></div>
+  <div class="field"><label>Amount (10,000 – 5,000,000)</label><input name="amount" type="number" min="10000" max="5000000" step="1000" value="100000"></div>
+  <p class="hint">Fixed weekly instalments are taken automatically from the company account. Pay off early any time, no penalty. Max 3 active loans.</p></div>
+  <div class="dfoot"><button class="btn ghost" data-close>Cancel</button><button class="btn primary">Borrow</button></div></form></dialog>
+{% endblock %}
+{% block scripts %}
+<script>
+const trend = {{ trend|tojson }}, cats = {{ cats|tojson }};
+FMP.chart(document.getElementById("chart-flow"), { labels: trend.map(t => t.d.slice(5)), prefix: FMP.cur,
+  series: [{ name: "Income", color: "#2fb67c", values: trend.map(t => t.inc) }, { name: "Expenses", color: "#c8102e", values: trend.map(t => t.exp) }] });
+const palette = ["#c8102e", "#2a5592", "#e0662b", "#4d8fe0", "#d9a400", "#2fb67c", "#a020a0", "#8fa8cc", "#ff6d86", "#15325e", "#79acf0", "#f3b951"];
+const colorOf = {}; cats.forEach((c, i) => colorOf[c.category] = palette[i % palette.length]);
+FMP.donut(document.getElementById("donut"), cats.filter(c => c.total < 0).map(c => ({ label: c.category, value: -c.total, color: colorOf[c.category] })));
+document.querySelectorAll(".cat-dot").forEach(d => d.style.background = colorOf[d.dataset.cat]);
+</script>
+{% endblock %}

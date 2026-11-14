@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overlay · Fleet Manager Pro</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v={{ VERSION }}">
+</head>
+<body class="overlay {{ 'solid' if solid }}" data-units="{{ current_units() }}" data-currency="{{ S.currency }}">
+<div class="hud" id="hud">
+  <div class="box"><div class="l">Speed</div><div class="v" id="o-speed">—</div><div class="s" id="o-limit"></div></div>
+  <div class="box"><div class="l">Gear · RPM</div><div class="v" id="o-gear">—</div><div class="s" id="o-rpm"></div></div>
+  <div class="box"><div class="l">Fuel</div><div class="v" id="o-fuel">—</div><div class="s" id="o-range"></div></div>
+  <div class="box" style="min-width:240px"><div class="l">Job</div><div class="v" style="font-size:18px" id="o-job">—</div><div class="s" id="o-route"></div></div>
+  <div class="box"><div class="l">Remaining</div><div class="v" id="o-dist">—</div><div class="s" id="o-eta"></div></div>
+  <div class="box"><div class="l">Damage</div><div class="v" id="o-dmg">—</div><div class="s" id="o-cargo"></div></div>
+</div>
+<script src="{{ url_for('static', filename='js/app.js') }}?v={{ VERSION }}"></script>
+<script>
+const key = {{ key|tojson }};
+const set = (id, t) => document.getElementById(id).textContent = t;
+function tick() {
+  fetch("/api/overlay" + (key ? "?key=" + encodeURIComponent(key) : ""), { credentials: "same-origin" }).then(r => r.json()).then(d => {
+    if (!d.online) { set("o-speed", "—"); set("o-job", "Offline"); set("o-route", d.status || ""); return; }
+    const v = d.values, imp = FMP.imp();
+    set("o-speed", Math.round(Math.abs(FMP.speed(v.speed_kmh))) + " " + FMP.speedU());
+    set("o-limit", v.speed_limit > 0 ? "Limit " + Math.round(imp ? v.speed_limit_mph : v.speed_limit_kmh) + (v.cruise_control ? " · CC " + Math.round(imp ? v.cruise_mph : v.cruise_kmh) : "") : "");
+    set("o-gear", v.gear_label); set("o-rpm", Math.round(v.engine_rpm) + " rpm");
+    set("o-fuel", Math.round(v.fuel_pct) + "%"); set("o-range", FMP.dist(v.fuel_range) + " range");
+    set("o-job", v.on_job ? v.cargo : "Free roam"); set("o-route", v.on_job ? v.source_city + " → " + v.destination_city : v.game_clock);
+    set("o-dist", v.on_job ? FMP.dist(v.navigation_km, 0) : "—"); set("o-eta", v.on_job ? FMP.mins(v.navigation_time / 60) + " drive" : "");
+    set("o-dmg", v.truck_damage_pct.toFixed(1) + "%"); set("o-cargo", "Cargo " + (v.cargo_damage * 100).toFixed(1) + "%");
+  }).catch(() => {});
+}
+tick(); setInterval(tick, 500);
+</script>
+</body></html>

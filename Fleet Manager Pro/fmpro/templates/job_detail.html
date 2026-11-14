@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status, who, stat, csrf %}
+{% block title %}Job #{{ j.id }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Job #{{ j.id }} · {{ j.cargo or 'Unknown cargo' }}</h1>
+    <p>{{ who(j.user_id, j.display_name, j.color) }} · {{ j.source_company }} {{ j.source_city }} → {{ j.destination_company }} {{ j.destination_city }} · {{ j.game|upper }} · {{ j.source }}</p></div>
+  <div class="actions">{{ status(j.status) }}{% for f in (j.flags or '').split(',') if f %} <span class="badge {{ 'info' if f in ('demo', 'joined-late') else 'flag' }}" title="{{ 'Tracking started after the job was already loaded' if f == 'joined-late' else '' }}">{{ f }}</span>{% endfor %}</div>
+</div>
+
+{% set real_flags = (j.flags or '').split(',')|reject('in', ['', 'joined-late', 'demo'])|list %}
+{% if can('admin') and (j.status == 'pending_review' or real_flags) %}
+<div class="card accent" style="margin-bottom:16px">
+  <div class="between"><div><b>Needs review.</b> <span class="muted">{% if j.status == 'pending_review' and j.source == 'manual' %}Manual job — approve to pay it out.{% elif j.status == 'pending_review' %}Pay is on hold{% if real_flags %} — anti-cheat flagged: {{ real_flags|join(', ') }}{% else %} (remote driver){% endif %}. Approve to pay it out.{% else %}Anti-cheat flagged: {{ real_flags|join(', ') }}.{% endif %}</span></div>
+  <form method="post" action="/jobs/{{ j.id }}/review" class="row">{{ csrf() }}
+    {% if j.status == 'pending_review' %}<button name="action" value="approve" class="btn primary">Approve &amp; pay</button><button name="action" value="reject" class="btn danger">Reject</button>{% endif %}
+    {% if real_flags %}<button name="action" value="clear_flags" class="btn">Clear flags</button>{% endif %}
+  </form></div>
+</div>{% endif %}
+
+<div class="grid g4" style="margin-bottom:16px">
+  {{ stat('Revenue', (j.revenue or j.income)|money, ('Offered ' ~ (j.income|money) ~ ' − ' ~ (j.deduction|money) ~ ' ' ~ j.deduction_reason) if j.deduction else 'Offered ' ~ (j.income|money)) }}
+  {{ stat('Profit', j.profit|money, 'after costs & driver pay') }}
+  {{ stat('Distance', j.driven_km|dist(1), 'planned ' ~ (j.planned_km|dist)) }}
+  {{ stat('Score', j.score if j.status == 'delivered' else '—', (j.xp ~ ' XP earned') if j.xp else '') }}
+</div>
+<div class="grid g3">
+  <div class="card span2">
+    <div class="card-head"><h2>Route driven</h2><span class="right small muted">{{ points|length }} track points</span></div>
+    {% if points|length > 1 %}<div class="trail"><canvas id="trail" style="width:100%;height:100%"></canvas></div>
+    {% else %}<p class="muted">No GPS trail for this job{% if j.source == 'manual' %} (logged manually){% endif %}.</p>{% endif %}
+    <h3 style="margin-top:16px">Timeline</h3>
+    <ul class="feed">{% for e in events %}
+      <li><span class="ic">{{ {'started':'🚚','delivered':'✅','cancelled':'❌','fine':'🚨','toll':'🛣️','ferry':'⛴️','train':'🚆','refuel':'⛽'}.get(e.kind, '•') }}</span>
+        <div><b style="text-transform:capitalize">{{ e.kind }}</b> <span class="muted">{{ e.detail }}</span><div class="small faint">{{ e.created_at|dt('%b %d %H:%M:%S') }}</div></div>
+        {% if e.amount %}<span class="right" style="margin-left:auto">{{ e.amount|money }}</span>{% endif %}</li>
+    {% else %}<li class="muted">No events recorded.</li>{% endfor %}</ul>
+  </div>
+  <div class="stack">
+    <div class="card"><h2>Costs</h2><dl class="kv">
+      {% if j.deduction %}<dt style="text-transform:capitalize">{{ j.deduction_reason }}{% if j.deduction_reason == 'cargo damage' %} ({{ j.cargo_damage|pct(1) }}){% endif %}</dt>
+        <dd class="neg">−{{ j.deduction|money }} <span class="small faint">taken off the pay by the game</span></dd>{% endif %}
+      <dt>Driver pay</dt><dd>{{ j.driver_pay|money }}</dd>
+      <dt>Fuel ({{ j.fuel_used|liquid }})</dt><dd>{{ j.fuel_cost|money }}</dd>
+      <dt>Tolls</dt><dd>{{ j.tolls|money }}</dd><dt>Fines</dt><dd>{{ j.fines|money }}</dd>
+      <dt>Ferry / train</dt><dd>{{ j.ferry|money }} / {{ j.train|money }}</dd>
+      {% if j.penalty %}<dt>Cancellation penalty</dt><dd class="neg">{{ j.penalty|money }}</dd>{% endif %}
+    </dl></div>
+    <div class="card"><h2>Driving</h2><dl class="kv">
+      <dt>Cargo</dt><dd>{{ j.cargo }} · {{ j.cargo_mass|mass }}</dd>
+      <dt>Trailer</dt><dd>{{ j.trailer_name or '—' }}</dd>
+      <dt>Truck</dt><dd>{% if j.truck_id %}<a href="/fleet/truck/{{ j.truck_id }}">{{ j.truck_brand }} {{ j.truck_model }}</a>{% else %}—{% endif %}</dd>
+      <dt>Cargo damage</dt><dd>{{ j.cargo_damage|pct(1) }}</dd>
+      <dt>Truck wear</dt><dd>{{ j.truck_wear_start|pct(1) }} → {{ j.truck_wear_end|pct(1) }}</dd>
+      <dt>Top / avg speed</dt><dd>{{ j.max_speed|speed }} / {{ j.avg_speed|speed }}</dd>
+      <dt>Time driving</dt><dd>{{ j.driving_s|dur }}</dd>
+      <dt>Speeding</dt><dd>{{ j.speeding_s|dur }}{% if j.driving_s %} ({{ (j.speeding_s / j.driving_s)|pct(1) }}){% endif %}</dd>
+      <dt>Game XP</dt><dd>{{ j.game_xp }}</dd>
+      <dt>Auto park / load</dt><dd>{{ 'yes' if j.autopark else 'no' }} / {{ 'yes' if j.autoload else 'no' }}</dd>
+      <dt>Market</dt><dd>{{ (j.market or '—')|replace('_',' ') }}{% if j.special %} · special{% endif %}</dd>
+      <dt>Game time</dt><dd>{{ j.game_time_start|gametime }} → {{ j.game_time_end|gametime }}</dd>
+      <dt>Deadline</dt><dd>{{ j.game_time_deadline|gametime }}{% if j.game_time_end and j.game_time_deadline and j.game_time_end > j.game_time_deadline %} <span class="badge bad">late</span>{% endif %}</dd>
+      {% if j.contract_id %}<dt>Contract</dt><dd><a href="/dispatch">#{{ j.contract_id }}</a></dd>{% endif %}
+      <dt>Started</dt><dd>{{ j.started_at|dt }}</dd><dt>Finished</dt><dd>{{ j.finished_at|dt }}</dd>
+    </dl>{% if j.notes %}<p class="muted small" style="margin-top:10px">{{ j.notes }}</p>{% endif %}</div>
+    {% if can('admin') %}<form method="post" action="/jobs/{{ j.id }}/review">{{ csrf() }}<button name="action" value="delete" class="btn danger sm" data-confirm="Delete job #{{ j.id }} from the logbook? Money already booked stays in the ledger.">Delete job</button></form>{% endif %}
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const pts = {{ points|tojson }};
+const c = document.getElementById("trail");
+if (c && pts.length > 1) {
+  const m = FMP.WorldMap(c);
+  m.set([{ color: "#e23552", points: pts }], [{ id: 1, x: pts[pts.length - 1].x, z: pts[pts.length - 1].z, color: "#4d8fe0", label: {{ (j.destination_city or "")|tojson }} }]);
+}
+</script>
+{% endblock %}

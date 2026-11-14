@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, stat, status, who, csrf %}
+{% block title %}Expenses{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Expenses</h1><p>Every cost the company has paid: fuel, tolls, fines, repairs, cargo damage, payroll, garages, and anything entered by hand.</p></div>
+  <div class="actions">
+    <span class="seg">{% for p, l in periods %}<a class="{{ 'on' if a.period == p }}" href="?period={{ p }}">{{ l }}</a>{% endfor %}</span>
+    {% if can('admin') %}<a class="btn" href="/expenses.csv?{% for k, v in a.items() if v %}{{ k }}={{ v|urlencode }}&amp;{% endfor %}">{{ icon('download') }}CSV</a>
+    <button class="btn primary" data-open="dlg-expense" data-new>{{ icon('plus') }}Add expense</button>{% endif %}
+  </div>
+</div>
+
+<div class="grid g4" style="margin-bottom:16px">
+  {{ stat('Total expenses', total|money(2), (count ~ ' entries')) }}
+  {{ stat('Per day', (per_day|money(2)) if per_day is not none else '—', 'average over the period') }}
+  {{ stat('Biggest category', (totals[0].category|title) if totals else '—', (totals[0].total|money) if totals else '') }}
+  {{ stat('Entered by hand', rows|selectattr('manual')|list|length, 'of the entries shown') }}
+</div>
+
+<div class="grid g3" style="margin-bottom:16px">
+  <div class="card span2 flush">
+    <form class="filters" method="get" style="padding:14px 16px 0">
+      <input type="hidden" name="period" value="{{ a.period }}">
+      <div><label>Search</label><input name="q" value="{{ a.q }}" placeholder="Description"></div>
+      <div><label>Category</label><select name="category"><option value="">All</option>{% for c in cats %}<option value="{{ c }}" {{ 'selected' if a.category == c }}>{{ c|title }}</option>{% endfor %}</select></div>
+      <div><label>Truck</label><select name="truck"><option value="">All</option>{% for t in trucks %}<option value="{{ t.id }}" {{ 'selected' if a.truck == t.id|string }}>{{ t.brand }} {{ t.model }} {{ t.plate }}</option>{% endfor %}</select></div>
+      <div><label>Driver</label><select name="driver"><option value="">All</option>{% for d in drivers %}<option value="{{ d.id }}" {{ 'selected' if a.driver == d.id|string }}>{{ d.display_name }}</option>{% endfor %}</select></div>
+      <div><label>Source</label><select name="kind"><option value="">All</option><option value="auto" {{ 'selected' if a.kind == 'auto' }}>From the game</option><option value="manual" {{ 'selected' if a.kind == 'manual' }}>Entered by hand</option></select></div>
+      <button class="btn navy">Filter</button>
+    </form>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Truck</th><th>Driver</th><th class="num">Amount</th>{% if can('admin') %}<th></th>{% endif %}</tr></thead>
+      <tbody>{% for e in rows %}
+      <tr>
+        <td class="small muted">{{ e.created_at|dt('%b %d, %Y') }}</td>
+        <td>{{ status(e.category|replace(' ','_')) }}{% if e.manual %} <span class="badge info" title="Entered by {{ e.entered_name or 'a manager' }}">manual</span>{% endif %}</td>
+        <td>{{ e.description }}{% if e.job_id %} <a class="small" href="/jobs/{{ e.job_id }}">job #{{ e.job_id }}</a>{% endif %}</td>
+        <td class="small">{% if e.truck %}<a href="/fleet/truck/{{ e.truck }}">{{ e.brand }} {{ e.model }}</a>{% else %}—{% endif %}</td>
+        <td class="small">{% if e.driver and e.display_name %}{{ who(e.driver, e.display_name, e.color) }}{% else %}—{% endif %}</td>
+        <td class="num neg">{{ (-e.amount)|money(2) }}</td>
+        {% if can('admin') %}<td class="num" style="white-space:nowrap">{% if e.manual %}
+          <button type="button" class="btn sm" data-edit='{{ {"id": e.id, "date": e.created_at|dt("%Y-%m-%d"), "category": e.category, "amount": -e.amount, "description": e.description, "truck_id": e.truck_id or "", "driver_id": e.driver_id or "", "job_id": e.job_id or ""}|tojson|forceescape }}'>Edit</button>
+          <form method="post" action="/expenses/{{ e.id }}/delete" style="display:inline">{{ csrf() }}<button class="btn sm danger" data-confirm="Delete this {{ (-e.amount)|money(2) }} expense? The company balance goes back up by that amount.">Delete</button></form>
+        {% endif %}</td>{% endif %}
+      </tr>
+      {% else %}<tr><td colspan="7" class="empty">No expenses match.</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% if rows|length >= 500 %}<p class="small muted" style="padding:8px 16px">Showing the latest 500 — narrow the filter or export the CSV for everything.</p>{% endif %}
+  </div>
+  <div class="card"><div class="card-head"><h2>By category</h2><span class="right small muted">{{ dict(periods)[a.period] }}</span></div>
+    {% set top = totals[0].total if totals else 1 %}
+    {% for t in totals %}<div style="margin:8px 0">
+      <div class="between small"><a href="?period={{ a.period }}&amp;category={{ t.category|urlencode }}"><b>{{ t.category|title }}</b></a><span>{{ t.total|money(2) }} <span class="faint">· {{ t.n }}</span></span></div>
+      <div class="bar" style="margin-top:3px"><i style="width:{{ (t.total / top * 100) if top else 0 }}%"></i></div></div>
+    {% else %}<p class="muted">No expenses in this period.</p>{% endfor %}
+    <p class="hint" style="margin-top:12px">Costs from the game (fuel, tolls, fines, repairs, cargo damage, driver pay) are booked automatically. Use <b>Add expense</b> for anything else — insurance, parking, permits, a repair you paid outside the game.</p>
+  </div>
+</div>
+
+{% if can('admin') %}
+<dialog id="dlg-expense"><form method="post" action="/expenses/save" id="expense-form">{{ csrf() }}
+  <input type="hidden" name="id" value=""><input type="hidden" name="back_period" value="{{ a.period }}">
+  <div class="dhead"><h2 id="expense-title">Add expense</h2><button class="btn ghost sm" data-close>✕</button></div>
+  <div class="dbody"><div class="fields">
+    <div class="field"><label>Date *</label><input name="date" type="date" value="{{ today }}" max="{{ today }}" required></div>
+    <div class="field"><label>Amount *</label><input name="amount" type="number" min="0.01" step="0.01" required placeholder="0.00"></div>
+    <div class="field"><label>Category *</label><select name="category" id="expense-cat">{% for c in cats %}<option value="{{ c }}">{{ c|title }}</option>{% endfor %}<option value="__other">Other (type it)…</option></select>
+      <input name="category_other" maxlength="40" placeholder="Category name" style="display:none;margin-top:6px"></div>
+    <div class="field"><label>Truck</label><select name="truck_id"><option value="">—</option>{% for t in trucks if t.status not in ('sold','returned') %}<option value="{{ t.id }}">{{ t.brand }} {{ t.model }} {{ t.plate }}</option>{% endfor %}</select></div>
+    <div class="field"><label>Driver</label><select name="driver_id"><option value="">—</option>{% for d in drivers %}<option value="{{ d.id }}">{{ d.display_name }}</option>{% endfor %}</select></div>
+    <div class="field"><label>Job # (optional)</label><input name="job_id" type="number" min="1" step="1"></div>
+  </div>
+  <div class="field"><label>Description</label><input name="description" maxlength="200" placeholder="What was it for?"></div>
+  <p class="hint">The amount is taken from the company account and shows on Finance and here. Entries made by hand can be edited or deleted later.</p></div>
+  <div class="dfoot"><button class="btn ghost" data-close>Cancel</button><button class="btn primary" id="expense-submit">Record expense</button></div>
+</form></dialog>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const f = document.getElementById("expense-form");
+  if (!f) return;
+  const cat = document.getElementById("expense-cat"), other = f.elements["category_other"];
+  cat.addEventListener("change", () => { const o = cat.value === "__other"; other.style.display = o ? "" : "none"; other.required = o; });
+  document.querySelector("[data-new]").addEventListener("click", () => {
+    f.reset(); f.elements["id"].value = ""; other.style.display = "none";
+    document.getElementById("expense-title").textContent = "Add expense";
+    document.getElementById("expense-submit").textContent = "Record expense";
+  });
+  document.querySelectorAll("[data-edit]").forEach((b) => b.addEventListener("click", () => {
+    const e = JSON.parse(b.dataset.edit);
+    f.reset();
+    for (const k of ["id", "date", "amount", "description", "truck_id", "driver_id", "job_id"]) f.elements[k].value = e[k];
+    if ([...cat.options].some((o) => o.value === e.category)) { cat.value = e.category; other.style.display = "none"; }
+    else { cat.value = "__other"; other.value = e.category; other.style.display = ""; }
+    document.getElementById("expense-title").textContent = "Edit expense #" + e.id;
+    document.getElementById("expense-submit").textContent = "Save changes";
+    document.getElementById("dlg-expense").showModal();
+  }));
+})();
+</script>
+{% endblock %}

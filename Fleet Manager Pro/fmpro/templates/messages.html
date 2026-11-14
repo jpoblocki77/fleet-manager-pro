@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar, csrf %}
+{% block title %}Messages{% endblock %}
+{% block content %}
+{% set me = current_user() %}
+<div class="page-head"><div><h1>Messages</h1><p>Company chat and private messages.</p></div></div>
+<div class="grid" style="grid-template-columns: 260px minmax(0,1fr)">
+  <div class="card conv" style="padding:10px">
+    <a href="/messages" class="{{ 'on' if not other }}"><span class="avatar sm" style="background:var(--navy-600)">#</span><b>Company chat</b></a>
+    <hr style="margin:8px 0">
+    {% for c in convs %}<a href="/messages?with={{ c.id }}" class="{{ 'on' if other == c.id }}">{{ avatar(c.display_name, c.color, 'sm') }}{{ c.display_name }}{% if c.unread %}<span class="pill" style="margin-left:auto">{{ c.unread }}</span>{% endif %}</a>{% endfor %}
+  </div>
+  <div class="card">
+    <div class="chat" id="chat">
+      {% for m in rows %}<div class="msg {{ 'me' if m.from_id == me.id }}"><div class="meta">{{ m.display_name }} · {{ m.created_at|dt('%b %d %H:%M') }}</div>{{ m.body }}</div>
+      {% else %}<p class="muted">No messages yet — say hello!</p>{% endfor %}
+    </div>
+    <form method="post" class="row" style="margin-top:12px;flex-wrap:nowrap">{{ csrf() }}<input type="hidden" name="to" value="{{ other or '' }}">
+      <input name="body" placeholder="Write a message…" maxlength="2000" required autofocus autocomplete="off"><button class="btn primary">Send</button></form>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script>const c = document.getElementById("chat"); c.scrollTop = c.scrollHeight;</script>{% endblock %}

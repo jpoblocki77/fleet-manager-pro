@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf, status, who as whois %}
+{% block title %}ELD & Compliance{% endblock %}
+{% macro hm(m) -%}{{ '%d:%02d'|format((m or 0) // 60, (m or 0) % 60) }}{%- endmacro %}
+{% block content %}
+<div class="page-head">
+  <div><h1>ELD &amp; Compliance</h1><p>Electronic logbook (Hours of Service), pre/post-trip inspections (DVIR) and roadside inspections — all on in-game time.</p></div>
+  <div class="actions">
+    <span class="seg">{% for g_ in ['ats', 'ets2'] %}<a class="{{ 'on' if g_ == game }}" href="?tab={{ tab }}&amp;driver={{ who.id }}&amp;game={{ g_ }}">{{ g_|upper }} logbook</a>{% endfor %}</span>
+    <form method="get" class="row"><input type="hidden" name="tab" value="{{ tab }}"><input type="hidden" name="game" value="{{ game }}">
+      <select name="driver" onchange="this.form.submit()" style="width:auto">{% for d in drivers %}<option value="{{ d.id }}" {{ 'selected' if d.id == who.id }}>{{ d.display_name }}</option>{% endfor %}</select></form>
+    {% if can('admin') %}<button class="btn danger" data-open="dlg-reset">Reset…</button>{% endif %}
+  </div>
+</div>
+{% if can('admin') %}
+<dialog id="dlg-reset"><form method="post" action="/compliance/reset">{{ csrf() }}
+  <div class="dhead"><h2>Reset ELD &amp; Compliance</h2><button class="btn ghost sm" data-close>✕</button></div>
+  <div class="dbody">
+    <p class="muted">Clears records so the clocks start fresh — for example after testing, or at the start of a new season.</p>
+    <div class="fields">
+      <div class="field"><label>Driver</label><select name="driver"><option value="{{ who.id }}">{{ who.display_name }}</option><option value="all">All drivers</option></select></div>
+      <div class="field"><label>Game</label><select name="game"><option value="{{ game }}">{{ game|upper }} only</option><option value="both">Both games</option></select></div>
+    </div>
+    <div class="field"><label>What to clear</label>
+      <label class="check"><input type="checkbox" name="logbook" value="1" checked> ELD logbook (duty status, Hours of Service clocks)</label>
+      <label class="check"><input type="checkbox" name="violations" value="1" checked> Violations</label>
+      <label class="check"><input type="checkbox" name="dvir" value="1"> DVIR inspection reports (lifts truck holds they caused)</label>
+      <label class="check"><input type="checkbox" name="inspections" value="1"> Roadside inspections (both games)</label>
+    </div>
+    <div class="field"><label>Type RESET to confirm</label><input name="confirm" autocomplete="off" required pattern="[Rr][Ee][Ss][Ee][Tt]" placeholder="RESET"></div>
+    <p class="hint">This can't be undone. Fines already charged stay in Finance and Expenses. The live logbook starts a fresh line the next time the driver is in the game.</p>
+  </div>
+  <div class="dfoot"><button class="btn ghost" data-close>Cancel</button><button class="btn danger">Reset</button></div>
+</form></dialog>
+{% endif %}
+<div class="tabs">{% for t, l in [('logbook','ELD logbook'),('dvir','DVIR inspections'),('inspections','Roadside inspections'),('violations','Violations')] %}
+  <a class="{{ 'on' if tab == t }}" href="?tab={{ t }}&amp;driver={{ who.id }}&amp;game={{ game }}">{{ l }}</a>{% endfor %}</div>
+
+{% if tab == 'logbook' %}
+  {% if not clocks %}
+  <div class="card empty">No log yet for {{ who.display_name }}. Duty status is recorded automatically while driving with telemetry.</div>
+  {% else %}
+  {% if holds %}<div class="flash error">⛔ {{ holds|join(' · ') }}</div>{% endif %}
+  <div class="grid g4" style="margin-bottom:16px">
+    {% for key, label, sub in [('drive', 'Driving', 'until ' ~ hm(clocks.reset_len) ~ ' rest'), ('window', 'On-duty window', 'since first work after rest'), ('break', 'Since last break', clocks.break_len ~ '-min break resets'), ('cycle', 'Cycle', clocks.rules_label)] %}
+    {% set k = clocks[key] %}
+    <div class="card stat"><div class="label">{{ label }}</div>
+      <div class="value {{ 'neg' if k.over }}">{{ hm(k.left if k.left > 0 else 0) }}<span class="small muted"> left</span></div>
+      <div class="bar {{ 'ok' if k.pct < 75 else 'warn' if k.pct < 100 else '' }}" style="margin:6px 0 4px"><i style="width:{{ k.pct }}%"></i></div>
+      <div class="sub">{{ hm(k.used) }} of {{ hm(k.limit) }} · {{ sub }}</div></div>
+    {% endfor %}
+  </div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-head"><h2>Daily log · {{ (day * 1440)|gametime }}</h2>
+      <div class="right row">
+        <span class="badge {{ 'ok' if clocks.status == 'driving' else 'info' }}">{{ STATUSES[clocks.status] }}</span>
+        <a class="btn sm" href="?tab=logbook&amp;driver={{ who.id }}&amp;game={{ game }}&amp;day={{ day - 1 }}">◀ Previous day</a>
+        <a class="btn sm" href="?tab=logbook&amp;driver={{ who.id }}&amp;game={{ game }}&amp;day={{ day + 1 }}">Next day ▶</a></div></div>
+    {% set W, rowh, lab = 960, 34, 150 %}
+    <svg viewBox="0 0 {{ W + lab + 70 }} {{ rowh * 4 + 30 }}" style="width:100%;height:auto" font-family="Segoe UI, sans-serif">
+      {% for st in ['off','sleeper','driving','on'] %}
+        {% set y = loop.index0 * rowh %}
+        <rect x="{{ lab }}" y="{{ y }}" width="{{ W }}" height="{{ rowh }}" fill="{{ 'rgba(143,168,204,.05)' if loop.index0 % 2 else 'transparent' }}" stroke="var(--line)"/>
+        <text x="8" y="{{ y + 22 }}" fill="var(--muted)" font-size="13">{{ STATUSES[st] }}</text>
+        <text x="{{ lab + W + 8 }}" y="{{ y + 22 }}" fill="var(--text)" font-size="13" font-weight="700">{{ hm(totals[st]) }}</text>
+      {% endfor %}
+      {% for h in range(25) %}
+        <line x1="{{ lab + h * W / 24 }}" x2="{{ lab + h * W / 24 }}" y1="0" y2="{{ rowh * 4 }}" stroke="var(--line)" stroke-width="{{ 1.5 if h % 6 == 0 else 0.6 }}"/>
+        {% if h < 24 %}<text x="{{ lab + h * W / 24 + 2 }}" y="{{ rowh * 4 + 16 }}" fill="var(--faint)" font-size="11">{{ 'M' if h == 0 else ('N' if h == 12 else h % 12) }}</text>{% endif %}
+      {% endfor %}
+      {% set rowy = {'off': 0, 'sleeper': 1, 'driving': 2, 'on': 3} %}
+      {% set ns = namespace(px=None, py=None) %}
+      {% for b in bars %}
+        {% set y = rowy[b.status] * rowh + rowh / 2 %}
+        {% set x1 = lab + b.a * W / 1440 %}{% set x2 = lab + b.b * W / 1440 %}
+        {% if ns.px is not none %}<line x1="{{ x1 }}" x2="{{ x1 }}" y1="{{ ns.py }}" y2="{{ y }}" stroke="#e23552" stroke-width="2"/>{% endif %}
+        <line x1="{{ x1 }}" x2="{{ x2 }}" y1="{{ y }}" y2="{{ y }}" stroke="{{ '#e23552' if b.status == 'driving' else '#4d8fe0' }}" stroke-width="5" stroke-linecap="round"><title>{{ STATUSES[b.status] }} {{ hm(b.a) }}–{{ hm(b.b) }}{{ ' (manual)' if not b.auto }}</title></line>
+        {% set ns.px = x2 %}{% set ns.py = y %}
+      {% endfor %}
+    </svg>
+    {% if day_viol %}<div style="margin-top:10px">{% for x in day_viol %}<div class="small neg">⚠ {{ x.game_min|gametime }} — {{ x.rule }}: {{ x.detail }}</div>{% endfor %}</div>{% endif %}
+  </div>
+  <div class="grid g2">
+    <div class="card"><h2>Change duty status</h2>
+      <p class="small muted">Driving and on-duty are recorded automatically from telemetry. Sleeping in the game is logged as sleeper berth. Use these when you stop for the day.</p>
+      {% if who.id == current_user().id %}
+      <form method="post" action="/compliance/status" class="row">{{ csrf() }}<input type="hidden" name="game" value="{{ game }}">
+        <input name="note" placeholder="Note (optional), e.g. home time" maxlength="120" style="flex:1;min-width:160px">
+        <button class="btn" name="status" value="off">Off duty</button><button class="btn" name="status" value="sleeper">Sleeper</button><button class="btn" name="status" value="on">On duty</button></form>
+      {% else %}<p class="muted small">Only {{ who.display_name }} can change their own status.</p>{% endif %}
+    </div>
+    <div class="card"><h2>Rules</h2>
+      <dl class="kv small">
+        <dt>Ruleset ({{ game|upper }})</dt><dd>{{ clocks.rules_label }}</dd>
+        <dt>Driving limit</dt><dd>{{ hm(clocks.drive.limit) }} after {{ hm(clocks.reset_len) }} off</dd>
+        <dt>On-duty window</dt><dd>{{ hm(clocks.window.limit) }}</dd>
+        <dt>Break</dt><dd>{{ clocks.break_len }} min after {{ hm(clocks.break.limit) }} driving</dd>
+        <dt>Cycle</dt><dd>{{ hm(clocks.cycle.limit) }} (restart: {{ hm(clocks.restart_len) }} off)</dd>
+        <dt>Fine per violation</dt><dd>{{ S.hos_fine|float|money }}</dd>
+      </dl></div>
+  </div>
+  {% endif %}
+
+{% elif tab == 'dvir' %}
+<div class="grid g3">
+  <form class="card span2" method="post" action="/compliance/dvir">{{ csrf() }}<input type="hidden" name="game" value="{{ game }}">
+    <div class="card-head"><h2>Driver Vehicle Inspection Report</h2>
+      {% if pretrip_ok %}<span class="right badge ok">pre-trip done (24 h)</span>{% else %}<span class="right badge warn">no pre-trip in 24 h</span>{% endif %}</div>
+    <div class="fields">
+      <div class="field"><label>Report</label><select name="kind"><option value="pre">Pre-trip</option><option value="post">Post-trip</option></select></div>
+      <div class="field"><label>Truck</label><select name="truck_id"><option value="">—</option>{% for t in trucks %}<option value="{{ t.id }}" {{ 'selected' if truck and t.id == truck.id }}>{{ t.brand }} {{ t.model }} {{ t.plate }}</option>{% endfor %}</select></div>
+    </div>
+    <table><thead><tr><th>Item</th><th style="width:180px">Condition</th><th>Notes</th></tr></thead><tbody>
+    {% for key, label, hint in items %}
+      <tr><td><b>{{ label }}</b><div class="small faint">{{ hint }}</div>{% if hints.get(key) %}<div class="small" style="color:#f3b951">Telemetry: {{ hints[key] }}</div>{% endif %}</td>
+        <td><label class="check" style="display:inline-flex;margin:0 10px 0 0"><input type="radio" name="item_{{ key }}" value="ok" {{ 'checked' if not hints.get(key) }}> OK</label>
+            <label class="check" style="display:inline-flex;margin:0"><input type="radio" name="item_{{ key }}" value="defect" {{ 'checked' if hints.get(key) }}> Defect</label></td>
+        <td><input name="note_{{ key }}" maxlength="200" placeholder="Describe a defect" value="{{ hints.get(key, '') }}"></td></tr>
+    {% endfor %}</tbody></table>
+    <label class="check" style="margin-top:12px"><input type="checkbox" name="signed" value="1"> I inspected this vehicle and this report is accurate — signed {{ current_user().display_name }}</label>
+    <button class="btn primary">Submit report</button>
+    <p class="hint">Defects put the truck on a maintenance hold: dispatch is blocked and a roadside inspection will place it out of service until a manager marks it repaired.</p>
+  </form>
+  <div class="card"><h2>Why it matters</h2>
+    <ul class="small muted" style="padding-left:18px">
+      <li>Picking up a load without a pre-trip in the last 24 game-hours is a violation ({{ S.dvir_fine|float|money }}).</li>
+      <li>Driving a truck with open defects is out-of-service ({{ S.oos_fine|float|money }}).</li>
+      <li>Roadside inspectors check your latest DVIR.</li>
+    </ul></div>
+</div>
+<div class="card flush" style="margin-top:16px"><div class="card-head" style="padding:16px 18px 0"><h2>Reports</h2></div>
+<div class="table-wrap"><table><thead><tr><th>#</th><th>When</th><th>Driver</th><th>Type</th><th>Truck</th><th>Result</th><th>Defects</th><th></th></tr></thead><tbody>
+{% for r in rows %}<tr><td class="muted">{{ r.id }}</td><td class="small">{{ r.game_min|gametime if r.game_min else r.created_at|dt }}<div class="faint">{{ r.created_at|ago }}</div></td>
+  <td>{{ r.display_name }}</td><td>{{ 'Pre-trip' if r.kind == 'pre' else 'Post-trip' }}</td><td>{{ r.brand or '—' }} {{ r.model or '' }} <span class="small faint">{{ r.plate or '' }}</span></td>
+  <td>{{ status(r.status) }}</td><td class="small">{{ r.defects or '—' }}</td>
+  <td>{% if r.status == 'defects' and can('admin') %}<form method="post" action="/compliance/dvir/{{ r.id }}/repair" class="row">{{ csrf() }}<span class="small" title="Price per defect is set in Settings &gt; Economy">{{ dvir_price(r.defects)|money }}</span><button class="btn sm primary">Repaired</button></form>{% endif %}</td></tr>
+{% else %}<tr><td colspan="8" class="empty">No inspection reports yet.</td></tr>{% endfor %}</tbody></table></div></div>
+
+{% elif tab == 'inspections' %}
+<div class="grid g4" style="margin-bottom:16px">
+  <div class="card stat"><div class="label">Inspections</div><div class="value">{{ stats.n or 0 }}</div></div>
+  <div class="card stat"><div class="label">Clean</div><div class="value">{{ stats.passed or 0 }}</div><div class="sub">{{ ((stats.passed or 0) / stats.n * 100)|round|int if stats.n else 0 }}% pass rate</div></div>
+  <div class="card stat"><div class="label">Out of service</div><div class="value">{{ stats.oos or 0 }}</div></div>
+  <div class="card stat"><div class="label">Fines</div><div class="value">{{ stats.fines|money }}</div></div>
+</div>
+<div class="card" style="margin-bottom:16px"><div class="between"><div><b>How roadside inspections work.</b>
+  <span class="muted small">On {{ S.inspection_chance_pct }}% of loads an inspector pulls the truck over at the first stop part-way along the route.
+  Level 1 = full (driver, vehicle, load), Level 2 = walk-around (driver + vehicle), Level 3 = driver only (hours, DVIR).</span></div>
+  {% if can('dispatcher') %}<form method="post" action="/compliance/inspect" class="row">{{ csrf() }}<input type="hidden" name="driver" value="{{ who.id }}">
+    <select name="level" style="width:auto"><option value="">Random level</option><option value="1">Level 1</option><option value="2">Level 2</option><option value="3">Level 3</option></select>
+    <button class="btn" {{ 'disabled title="Driver has no live telemetry"' if not live }}>Inspect {{ who.display_name }} now</button></form>{% endif %}</div></div>
+<div class="stack">
+{% for r in rows %}
+  <div class="card {{ 'accent' if r.result == 'oos' }}">
+    <div class="between"><div>{{ whois(r.user_id, r.display_name, r.color) }} <b style="margin-left:6px">Level {{ r.level }}</b>
+      <span class="small muted">· {{ r.game_min|gametime if r.game_min else '' }} · {{ r.location or '' }} · {{ r.brand or '' }} {{ r.model or '' }} {{ r.plate or '' }}{% if r.job_id %} · <a href="/jobs/{{ r.job_id }}">job #{{ r.job_id }}</a>{% endif %}</span></div>
+      <div class="row"><span class="badge {{ {'passed':'ok','warning':'info','violation':'warn','oos':'bad'}[r.result] }}">{{ 'out of service' if r.result == 'oos' else r.result }}</span>{% if r.fine %}<b>{{ r.fine|money }}</b>{% endif %}</div></div>
+    {% if r.findings %}<ul class="small" style="margin:8px 0 0;padding-left:18px">{% for f in r.findings %}
+      <li><span class="badge {{ {'oos':'bad','violation':'warn','warning':'info'}[f.severity] }}">{{ f.code }}</span> {{ f.text }}{% if f.fine %} — {{ f.fine|money }}{% endif %}</li>{% endfor %}</ul>
+    {% else %}<p class="small muted" style="margin:6px 0 0">No violations found. Have a safe trip!</p>{% endif %}
+  </div>
+{% else %}<div class="card empty">No roadside inspections yet.</div>{% endfor %}
+</div>
+
+{% elif tab == 'violations' %}
+<div class="card flush"><div class="table-wrap"><table><thead><tr><th>When</th><th>Driver</th><th>Rule</th><th>Detail</th><th class="num">Fine</th></tr></thead><tbody>
+{% for r in rows %}<tr><td class="small">{{ r.game_min|gametime if r.game_min else '' }}<div class="faint">{{ r.created_at|ago }}</div></td>
+  <td>{{ whois(r.user_id, r.display_name, r.color) }}</td><td><span class="badge warn">{{ r.rule }}</span></td><td>{{ r.detail }}</td><td class="num">{{ r.fine|money }}</td></tr>
+{% else %}<tr><td colspan="5" class="empty">No violations. Clean record!</td></tr>{% endfor %}</tbody></table></div></div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends "auth_base.html" %}
+{% block title %}Set up{% endblock %}
+{% block authclass %}wide{% endblock %}
+{% block content %}
+<h1>Set up your company</h1>
+<p class="muted">First run. Create your virtual trucking company and the owner account. You can change everything later in Settings.</p>
+{% if error %}<div class="flash error">{{ error }}</div>{% endif %}
+<form method="post">
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+  <h3 style="margin-top:16px">Company</h3>
+  <div class="fields">
+    <div class="field" style="grid-column:span 2"><label>Company name *</label><input name="company_name" required maxlength="64" value="{{ request.form.company_name }}"></div>
+    <div class="field"><label>Tag</label><input name="company_tag" maxlength="8" placeholder="FMP" value="{{ request.form.company_tag }}"></div>
+    <div class="field" style="grid-column:1/-1"><label>Motto</label><input name="company_motto" maxlength="120" placeholder="Safe miles, on time." value="{{ request.form.company_motto }}"></div>
+    <div class="field"><label>Main game</label><select name="default_game"><option value="ats">American Truck Simulator</option><option value="ets2">Euro Truck Simulator 2</option></select></div>
+    <div class="field"><label>Units</label><select name="units"><option value="imperial">Imperial (mi, mph, lb)</option><option value="metric">Metric (km, km/h, t)</option></select></div>
+    <div class="field"><label>Currency symbol</label><input name="currency" maxlength="4" value="$"></div>
+    <div class="field"><label>Starting capital</label><input value="{{ '{:,}'.format(STARTING_CAPITAL) }}" readonly disabled aria-readonly="true"><div class="hint">Every company starts with this amount.</div></div>
+  </div>
+  <h3 style="margin-top:8px">Owner account</h3>
+  <div class="fields">
+    <div class="field"><label>Username *</label><input name="username" required maxlength="32" autocomplete="username" value="{{ request.form.username }}"></div>
+    <div class="field"><label>Display name</label><input name="display_name" maxlength="48" value="{{ request.form.display_name }}"></div>
+    <div class="field"><label>Password * (8+ characters)</label><input name="password" type="password" required minlength="8" autocomplete="new-password"></div>
+    <div class="field"><label>Repeat password *</label><input name="password2" type="password" required minlength="8" autocomplete="new-password"></div>
+  </div>
+  <button class="btn primary">Create company</button>
+</form>
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, status, csrf %}
+{% block title %}Events{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Events &amp; Convoys</h1><p>Company convoys, meetings and training. RSVP, and earn XP for showing up.</p></div>
+  {% if can('dispatcher') %}<div class="actions"><button class="btn primary" data-open="dlg-ev">{{ icon('plus') }}New event</button></div>{% endif %}
+</div>
+<div class="grid g3">
+{% for e in rows %}
+  <div class="card ev-card {{ 'accent' if e.start_at > now and e.status == 'scheduled' }}" style="{{ 'opacity:.65' if e.start_at < now - 10800 }}">
+    <a class="ev-link" href="/events/{{ e.id }}" aria-label="{{ e.title }}"></a>
+    <div class="between"><span class="badge info">{{ e.kind }}</span>{{ status(e.status) }}</div>
+    <h2 style="margin-top:10px">{{ e.title }}</h2>
+    <div class="muted">{{ e.start_at|dt('%A %b %d, %H:%M') }} · {{ e.start_at|ago }}</div>
+    <div class="small" style="margin-top:6px">{{ e.departure or '?' }} → {{ e.destination or '?' }} · {{ e.game|upper }}{% if e.server %} · {{ e.server }}{% endif %}</div>
+    <div class="between small" style="margin-top:10px"><span>{{ e.going }} going{% if e.max_slots %} / {{ e.max_slots }}{% endif %}</span>
+      {% if mine.get(e.id) %}{{ status(mine[e.id]) }}{% endif %}{% if e.xp_reward %}<span class="badge crimson">+{{ e.xp_reward }} XP</span>{% endif %}</div>
+    {% if can('dispatcher') %}<div style="margin-top:10px"><a class="btn sm ev-edit" href="/events/{{ e.id }}?edit=1">Edit</a></div>{% endif %}
+  </div>
+{% else %}<div class="card empty span3">No events yet.</div>{% endfor %}
+</div>
+<dialog id="dlg-ev"><form method="post" action="/events/save">{{ csrf() }}
+  <div class="dhead"><h2>New event</h2><button class="btn ghost sm" data-close>✕</button></div>
+  <div class="dbody"><div class="fields">
+    <div class="field" style="grid-column:1/-1"><label>Title *</label><input name="title" required maxlength="100"></div>
+    <div class="field"><label>Type</label><select name="kind"><option>convoy</option><option>meeting</option><option>training</option><option>public</option><option>race</option></select></div>
+    <div class="field"><label>Starts *</label><input name="start_at" type="datetime-local" required></div>
+    <div class="field"><label>Game</label><select name="game"><option value="ats" {{ 'selected' if S.default_game=='ats' }}>ATS</option><option value="ets2" {{ 'selected' if S.default_game=='ets2' }}>ETS2</option></select></div>
+    <div class="field"><label>Server</label><input name="server" maxlength="64" placeholder="TruckersMP Sim 1"></div>
+    <div class="field"><label>Meet-up</label><input name="meetup" maxlength="100" placeholder="Truck stop, slot…"></div>
+    <div class="field"><label>Departure</label><input name="departure" maxlength="100"></div>
+    <div class="field"><label>Destination</label><input name="destination" maxlength="100"></div>
+    <div class="field"><label>Required DLC</label><input name="dlc" maxlength="200"></div>
+    <div class="field"><label>Min. level</label><input name="min_level" type="number" min="0" value="0"></div>
+    <div class="field"><label>Slots (0 = unlimited)</label><input name="max_slots" type="number" min="0" value="0"></div>
+    <div class="field"><label>XP for attending</label><input name="xp_reward" type="number" min="0" value="500"></div>
+  </div><div class="field"><label>Description / route notes</label><textarea name="description" maxlength="3000"></textarea></div></div>
+  <div class="dfoot"><button class="btn ghost" data-close>Cancel</button><button class="btn primary">Create</button></div></form></dialog>
+{% endblock %}

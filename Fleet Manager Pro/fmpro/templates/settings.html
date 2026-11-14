@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf, status %}
+{% block title %}Settings{% endblock %}
+{% macro check(key, label, hint='') -%}
+<input type="hidden" name="has_{{ key }}" value="1"><label class="check"><input type="checkbox" name="{{ key }}" value="1" {{ 'checked' if S[key] == '1' }}> {{ label }}</label>{% if hint %}<div class="hint" style="margin:-6px 0 10px 26px">{{ hint }}</div>{% endif %}
+{%- endmacro %}
+{% block content %}
+<div class="page-head"><div><h1>Settings</h1><p>Company, economy, telemetry and integrations.</p></div></div>
+<div class="tabs">{% for t, l in [('company','Company'),('economy','Economy'),('telemetry','Telemetry'),('compliance','Compliance'),('integrations','Discord'),('recruitment','Recruitment'),('licence','Licence'),('audit','Audit log')] + ([('data','Clear data')] if can('owner') else []) %}
+  <a class="{{ 'on' if tab == t }}" href="?tab={{ t }}">{{ l }}</a>{% endfor %}</div>
+
+{% if tab == 'company' %}
+<form method="post" class="card" style="max-width:820px">{{ csrf() }}<input type="hidden" name="section" value="company">
+  <div class="fields">
+    <div class="field" style="grid-column:span 2"><label>Company name</label><input name="company_name" value="{{ S.company_name }}" maxlength="64"></div>
+    <div class="field"><label>Tag</label><input name="company_tag" value="{{ S.company_tag }}" maxlength="8"></div>
+    <div class="field" style="grid-column:1/-1"><label>Motto</label><input name="company_motto" value="{{ S.company_motto }}" maxlength="120"></div>
+    <div class="field"><label>Main game</label><select name="default_game"><option value="ats" {{ 'selected' if S.default_game=='ats' }}>ATS</option><option value="ets2" {{ 'selected' if S.default_game=='ets2' }}>ETS2</option></select></div>
+    <div class="field"><label>Units</label><select name="units"><option value="imperial" {{ 'selected' if S.units=='imperial' }}>Imperial</option><option value="metric" {{ 'selected' if S.units=='metric' }}>Metric</option></select></div>
+    <div class="field"><label>Currency symbol</label><input name="currency" value="{{ S.currency }}" maxlength="4"></div>
+  </div><button class="btn primary">Save</button></form>
+
+{% elif tab == 'economy' %}
+<form method="post" class="card" style="max-width:820px">{{ csrf() }}<input type="hidden" name="section" value="economy"><input type="hidden" name="units" value="{{ current_units() }}">
+  <div class="fields">
+    <div class="field"><label>{{ uf.fuel_price.label }}</label><input name="fuel_price" type="number" step="any" min="0" value="{{ uf.fuel_price.value }}"><div class="hint">Charged when a driver refuels in-game.</div></div>
+    <div class="field"><label>{{ uf.driver_pay_per_km.label }}</label><input name="driver_pay_per_km" type="number" step="any" min="0" value="{{ uf.driver_pay_per_km.value }}"></div>
+    <div class="field"><label>Driver commission % of revenue</label><input name="driver_commission_pct" type="number" step="0.5" min="0" max="100" value="{{ S.driver_commission_pct }}"></div>
+    <div class="field"><label>Repair cost per 1% wear</label><input name="repair_cost_per_pct" type="number" step="1" min="0" value="{{ S.repair_cost_per_pct }}"><div class="hint">Prices every repair: in-game repairs (per 1% of wear removed) and Record maintenance repairs (the truck's current wear across engine, transmission, cabin, chassis and wheels). Default 40.</div></div>
+    <div class="field"><label>Inspection defect repair</label><input name="dvir_repair_per_defect" type="number" step="0.01" min="0" value="{{ S.dvir_repair_per_defect }}"><div class="hint">Charged per defect when a manager marks a pre/post-trip report repaired. Default 250.</div></div>
+    <div class="field"><label>Service price</label><input name="maint_price_service" type="number" step="0.01" min="0" value="{{ S.maint_price_service }}"><div class="hint">Record maintenance (Fleet page) always charges these prices and they can't be changed there. Default 800.</div></div>
+    <div class="field"><label>Tyres price</label><input name="maint_price_tyres" type="number" step="0.01" min="0" value="{{ S.maint_price_tyres }}"><div class="hint">Default 2,400.</div></div>
+    <div class="field"><label>Inspection price</label><input name="maint_price_inspection" type="number" step="0.01" min="0" value="{{ S.maint_price_inspection }}"><div class="hint">Default 150.</div></div>
+    <div class="field"><label>Wash price</label><input name="maint_price_wash" type="number" step="0.01" min="0" value="{{ S.maint_price_wash }}"><div class="hint">Default 40.</div></div>
+    <div class="field"><label>Upgrade price</label><input name="maint_price_upgrade" type="number" step="0.01" min="0" value="{{ S.maint_price_upgrade }}"><div class="hint">Default 0 (free) - set a price if upgrades should cost money.</div></div>
+    <div class="field"><label>{{ uf.xp_per_km.label }}</label><input name="xp_per_km" type="number" step="any" min="0" value="{{ uf.xp_per_km.value }}"></div>
+    <div class="field"><label>{{ uf.xp_per_tonne.label }}</label><input name="xp_per_tonne" type="number" step="any" min="0" value="{{ uf.xp_per_tonne.value }}"></div>
+    <div class="field"><label>{{ uf.speeding_tolerance_kmh.label }}</label><input name="speeding_tolerance_kmh" type="number" step="any" min="0" max="{{ 31 if current_units() == 'imperial' else 50 }}" value="{{ uf.speeding_tolerance_kmh.value }}"></div>
+  </div>
+  {{ check('auto_charge_repairs', 'Charge in-game repairs to the company account') }}
+  {{ check('require_manual_approval', 'Manual jobs from drivers need manager approval') }}
+  <button class="btn primary">Save</button></form>
+
+{% elif tab == 'telemetry' %}
+<div class="grid g2">
+<form method="post" class="card">{{ csrf() }}<input type="hidden" name="section" value="telemetry">
+  <h2>Telemetry source</h2>
+  <p class="small muted">Status: <b>{{ status }}</b> · {{ "{:,}".format(frames) }} frames read this session.</p>
+  <div class="field"><label>Source</label><select name="telemetry_mode">
+    <option value="auto" {{ 'selected' if S.telemetry_mode=='auto' }}>Game (scs-telemetry.dll)</option>
+    <option value="demo" {{ 'selected' if S.telemetry_mode=='demo' }}>Demo simulator (no game needed)</option>
+    <option value="off" {{ 'selected' if S.telemetry_mode=='off' }}>Off</option></select>
+    <div class="hint">The demo simulator drives a Kenworth W900 between real ATS cities, with tolls, fines, refuels and deliveries — every job and transaction it creates is real data in your logbook.</div></div>
+  <div class="field"><label>Credit this PC's telemetry to</label><select name="telemetry_user_id">{% for d in drivers %}<option value="{{ d.id }}" {{ 'selected' if S.telemetry_user_id == d.id|string }}>{{ d.display_name }}</option>{% endfor %}</select></div>
+  {{ check('auto_create_trucks', 'Add trucks to the fleet automatically when first driven') }}
+  {{ check('agent_jobs_need_approval', "Hold every remote driver's delivery for manager approval",
+           'Deliveries that fail the anti-cheat checks are always held, whoever drove them.') }}
+  <button class="btn primary">Save</button>
+</form>
+<div class="card"><h2>Game plugin</h2>
+  <p class="small muted">Fleet Manager Pro reads the bundled <code>plugin\scs-telemetry.dll</code> (MIT licence) through its shared memory. It must be in the game's <code>bin\win_x64\plugins</code> folder.</p>
+  {% for g in plugin.games %}<form method="post" action="/settings/plugin-install" class="between" style="padding:8px 0;border-bottom:1px solid var(--line-soft)">{{ csrf() }}<input type="hidden" name="dir" value="{{ g.dir }}">
+    <div><b>{{ g.name }}</b> {{ status(g.state|replace(' ','_')) }}<div class="small faint mono">{{ g.dir }}</div></div>
+    <button class="btn sm {{ 'primary' if g.state != 'installed' }}">{{ 'Reinstall' if g.state == 'installed' else 'Install' }}</button></form>
+  {% else %}<p class="muted">No Steam copy of ATS or ETS2 found. Copy <code>plugin\scs-telemetry.dll</code> into <code>&lt;game folder&gt;\bin\win_x64\plugins\</code> (create the folder if needed).</p>{% endfor %}
+  <form method="post" action="/settings/plugin-install" class="row" style="margin-top:10px;flex-wrap:nowrap">{{ csrf() }}
+    <input name="game_dir" placeholder="Other game folder, e.g. D:\Games\American Truck Simulator" maxlength="400"><button class="btn sm">Install here</button></form>
+  <p class="small muted" style="margin-top:10px">After installing, start the game and click <b>OK</b> on the "advanced SDK features" message.</p>
+  <h3 style="margin-top:14px">Remote drivers</h3>
+  <p class="small muted">Start this PC with <b>Start Fleet Manager Pro (LAN).bat</b>. Other PCs then open
+  <code>https://THIS-PC:8760</code> (encrypted; the browser shows a one-time warning because the certificate is self-made).
+  Each driver's profile page shows the exact agent command with their token and this server's fingerprint.</p>
+  {% if lan_pin %}<p class="small muted">Certificate fingerprint: <span class="mono" style="word-break:break-all">{{ lan_pin }}</span></p>{% endif %}
+</div>
+</div>
+
+{% elif tab == 'compliance' %}
+<form method="post" class="card" style="max-width:820px">{{ csrf() }}<input type="hidden" name="section" value="compliance">
+  <h2>ELD / Hours of Service</h2>
+  {{ check('hos_enabled', 'Keep an electronic logbook and enforce Hours of Service', 'Duty status comes from telemetry on in-game time.') }}
+  <div class="fields">
+    <div class="field"><label>ATS rules</label><select name="hos_rules_ats"><option value="us70" {{ 'selected' if S.hos_rules_ats=='us70' }}>US 70-hour / 8-day</option><option value="us60" {{ 'selected' if S.hos_rules_ats=='us60' }}>US 60-hour / 7-day</option></select></div>
+    <div class="field"><label>ETS2 rules</label><select name="hos_rules_ets2"><option value="eu">EU 561/2006</option></select></div>
+    <div class="field"><label>Fine per HOS violation</label><input name="hos_fine" type="number" min="0" step="50" value="{{ S.hos_fine }}"></div>
+  </div>
+  <h2 style="margin-top:8px">DVIR</h2>
+  {{ check('dvir_required', 'Require a pre-trip inspection (DVIR) within 24 game-hours before picking up a load') }}
+  <div class="fields"><div class="field"><label>Missing pre-trip fine</label><input name="dvir_fine" type="number" min="0" step="50" value="{{ S.dvir_fine }}"></div></div>
+  <h2 style="margin-top:8px">Roadside inspections</h2>
+  {{ check('inspections_enabled', 'Random roadside (DOT) inspections during loads') }}
+  <div class="fields">
+    <div class="field"><label>Chance per load (%)</label><input name="inspection_chance_pct" type="number" min="0" max="100" step="1" value="{{ S.inspection_chance_pct }}"></div>
+    <div class="field"><label>Out-of-service fine</label><input name="oos_fine" type="number" min="0" step="100" value="{{ S.oos_fine }}"></div>
+  </div>
+  <button class="btn primary">Save</button></form>
+
+{% elif tab == 'integrations' %}
+<form method="post" class="card" style="max-width:820px">{{ csrf() }}<input type="hidden" name="section" value="integrations">
+  <h2>Discord webhook</h2>
+  <div class="field"><label>Webhook URL</label><input name="discord_webhook" value="{{ S.discord_webhook }}" placeholder="https://discord.com/api/webhooks/…" maxlength="300">
+    <div class="hint">Discord → Server Settings → Integrations → Webhooks → New Webhook → Copy URL.</div></div>
+  {{ check('webhook_on_delivery', 'Post every delivery') }}
+  {{ check('webhook_on_event', 'Post announcements, events, contracts and applications') }}
+  <div class="row"><button class="btn primary">Save</button></div></form>
+<form method="post" action="/settings/webhook-test" style="margin-top:10px">{{ csrf() }}<button class="btn">Send test message</button></form>
+
+{% elif tab == 'recruitment' %}
+<form method="post" class="card" style="max-width:820px">{{ csrf() }}<input type="hidden" name="section" value="recruitment">
+  {{ check('recruitment_open', 'Accept applications on your online Apply page (link on the Recruitment page)') }}
+  <div class="field"><label>Text shown on the application page</label><textarea name="recruitment_text" maxlength="1000">{{ S.recruitment_text }}</textarea></div>
+  <button class="btn primary">Save</button></form>
+
+{% elif tab == 'licence' %}
+<div class="grid g2">
+<div class="card accent"><div class="card-head"><h2>Licence</h2><span class="right badge {{ 'ok' if lic.licensed else 'bad' }}">{{ 'active' if lic.licensed else 'locked' }}</span></div>
+  <dl class="kv">
+    <dt>Product</dt><dd>Fleet Manager Pro {{ VERSION }}</dd>
+    <dt>Licensed to</dt><dd>{{ lic.name or '—' }}{% if lic.email %} <span class="muted small">{{ lic.email }}</span>{% endif %}</dd>
+    <dt>Purchase key</dt><dd class="mono">{% if not lic.key %}—{% elif can('owner') %}{{ lic.key }}{% else %}{{ lic.key[:8] }}-····-····-···· <span class="faint small">(owner only)</span>{% endif %}</dd>
+    <dt>This PC</dt><dd>{% if lic.slot %}PC {{ lic.slot }} of {{ lic.slots }}{% else %}—{% endif %}</dd>
+    <dt>Machine ID</dt><dd class="mono">{{ lic.machine_id }}</dd>
+    <dt>Last online check</dt><dd>{{ lic.last_check|replace('T', ' ') if lic.last_check else 'never' }}{% if lic.online == false %} <span class="badge warn">offline</span>{% endif %}</dd>
+    <dt>Works offline until</dt><dd>{{ (lic.expires or '—')|replace('T', ' ')|replace('Z', ' UTC') }}</dd>
+    <dt>Licence server</dt><dd class="mono small">{{ lic.server }}</dd>
+  </dl>
+  <p class="small muted">Checked at start-up and every 6 hours. Without internet it keeps working until the date above.</p>
+  <form method="post" action="/settings/licence" class="row">{{ csrf() }}
+    <button class="btn" name="action" value="check">Check now</button>
+    {% if can('owner') %}<button class="btn danger" name="action" value="deactivate" data-confirm="Deactivate Fleet Manager Pro on this PC? It frees this PC's slot so the key can be used on another PC. This PC locks until activated again.">Deactivate this PC</button>{% endif %}
+  </form>
+</div>
+<div class="card"><h2>Moving to another PC</h2>
+  <p class="muted">Each purchase works on 2 PCs. To move, click <b>Deactivate this PC</b> here, then activate on the new PC with the same key.
+  If the old PC is gone (broken, reinstalled, sold), ask the seller to release it.</p>
+  <p class="muted">Your company data lives in the <code>data</code> folder — copy it to the new PC to keep everything.</p>
+</div>
+</div>
+
+{% elif tab == 'data' %}
+<div class="card" style="max-width:820px;border-color:var(--crimson)">
+  <h2>Clear all company data</h2>
+  <p>Deletes every job, ledger entry, expense, contract, truck, trailer, garage, loan, logbook line, inspection, event,
+    message, achievement, learned map road and audit line. Use it to start the company over, e.g. after testing.</p>
+  <p class="muted"><b>Kept:</b> your Owner account and password, company settings, and the licence (no re-activation needed).
+    A full backup of the database is saved to <code>data\backups</code> first, so this can be undone by restoring that file.</p>
+  <table style="max-width:460px;margin:10px 0"><tbody>{% for label, n in data_counts if n %}<tr><td>{{ label|capitalize }}</td><td class="num">{{ '{:,}'.format(n) }}</td></tr>
+  {% else %}<tr><td class="empty">There is nothing to clear.</td></tr>{% endfor %}</tbody></table>
+  <button class="btn danger" data-open="dlg-clear">Clear all data…</button>
+</div>
+<dialog id="dlg-clear"><form method="post" action="/settings/clear-data" id="clear-form">{{ csrf() }}
+  <div class="dhead"><h2>Delete ALL company data?</h2><button class="btn ghost sm" data-close>✕</button></div>
+  <div class="dbody">
+    <div class="flash error">This removes everything listed on the page for every member. A backup is saved first, but the app
+      itself can't undo it.</div>
+    <label class="check"><input type="checkbox" name="keep_members" value="1" checked> Keep member accounts (drivers, dispatchers, managers) — their XP goes back to 0</label>
+    <label class="check"><input type="checkbox" name="capital" value="1" checked> Start again with the starting capital ({{ S.currency }}{{ '{:,}'.format(STARTING_CAPITAL) }})</label>
+    <label class="check"><input type="checkbox" name="understand" value="1" required> I understand all jobs, money, fleet and records will be deleted</label>
+    <div class="field"><label>Type <b>{{ clear_confirm }}</b> to confirm</label><input name="confirm" autocomplete="off" required placeholder="{{ clear_confirm }}"></div>
+    <div class="field"><label>Your password</label><input name="password" type="password" autocomplete="current-password" required></div>
+  </div>
+  <div class="dfoot"><button class="btn ghost" data-close>Cancel</button><button class="btn danger" id="clear-go" disabled>Delete everything</button></div>
+</form></dialog>
+<script>
+(function () {
+  const f = document.getElementById("clear-form"), go = document.getElementById("clear-go");
+  const ok = () => { go.disabled = !(f.elements["understand"].checked && f.elements["confirm"].value.trim() === {{ clear_confirm|tojson }} && f.elements["password"].value); };
+  f.addEventListener("input", ok); f.addEventListener("change", ok);
+  f.addEventListener("submit", (e) => { if (!confirm("Last check: delete ALL company data now?")) e.preventDefault(); });
+})();
+</script>
+
+{% elif tab == 'audit' %}
+<div class="card flush"><div class="table-wrap"><table><thead><tr><th>When</th><th>Who</th><th>Action</th><th>Detail</th></tr></thead><tbody>
+{% for a in audit %}<tr><td class="small">{{ a.created_at|dt }}</td><td>{{ a.display_name or '—' }}</td><td>{{ a.action }}</td><td class="small muted">{{ a.detail }}</td></tr>
+{% else %}<tr><td colspan="4" class="empty">Nothing logged.</td></tr>{% endfor %}</tbody></table></div></div>
+{% endif %}
+{% endblock %}

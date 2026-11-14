@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, status, who, csrf %}
+{% block title %}Dispatch{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const CARGO = {{ cargo|tojson }};
+  const pick = document.getElementById("cargo-pick"), other = document.getElementById("cargo-other"), game = document.getElementById("contract-game");
+  if (!pick) return;
+  const opt = (value, label) => { const o = document.createElement("option"); o.value = value; o.textContent = label; return o; };
+  function fill() {
+    const g = CARGO[game.value] || { hauled: [], all: [] };
+    pick.innerHTML = "";
+    pick.appendChild(opt("", "Any cargo"));
+    const seen = new Set();
+    if (g.hauled.length) {
+      const og = document.createElement("optgroup"); og.label = "Hauled by your company (" + g.hauled.length + ")";
+      g.hauled.forEach(([id, name]) => { og.appendChild(opt(id + "|" + name, name)); seen.add(name.toLowerCase()); });
+      pick.appendChild(og);
+    }
+    const og = document.createElement("optgroup"); og.label = "All " + game.value.toUpperCase() + " cargo (" + g.all.length + ")";
+    g.all.forEach(([id, name]) => { if (!seen.has(name.toLowerCase())) og.appendChild(opt(id + "|" + name, name)); });
+    pick.appendChild(og);
+    pick.appendChild(opt("__other", "Other (type the name)..."));
+    other.style.display = "none"; other.required = false;
+    document.querySelectorAll("select[data-city]").forEach((sel) => {
+      const typed = sel.parentElement.querySelector("input");
+      sel.innerHTML = "";
+      sel.appendChild(opt("", sel.dataset.city === "any" ? "Any city" : "Choose a city..."));
+      const had = new Set();
+      if ((g.been || []).length) {
+        const b = document.createElement("optgroup"); b.label = "Where your drivers have been (" + g.been.length + ")";
+        g.been.forEach((n) => {
+          const known = (g.cities || []).filter((c) => c[1].toLowerCase() === n.toLowerCase());
+          if (!known.length) b.appendChild(opt("|" + n, n));        // a mod city: name only
+          known.forEach((c) => { b.appendChild(opt(c[0] + "|" + c[1], c[2])); had.add(c[0]); });  // Kansas City, KS and MO
+        });
+        sel.appendChild(b);
+      }
+      const all = document.createElement("optgroup"); all.label = "All " + game.value.toUpperCase() + " cities (" + (g.cities || []).length + ")";
+      (g.cities || []).forEach(([id, name, label]) => { if (!had.has(id)) all.appendChild(opt(id + "|" + name, label)); });
+      sel.appendChild(all);
+      sel.appendChild(opt("__other", "Other (type the name)..."));
+      typed.style.display = "none"; typed.required = false;
+      sel.onchange = () => { const o = sel.value === "__other"; typed.style.display = o ? "" : "none"; typed.required = o; if (o) typed.focus(); };
+    });
+    document.querySelectorAll("select[data-company]").forEach((sel) => {
+      const city = document.getElementById(sel.dataset.company);
+      const fillCo = () => {
+        const typed = sel.parentElement.querySelector("input");
+        const keep = sel.value;
+        sel.innerHTML = "";
+        typed.style.display = "none"; typed.required = false;
+        const cv = city.value, cid = cv.includes("|") ? cv.split("|")[0] : "";
+        const cname = city.selectedOptions[0] ? city.selectedOptions[0].textContent : "";
+        const here = cid && (g.depots || {})[cid];
+        if (!cv) {                                   // no city: no company to pick
+          sel.appendChild(opt("", "Any company (pick the city first)"));
+          sel.disabled = true;
+          return;
+        }
+        sel.disabled = false;
+        if (here) {                                  // a game city: only the companies that have a depot there
+          sel.appendChild(opt("", "Any company in " + cname));
+          const og = document.createElement("optgroup"); og.label = "Companies in " + cname + " (" + here.length + ")";
+          here.forEach((n) => og.appendChild(opt(n, n)));
+          sel.appendChild(og);
+        } else {                                     // typed / mod city: the game doesn't know its companies
+          sel.appendChild(opt("", "Any company"));
+          const had = new Set();
+          if ((g.visited || []).length) {
+            const v = document.createElement("optgroup"); v.label = "Visited by your company (" + g.visited.length + ")";
+            g.visited.forEach((n) => { v.appendChild(opt(n, n)); had.add(n.toLowerCase()); });
+            sel.appendChild(v);
+          }
+          const all = document.createElement("optgroup"); all.label = "All " + game.value.toUpperCase() + " companies (" + (g.companies || []).length + ")";
+          (g.companies || []).forEach((n) => { if (!had.has(n.toLowerCase())) all.appendChild(opt(n, n)); });
+          sel.appendChild(all);
+          sel.appendChild(opt("__other", "Other (type the name)..."));
+        }
+        if ([...sel.options].some((o) => o.value === keep)) sel.value = keep;
+      };
+      sel.onchange = () => {
+        const typed = sel.parentElement.querySelector("input"), o = sel.value === "__other";
+        typed.style.display = o ? "" : "none"; typed.required = o; if (o) typed.focus();
+      };
+      sel._fill = fillCo;                          // the latest game's lists
+      if (!sel._bound) { city.addEventListener("change", () => sel._fill()); sel._bound = true; }
+      fillCo();
+    });
+  }
+  pick.addEventListener("change", () => { const o = pick.value === "__other"; other.style.display = o ? "" : "none"; other.required = o; if (o) other.focus(); });
+  game.addEventListener("change", fill);
+  fill();
+  const PROFILES = {{ profiles|tojson }};
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-togame]");
+    if (!b) return;
+    const sel = document.getElementById("togame-save"), list = PROFILES[b.dataset.game] || [];
+    sel.innerHTML = "";
+    list.forEach((p) => {
+      const g = document.createElement("optgroup"); g.label = "Profile: " + p.name;
+      p.saves.slice(0, 8).forEach((s, i) => g.appendChild(opt(s.dir, s.name + " - " + new Date(s.time * 1000).toLocaleString() + (i === 0 ? " (latest)" : ""))));
+      sel.appendChild(g);
+    });
+    document.getElementById("togame-id").textContent = "#" + b.dataset.togame;
+    document.getElementById("togame-form").action = "/dispatch/" + b.dataset.togame + "/to-game";
+    document.getElementById("dlg-togame").showModal();
+  });
+})();
+</script>
+{% endblock %}
+{% block content %}
+<div class="page-head banner banner-dispatch" title="Photo: Rhys Moult / Unsplash">
+  <div><h1>Dispatch Board</h1><p>Contracts with bonuses and deadlines. Pick up a matching load in-game and it's linked and completed automatically on delivery.</p></div>
+  {% if can('dispatcher') %}<div class="actions"><button class="btn primary" data-open="new-contract">{{ icon('plus') }}New contract</button></div>{% endif %}
+</div>
+<div class="card flush"><div class="table-wrap"><table>
+  <thead><tr><th>#</th><th>Contract</th><th>Route</th><th>Cargo</th><th class="num">Bonus</th><th>Priority</th><th>Deadline</th><th>Driver</th><th>Status</th><th></th></tr></thead>
+  <tbody>{% for c in rows %}
+  <tr>
+    <td class="muted">{{ c.id }}</td>
+    <td><b>{{ c.title }}</b>{% if c.notes %}<div class="small muted">{{ c.notes|truncate(80) }}</div>{% endif %}</td>
+    <td>{{ c.source_city or 'Any' }} → <b>{{ c.destination_city }}</b><div class="small faint">{{ c.game|upper }}{% if c.source_company or c.destination_company %} · {{ c.source_company or 'any company' }} → {{ c.destination_company or 'any company' }}{% endif %}</div></td>
+    <td>{{ c.cargo or 'Any' }}{% if c.min_mass_t %}<div class="small faint">≥ {{ (c.min_mass_t * 1000)|mass }}</div>{% endif %}</td>
+    <td class="num">{{ c.bonus|money }}</td>
+    <td>{{ status(c.priority) }}</td>
+    <td class="small">{% if c.deadline %}{{ c.deadline|dt('%b %d %H:%M') }}<div class="{{ 'neg' if c.deadline < now and c.status in ('open','assigned') else 'faint' }}">{{ c.deadline|ago }}</div>{% else %}—{% endif %}</td>
+    <td>{% if c.assigned_user_id %}{{ who(c.assigned_user_id, c.assignee, c.color) }}{% else %}<span class="faint">unassigned</span>{% endif %}</td>
+    <td>{{ status(c.status) }}{% if c.game_slot %} <span class="badge info" title="Sent {{ c.sent_at|ago }}">in game</span>{% endif %}{% if c.job_id %} <a class="small" href="/jobs/{{ c.job_id }}">job #{{ c.job_id }}</a>{% endif %}</td>
+    <td class="right"><form method="post" class="row" style="justify-content:flex-end" action="">{{ csrf() }}
+      {% if c.status in ('open', 'assigned') and (profiles.get(c.game) or []) and (can('dispatcher') or c.assigned_user_id == current_user().id) %}
+        <button type="button" class="btn sm navy" data-togame="{{ c.id }}" data-game="{{ c.game }}" title="Put this job into your game's freight market">Send to game</button>{% endif %}
+      {% if c.status == 'open' %}<button class="btn sm primary" formaction="/dispatch/{{ c.id }}/claim">Claim</button>{% endif %}
+      {% if c.status == 'assigned' and c.assigned_user_id == current_user().id %}<button class="btn sm" formaction="/dispatch/{{ c.id }}/release">Release</button>{% endif %}
+      {% if can('dispatcher') %}
+        {% if c.status in ('open','assigned') %}<button class="btn sm" formaction="/dispatch/{{ c.id }}/complete">Done</button><button class="btn sm danger" formaction="/dispatch/{{ c.id }}/cancel">Cancel</button>
+        {% else %}<button class="btn sm" formaction="/dispatch/{{ c.id }}/reopen">Reopen</button>{% endif %}
+      {% endif %}</form></td>
+  </tr>
+  {% else %}<tr><td colspan="10" class="empty">No contracts yet.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+
+<dialog id="new-contract"><form method="post" action="/dispatch/new">{{ csrf() }}
+  <div class="dhead"><h2>New contract</h2><button class="btn ghost sm" data-close>✕</button></div>
+  <div class="dbody"><div class="fields">
+    <div class="field" style="grid-column:1/-1"><label>Title</label><input name="title" maxlength="100" placeholder="Weekly steel run"></div>
+    <div class="field"><label>Game</label><select name="game" id="contract-game"><option value="ats" {{ 'selected' if form_game=='ats' }}>ATS</option><option value="ets2" {{ 'selected' if form_game=='ets2' }}>ETS2</option></select></div>
+    <div class="field"><label>From city</label><select name="source_city_pick" id="src-city" data-city="any"></select>
+      <input name="source_city" maxlength="64" placeholder="City name exactly as the game shows it" style="display:none;margin-top:6px"></div>
+    <div class="field"><label>To city *</label><select name="destination_city_pick" id="dst-city" data-city="required" required></select>
+      <input name="destination_city" maxlength="64" placeholder="City name exactly as the game shows it" style="display:none;margin-top:6px"></div>
+    <div class="field"><label>From company</label><select name="source_company_pick" id="src-co" data-company="src-city"></select>
+      <input name="source_company" maxlength="64" placeholder="Company name exactly as the game shows it" style="display:none;margin-top:6px"></div>
+    <div class="field"><label>To company</label><select name="destination_company_pick" id="dst-co" data-company="dst-city"></select>
+      <input name="destination_company" maxlength="64" placeholder="Company name exactly as the game shows it" style="display:none;margin-top:6px"></div>
+    <div class="field"><label>Cargo</label><select name="cargo_pick" id="cargo-pick"></select>
+      <input name="cargo" id="cargo-other" maxlength="64" placeholder="Cargo name exactly as the game shows it" style="display:none;margin-top:6px"></div>
+    <div class="field"><label>Min. weight (t)</label><input name="min_mass_t" type="number" min="0" step="0.5"></div>
+    <div class="field"><label>Bonus</label><input name="bonus" type="number" min="0" step="50" value="1000"></div>
+    <div class="field"><label>Deadline (hours from now)</label><input name="deadline_hours" type="number" min="0" step="1" value="48"></div>
+    <div class="field"><label>Priority</label><select name="priority"><option>low</option><option selected>normal</option><option>high</option><option>urgent</option></select></div>
+    <div class="field"><label>Assign to</label><select name="assigned_user_id"><option value="">Open to everyone</option>{% for d in drivers %}<option value="{{ d.id }}">{{ d.display_name }}</option>{% endfor %}</select></div>
+  </div><div class="field"><label>Notes</label><textarea name="notes" maxlength="1000"></textarea></div>
+  <p class="hint">The city, cargo and company lists are the game's own, so a contract matches the in-game job exactly;
+  anything from a mod appears once one of your drivers has hauled it or been there, or pick "Other" and type it.
+  The company lists only show the companies that have a depot in the city you picked.</p></div>
+  <div class="dfoot"><button class="btn ghost" data-close>Cancel</button><button class="btn primary">Post contract</button></div>
+</form></dialog>
+
+<dialog id="dlg-togame"><form method="post" id="togame-form">{{ csrf() }}
+  <div class="dhead"><h2>Send contract <span id="togame-id"></span> to the game</h2><button class="btn ghost sm" data-close>✕</button></div>
+  <div class="dbody">
+    <p class="muted">Fleet Manager Pro copies the save you pick into a <b>new</b> save slot named
+      "Fleet Manager Pro - Contract #…" with this job added to the pickup company's freight market.
+      The save you pick, and all your other saves, are not changed.</p>
+    <div class="field"><label>Start from this save</label><select name="save" id="togame-save" required></select></div>
+    <ol class="small muted" style="padding-left:18px">
+      <li>Save your game first (or use the latest autosave), then click <b>Send</b>.</li>
+      <li>In the game: <b>Load game</b> → pick <b>Fleet Manager Pro - Contract #…</b>.</li>
+      <li>Drive to the pickup company and take the job from its freight market. Delivering it completes the contract.</li>
+      <li>The job stays in the freight market for about a game day, the same as the game's own jobs.</li>
+    </ol>
+    <p class="hint">Single-player only (TruckersMP doesn't use your saves). If the game is open, load the new save from its menu.</p>
+  </div>
+  <div class="dfoot"><button class="btn ghost" data-close>Cancel</button><button class="btn primary">Send</button></div>
+</form></dialog>
+{% endblock %}

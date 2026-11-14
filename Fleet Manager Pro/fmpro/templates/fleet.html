@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, status, csrf %}
+{% block title %}Fleet{% endblock %}
+{% block content %}
+<div class="page-head banner banner-fleet" title="Photo: Nigel Tadyanehondo / Unsplash">
+  <div><h1>Fleet &amp; Garages</h1><p>Trucks are detected automatically from telemetry. Buy garages, track wear, services and repairs.</p></div>
+  {% if can('admin') %}<div class="actions">
+    <button class="btn" data-open="dlg-garage">{{ icon('plus') }}Garage</button>
+    <button class="btn" data-open="dlg-trailer">{{ icon('plus') }}Trailer</button>
+    <a class="btn" href="/leasing">{{ icon('plus') }}Lease a truck</a>
+    <button class="btn primary" data-open="dlg-truck">{{ icon('plus') }}Truck</button></div>{% endif %}
+</div>
+
+<div class="card flush" style="margin-bottom:16px"><div class="card-head" style="padding:16px 18px 0"><h2>Trucks</h2><span class="right badge">{{ trucks|rejectattr('status','in',['sold','returned'])|list|length }} active</span>
+  {% set gone = (trucks|selectattr('status','in',['sold','returned'])|list|length) + (trailers|selectattr('status','equalto','sold')|list|length) %}
+  {% if can('admin') and gone %}<form method="post" action="/fleet/clear-sold" style="margin-left:8px">{{ csrf() }}<button class="btn sm danger" title="Remove sold and returned trucks and sold trailers from the lists" data-confirm="Delete {{ gone }} sold / returned truck(s) and trailer(s) from the lists for good? Their jobs, maintenance and ledger lines stay. This can't be undone.">Delete sold ({{ gone }})</button></form>{% endif %}</div>
+<div class="table-wrap"><table>
+  <thead><tr><th>Truck</th><th>Plate</th><th>Driver</th><th>Garage</th><th class="num">Odometer</th><th>Condition</th><th class="num">Jobs</th><th>Status</th></tr></thead>
+  <tbody>{% for t in trucks %}
+  <tr class="clickable" data-href="/fleet/truck/{{ t.id }}">
+    <td><b>{{ t.brand }} {{ t.model }}</b>{% if t.auto_detected %} <span class="badge info" title="Detected from telemetry">auto</span>{% endif %}{% if t.leased %} <span class="badge leased" title="On a lease - see Truck Leasing">leased</span>{% endif %}</td>
+    <td>{{ t.plate }}<div class="small faint">{{ t.plate_country }}</div></td>
+    <td>{{ t.driver or '—' }}</td><td>{{ t.garage or '—' }}</td>
+    <td class="num">{{ t.odometer|dist }}</td>
+    <td style="min-width:140px"><div class="bar {{ 'ok' if t.wear_max < 0.03 else 'warn' if t.wear_max < 0.1 else '' }}"><i style="width:{{ [100 - t.wear_max * 100, 2]|max }}%"></i></div>
+      <div class="small faint">{{ (1 - t.wear_max)|pct }} {% if t.service_due %}<span class="badge warn">service due</span>{% endif %}</div></td>
+    <td class="num">{{ t.jobs }}</td><td>{{ status(t.status) }}</td>
+  </tr>{% else %}<tr><td colspan="8" class="empty">No trucks yet — drive with telemetry and your truck appears here, or add one.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+
+<div class="grid g2">
+  <div class="card flush"><div class="card-head" style="padding:16px 18px 0"><h2>Garages</h2></div>
+  <div class="table-wrap"><table><thead><tr><th>City</th><th>Size</th><th>Trucks</th><th class="num">Bought for</th><th class="num">Upkeep / wk</th>{% if can('admin') %}<th></th>{% endif %}</tr></thead><tbody>
+  {% for g in garages %}<tr><td><b>{{ g.city }}</b> <span class="small faint">{{ g.game|upper }}</span>{% if g.notes %}<div class="small faint">{{ g.notes }}</div>{% endif %}</td><td>{{ g.size|title }}</td>
+    <td><div class="bar navy" style="max-width:120px"><i style="width:{{ (g.used / g.slots * 100) if g.slots else 0 }}%"></i></div><span class="small faint">{{ g.used }} / {{ g.slots }}</span></td>
+    <td class="num">{{ g.purchase_price|money }}</td>
+    <td class="num">{{ g.upkeep_per_week|money }}</td>
+    {% if can('admin') %}<td class="num" style="white-space:nowrap">
+      <button type="button" class="btn sm" data-garage='{{ {"id": g.id, "game": g.game or "ats", "city": g.city, "city_id": g.city_id or "", "size": g.size, "upkeep": g.upkeep_per_week, "notes": g.notes or ""}|tojson|forceescape }}'>Edit</button>
+      <button type="button" class="btn sm danger" data-garage-del="{{ g.id }}" data-city="{{ g.city }}" data-used="{{ g.used }}" data-paid="{{ g.purchase_price|int }}" data-size="{{ g.size }}">Delete</button></td>{% endif %}</tr>
+  {% else %}<tr><td colspan="6" class="empty">No garages. Buying one gives your trucks a home base.</td></tr>{% endfor %}</tbody></table></div></div>
+
+  <div class="card flush"><div class="card-head" style="padding:16px 18px 0"><h2>Trailers</h2></div>
+  <div class="table-wrap"><table><thead><tr><th>Trailer</th><th>Type</th><th>Plate</th><th>Garage</th><th class="num">Bought for</th><th>Status</th>{% if can('admin') %}<th></th>{% endif %}</tr></thead><tbody>
+  {% for t in trailers %}<tr><td><b>{{ t.name }}</b> <span class="small faint">{{ t.brand }}</span></td><td>{{ t.body_type }}</td><td>{{ t.plate }}</td><td>{{ t.garage or '—' }}</td>
+    <td class="num">{{ t.purchase_price|money }}</td><td>{{ status(t.status) }}</td>
+    {% if can('admin') %}<td class="num">{% if t.status != 'sold' %}<button type="button" class="btn sm danger" data-trailer-sell="{{ t.id }}" data-name="{{ t.name }}" data-paid="{{ t.purchase_price|int }}">Sell</button>{% else %}<form method="post" action="/fleet/trailer/{{ t.id }}/delete" style="display:inline">{{ csrf() }}<button class="btn sm" data-confirm="Delete sold trailer {{ t.name }} from the list for good? Its sale stays in the ledger.">Delete</button></form>{% endif %}</td>{% endif %}</tr>
+  {% else %}<tr><td colspan="7" class="empty">No company trailers.</td></tr>{% endfor %}</tbody></table></div></div>
+</div>
+
+<div class="card flush" style="margin-top:16px"><div class="card-head" style="padding:16px 18px 0"><h2>Maintenance log</h2>
+  {% if can('admin') %}<div class="right"><button class="btn sm" data-open="dlg-maint">{{ icon('plus') }}Record</button></div>{% endif %}</div>
+<div class="table-wrap"><table><thead><tr><th>Date</th><th>Truck</th><th>Type</th><th>Notes</th><th>By</th><th class="num">Cost</th></tr></thead><tbody>
+{% for m in maint %}<tr><td class="small">{{ m.created_at|dt }}</td><td>{% if m.truck_id %}<a href="/fleet/truck/{{ m.truck_id }}">{{ m.brand }} {{ m.model }}</a>{% else %}—{% endif %}</td>
+  <td>{{ status(m.kind) }}{% if m.auto %} <span class="badge info">auto</span>{% endif %}</td><td class="small muted">{{ m.notes }}</td><td>{{ m.display_name or '—' }}</td><td class="num">{{ m.cost|money }}</td></tr>
+{% else %}<tr><td colspan="6" class="empty">No maintenance recorded. In-game repairs are detected automatically.</td></tr>{% endfor %}</tbody></table></div></div>
+
+<dialog id="dlg-truck"><form method="post" action="/fleet/truck/save">{{ csrf() }}<input type="hidden" name="units" value="{{ current_units() }}">{% set imp = current_units() == 'imperial' %}
+  <div class="dhead"><h2>Add truck</h2><button class="btn ghost sm" data-close>✕</button></div>
+  <div class="dbody"><div class="fields">
+    <div class="field"><label>Game</label><select class="veh-game" data-kind="trucks"><option value="ats" {{ 'selected' if form_game == 'ats' }}>ATS</option><option value="ets2" {{ 'selected' if form_game == 'ets2' }}>ETS2</option></select></div>
+    <div class="field" style="grid-column:span 2"><label>Truck from the dealer</label><select class="veh-pick" data-kind="trucks"></select></div>
+    <div class="field"><label>Brand *</label><input name="brand" required maxlength="64" placeholder="Peterbilt"></div>
+    <div class="field"><label>Model *</label><input name="model" required maxlength="64" placeholder="579"></div>
+    <div class="field"><label>Plate</label><input name="plate" maxlength="32"></div>
+    <div class="field"><label>Plate region</label><input name="plate_country" maxlength="64"></div>
+    <div class="field"><label>Purchase price</label><input name="purchase_price" type="number" min="0" step="100" value="0"></div>
+    <div class="field"><label>Odometer ({{ 'mi' if imp else 'km' }})</label><input name="odometer" type="number" min="0" step="1" value="0"></div>
+    <div class="field"><label>Fuel tank ({{ 'gal' if imp else 'L' }})</label><input name="fuel_capacity" type="number" min="0" step="1" placeholder="{{ '150' if imp else '600' }}"></div>
+    <div class="field"><label>Garage</label><select name="garage_id"><option value="">—</option>{% for g in garages %}<option value="{{ g.id }}">{{ g.city }}</option>{% endfor %}</select></div>
+    <div class="field"><label>Driver</label><select name="assigned_user_id"><option value="">—</option>{% for d in drivers %}<option value="{{ d.id }}">{{ d.display_name }}</option>{% endfor %}</select></div>
+    <div class="field"><label>Service every ({{ 'mi' if imp else 'km' }})</label><input name="service_interval_km" type="number" min="{{ 650 if imp else 1000 }}" step="100" value="{{ 30000 if imp else 50000 }}"></div>
+  </div>
+  <details style="margin:6px 0"><summary class="small"><b>Truck price list</b> (game dealer, standard build)</summary>
+    <table class="small veh-list" data-kind="trucks" style="margin-top:6px"><thead><tr><th>Truck</th><th class="num">Standard</th><th class="num">From</th></tr></thead><tbody></tbody></table></details>
+  <p class="hint">Picking a truck fills in the brand, model and the dealer's standard price (paint and accessories cost extra in the game) — change the price if yours cost more. Company account: <b>{{ balance|money }}</b>. The purchase price is taken from the company account. Distances in {{ 'miles' if imp else 'kilometres' }}, fuel in {{ 'US gallons' if imp else 'litres' }} — change units with the Game selector at the top.</p></div>
+  <div class="dfoot"><button class="btn ghost" data-close>Cancel</button><button class="btn primary">Add truck</button></div></form></dialog>
+
+<dialog id="dlg-trailer"><form method="post" action="/fleet/trailer/save">{{ csrf() }}
+  <div class="dhead"><h2>Add trailer</h2><button class="btn ghost sm" data-close>✕</button></div>
+  <div class="dbody"><div class="fields">
+    <div class="field"><label>Game</label><select class="veh-game" data-kind="trailers"><option value="ats" {{ 'selected' if form_game == 'ats' }}>ATS</option><option value="ets2" {{ 'selected' if form_game == 'ets2' }}>ETS2</option></select></div>
+    <div class="field" style="grid-column:span 2"><label>Trailer from the dealer</label><select class="veh-pick" data-kind="trailers"></select></div>
+    <div class="field"><label>Name *</label><input name="name" required maxlength="64" placeholder="53' Dry Van"></div>
+    <div class="field"><label>Trailer type</label><select name="body_type_pick" class="veh-types"></select>
+      <input name="body_type" maxlength="64" placeholder="Type it" style="display:none;margin-top:6px"></div>
+    <div class="field"><label>Brand</label><input name="brand" maxlength="64"></div>
+    <div class="field"><label>Plate</label><input name="plate" maxlength="32"></div>
+    <div class="field"><label>Garage</label><select name="garage_id"><option value="">—</option>{% for g in garages %}<option value="{{ g.id }}">{{ g.city }}</option>{% endfor %}</select></div>
+    <div class="field"><label>Purchase price</label><input name="purchase_price" type="number" min="0" step="100" value="0"></div>
+  </div>
+  <details style="margin:6px 0"><summary class="small"><b>Trailer price list</b> (game dealer, cheapest build)</summary>
+    <table class="small veh-list" data-kind="trailers" style="margin-top:6px"><thead><tr><th>Trailer</th><th class="num">From</th></tr></thead><tbody></tbody></table></details>
+  <p class="hint">Picking a trailer fills in its name, brand and the dealer's starting price (bigger bodies, axles and paint cost more). Company account: <b>{{ balance|money }}</b>.</p></div>
+  <div class="dfoot"><button class="btn ghost" data-close>Cancel</button><button class="btn primary">Add trailer</button></div></form></dialog>
+
+<dialog id="dlg-trailer-sell"><form method="post" id="trailer-sell-form">{{ csrf() }}
+  <div class="dhead"><h2>Sell trailer <span id="trailer-sell-name"></span></h2><button class="btn ghost sm" data-close>✕</button></div>
+  <div class="dbody">
+    <table class="small" style="margin:0 0 10px;max-width:420px"><tbody>
+      <tr><td>Bought for</td><td class="num"><b id="trailer-sell-paid"></b></td></tr>
+      <tr><td>Suggested resale (60% of what you paid)</td><td class="num" id="trailer-sell-sugg"></td></tr></tbody></table>
+    <div class="field"><label>Sell for</label><input name="price" id="trailer-sell-price" type="number" min="0" step="100"></div>
+    <p class="hint">The amount is paid into the company account. Enter 0 to just scrap it.</p></div>
+  <div class="dfoot"><button class="btn ghost" data-close>Cancel</button><button class="btn danger">Sell trailer</button></div></form></dialog>
+
+<dialog id="dlg-garage"><form method="post" action="/fleet/garage/save" id="garage-form">{{ csrf() }}<input type="hidden" name="id" value="">
+  <div class="dhead"><h2 id="garage-title">Buy a garage</h2><button class="btn ghost sm" data-close>✕</button></div>
+  <div class="dbody"><div class="fields">
+    <div class="field"><label>Game</label><select name="game" id="garage-game"><option value="ats" {{ 'selected' if form_game == 'ats' }}>ATS</option><option value="ets2" {{ 'selected' if form_game == 'ets2' }}>ETS2</option></select></div>
+    <div class="field" style="grid-column:span 2"><label>Garage location *</label><select name="city_pick" id="garage-city" required></select>
+      <input name="city" maxlength="64" placeholder="City name (modded map)" style="display:none;margin-top:6px"></div>
+    <div class="field"><label>Size</label><select name="size" id="garage-size">{% for k, v in garage_sizes.items() %}<option value="{{ k }}">{{ k|title }} · {{ v[1]|money }}</option>{% endfor %}</select></div>
+    <div class="field" id="garage-price"><label>Price (blank = standard)</label><input name="purchase_price" type="number" min="0" step="1000"></div>
+    <div class="field"><label>Upkeep / week (blank = standard)</label><input name="upkeep_per_week" type="number" min="0" step="50"></div>
+  </div><div class="field"><label>Notes</label><input name="notes" maxlength="300" placeholder="Optional"></div>
+  <table class="small" id="garage-prices" style="margin:6px 0 4px;max-width:520px"><thead><tr><th>Size</th><th class="num">Trucks</th><th class="num">Price</th><th class="num">Upkeep / week</th></tr></thead><tbody>
+    {% for k, v in garage_sizes.items() %}<tr data-size="{{ k }}"><td>{{ k|title }}</td><td class="num">{{ v[0] }}</td><td class="num">{{ v[1]|money }}</td><td class="num">{{ v[2]|money }}</td></tr>{% endfor %}</tbody></table>
+  <p class="hint" id="garage-hint">Every garage location in the game is listed; ones you already own are marked. Company account: <b>{{ balance|money }}</b> — a garage that costs more can't be bought.</p></div>
+  <div class="dfoot"><button class="btn ghost" data-close>Cancel</button><button class="btn primary" id="garage-submit">Buy garage</button></div></form></dialog>
+
+<dialog id="dlg-garage-del"><form method="post" id="garage-del-form">{{ csrf() }}
+  <div class="dhead"><h2>Delete garage in <span id="garage-del-city"></span></h2><button class="btn ghost sm" data-close>✕</button></div>
+  <div class="dbody">
+    <p class="muted" id="garage-del-used"></p>
+    <table class="small" style="margin:6px 0 10px;max-width:420px"><tbody>
+      <tr><td>Bought for</td><td class="num"><b id="garage-del-paid"></b></td></tr>
+      <tr><td>Standard price today ({{ '<span id="garage-del-size"></span>'|safe }})</td><td class="num" id="garage-del-std"></td></tr></tbody></table>
+    <div class="field"><label>Sell for</label><input name="sale_price" id="garage-del-price" type="number" min="0" step="1000" value="0"></div>
+    <p class="hint">Filled in with what the garage cost (a full refund). Change it, or enter 0 to just remove it. The amount is paid into the company account; weekly upkeep stops.</p>
+  </div>
+  <div class="dfoot"><button class="btn ghost" data-close>Cancel</button><button class="btn danger">Delete garage</button></div></form></dialog>
+
+{% if can('admin') %}<dialog id="dlg-maint"><form method="post" action="/fleet/maintenance" id="maint-form">{{ csrf() }}
+  <div class="dhead"><h2>Record maintenance</h2><button class="btn ghost sm" data-close>✕</button></div>
+  <div class="dbody"><div class="fields">
+    <div class="field"><label>Truck</label><select name="truck_id" class="m-truck">{% for t in trucks if t.status not in ('sold','returned') %}<option value="{{ t.id }}" data-repair="{{ '%.2f'|format(t.repair_est) }}" data-repairf="{{ t.repair_est|money }}" data-wear="{{ '%.1f'|format(t.wear_total) }}" data-since="{{ t.since_service|dist }}" data-due="{{ 1 if t.service_due else 0 }}" data-spent="{{ t.maint_spent|money }}">{{ t.brand }} {{ t.model }} {{ t.plate }}</option>{% endfor %}</select></div>
+    <div class="field"><label>Type</label><select name="kind" class="m-kind">{% for k in ['service','repair','tyres','inspection','upgrade','wash'] %}<option value="{{ k }}" data-price="{{ '%.2f'|format(maint_prices[k]) if k in maint_prices else '' }}">{{ k }}</option>{% endfor %}</select></div>
+    <div class="field"><label>Cost</label><input name="cost" class="m-cost" type="number" min="0" step="0.01" value="{{ '%.2f'|format(maint_prices.service) }}" readonly title="Set in Settings > Economy"><div class="hint m-lock">Price set in Settings &gt; Economy</div></div>
+  </div><div class="field"><label>Notes</label><input name="notes" maxlength="500"></div>
+  <table class="small" style="margin:4px 0 8px"><thead><tr><th>Maintenance prices</th><th class="num">Cost</th></tr></thead><tbody>
+    <tr><td><b>Service</b> <span class="faint">oil, filters and check-up; clears the "service due" reminder</span></td><td class="num">{{ maint_prices.service|money }}</td></tr>
+    <tr><td><b>Repair</b> <span class="faint">this truck's wear <b class="m-wear">0</b>% &times; {{ repair_rate|money }} per 1%</span></td><td class="num m-repair">—</td></tr>
+    <tr><td><b>Tyres</b> <span class="faint">a new set</span></td><td class="num">{{ maint_prices.tyres|money }}</td></tr>
+    <tr><td><b>Inspection</b></td><td class="num">{{ maint_prices.inspection|money }}</td></tr>
+    <tr><td><b>Wash</b></td><td class="num">{{ maint_prices.wash|money }}</td></tr>
+    <tr><td><b>Upgrade</b> <span class="faint">parts or tuning</span></td><td class="num">{{ maint_prices.upgrade|money }}</td></tr>
+  </tbody></table>
+  <p class="hint m-info"></p>
+  <p class="hint">Every type always costs the price above (a repair: this truck's wear &times; the repair rate). Prices can only be changed in Settings &gt; Economy (<a href="/settings?tab=economy">open</a>). The cost is taken from the company account: <b>{{ balance|money }}</b>.</p></div>
+  <div class="dfoot"><button class="btn ghost" data-close>Cancel</button><button class="btn primary">Save</button></div></form></dialog>{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {   // Record maintenance: show this truck's figures and fill the cost from the price list
+  const f = document.getElementById("maint-form");
+  if (!f) return;
+  const truck = f.querySelector(".m-truck"), kind = f.querySelector(".m-kind"), cost = f.querySelector(".m-cost");
+  const lock = f.querySelector(".m-lock");
+  function show() {
+    const t = truck.selectedOptions[0], k = kind.selectedOptions[0];
+    f.querySelector(".m-wear").textContent = t ? t.dataset.wear : "0";
+    f.querySelector(".m-repair").textContent = t ? t.dataset.repairf : "—";
+    f.querySelector(".m-info").textContent = t ? ("This truck: " + t.dataset.since + " since its last service" +
+      (t.dataset.due === "1" ? " (service due)" : "") + ", " + t.dataset.spent + " spent on maintenance so far.") : "";
+    cost.readOnly = true;
+    lock.textContent = k && k.value === "repair" ? "Wear x repair rate (Settings > Economy)" : "Price set in Settings > Economy";
+    if (k) cost.value = k.value === "repair" ? (t ? t.dataset.repair : 0) : (k.dataset.price || 0);
+  }
+  truck.addEventListener("change", show);
+  kind.addEventListener("change", show);
+  show();
+})();
+
+(function () {
+  const LIST = {{ garage_list|tojson }}, OWNED = {{ garages|map(attribute='city_id')|list|tojson }};
+  const OWNED_GAME = {{ garages|map(attribute='game')|list|tojson }};
+  const VEH = {{ vehicles|tojson }};
+  const vopt = (v, l) => { const o = document.createElement("option"); o.value = v; o.textContent = l; return o; };
+  document.querySelectorAll(".veh-game").forEach((gsel) => {
+    const kind = gsel.dataset.kind, form = gsel.form, pick = form.querySelector(".veh-pick"), list = form.querySelector(".veh-list tbody");
+    const cur = (v) => {{ S.currency|tojson }} + Number(v).toLocaleString();
+    const items = () => ((VEH[gsel.value] || {})[kind] || []);
+    function fill() {
+      pick.innerHTML = ""; pick.appendChild(vopt("", "Choose... (" + items().length + ")"));
+      items().forEach((v, i) => pick.appendChild(vopt(i, v.brand + " " + v.model + " - " + cur(v.price || v.from))));
+      pick.appendChild(vopt("other", "Other / mod - type it below"));
+      const types = form.querySelector(".veh-types");
+      if (types) {
+        const keep = types.value, typed = form.elements["body_type"];
+        types.innerHTML = ""; types.appendChild(vopt("", "Choose a type... (" + ((VEH[gsel.value] || {}).trailer_types || []).length + ")"));
+        ((VEH[gsel.value] || {}).trailer_types || []).forEach(([id, label]) => types.appendChild(vopt(id, label)));
+        types.appendChild(vopt("__other", "Other (type it)..."));
+        if ([...types.options].some((o) => o.value === keep)) types.value = keep;
+        types.onchange = () => { const o = types.value === "__other"; typed.style.display = o ? "" : "none"; typed.required = o; };
+        types.onchange();
+      }
+      list.replaceChildren(...items().map((v) => {
+        const tr = document.createElement("tr");
+        const cells = [[v.brand + " " + v.model, ""]].concat(kind === "trucks" ? [[cur(v.price), "num"]] : [], [[cur(v.from), "num"]]);
+        cells.forEach(([text, cls]) => { const td = document.createElement("td"); td.textContent = text; if (cls) td.className = cls; tr.appendChild(td); });
+        return tr;
+      }));
+    }
+    pick.addEventListener("change", () => {
+      const v = items()[pick.value];
+      if (!v) return;
+      if (kind === "trucks") { form.elements["brand"].value = v.brand; form.elements["model"].value = v.model; form.elements["purchase_price"].value = v.price; }
+      else {
+        form.elements["name"].value = v.brand + " " + v.model; form.elements["brand"].value = v.brand; form.elements["purchase_price"].value = v.from;
+        const guess = [[/reefer|cool|frigo/, "refrigerated"], [/box|dryliner|boxliner|cargo|sbo/, "dryvan"], [/curtain|profiliner|paperliner/, "curtainside"],
+          [/hopper|grain|bril|distinction|prestige/, "hopper"], [/drop/, "dropdeck"], [/flat|force|renow|slidepost/, "flatbed"],
+          [/low/, "lowboy"], [/dump|kipp|tipper|ski|sko/, "dumper"], [/live/, "livestock"], [/log/, "log"], [/fuel/, "fueltank"],
+          [/food/, "foodtank"], [/chem/, "chemtank"], [/gas/, "gastank"], [/port|container/, "container"], [/bulkfeed/, "bulkfeed"], [/chip/, "chipvan"]];
+        const name = (v.id + " " + v.model).toLowerCase(), t = form.querySelector(".veh-types");
+        const hit = guess.find(([rx, id]) => rx.test(name) && [...t.options].some((o) => o.value === id));
+        if (hit) { t.value = hit[1]; t.onchange(); }
+      }
+    });
+    gsel.addEventListener("change", fill); fill();
+  });
+  document.querySelectorAll("[data-trailer-sell]").forEach((b) => b.addEventListener("click", () => {
+    const f2 = document.getElementById("trailer-sell-form"), paid = +b.dataset.paid;
+    f2.action = "/fleet/trailer/" + b.dataset.trailerSell + "/sell";
+    document.getElementById("trailer-sell-name").textContent = b.dataset.name;
+    document.getElementById("trailer-sell-paid").textContent = {{ S.currency|tojson }} + paid.toLocaleString();
+    document.getElementById("trailer-sell-sugg").textContent = {{ S.currency|tojson }} + Math.round(paid * 0.6).toLocaleString();
+    document.getElementById("trailer-sell-price").value = Math.round(paid * 0.6);
+    document.getElementById("dlg-trailer-sell").showModal();
+  }));
+  const SIZES = {{ garage_sizes|tojson }}, money = (v) => {{ S.currency|tojson }} + Number(v).toLocaleString();
+  const f = document.getElementById("garage-form");
+  if (!f) return;
+  const size = document.getElementById("garage-size");
+  const mark = () => document.querySelectorAll("#garage-prices tr[data-size]").forEach((r) => r.style.fontWeight = r.dataset.size === size.value ? "700" : "");
+  size.addEventListener("change", mark); mark();
+  const game = document.getElementById("garage-game"), city = document.getElementById("garage-city"), typed = f.elements["city"];
+  const opt = (v, l, dis) => { const o = document.createElement("option"); o.value = v; o.textContent = l; o.disabled = !!dis; return o; };
+  let editing = null;
+  function fill(keep) {
+    const list = LIST[game.value] || [];
+    city.innerHTML = "";
+    city.appendChild(opt("", "Choose a garage location... (" + list.length + ")"));
+    list.forEach(([id, name, label]) => {
+      const owned = OWNED.some((c, i) => c === id && OWNED_GAME[i] === game.value) && !(editing && editing.city_id === id);
+      city.appendChild(opt(id + "|" + name, label + (owned ? " - owned" : ""), owned));
+    });
+    city.appendChild(opt("__other", "Other (modded map, type the city)..."));
+    if (keep) city.value = keep;
+    const o = city.value === "__other";
+    typed.style.display = o ? "" : "none"; typed.required = o;
+  }
+  game.addEventListener("change", () => fill());
+  city.addEventListener("change", () => fill(city.value));
+  document.querySelector('[data-open="dlg-garage"]').addEventListener("click", () => {
+    editing = null; f.reset(); f.elements["id"].value = ""; fill();
+    document.getElementById("garage-title").textContent = "Buy a garage";
+    document.getElementById("garage-submit").textContent = "Buy garage";
+    document.getElementById("garage-price").style.display = "";
+  });
+  document.querySelectorAll("[data-garage]").forEach((b) => b.addEventListener("click", () => {
+    editing = JSON.parse(b.dataset.garage);
+    f.reset(); f.elements["id"].value = editing.id; game.value = editing.game;
+    const inList = (LIST[editing.game] || []).some((r) => r[0] === editing.city_id);
+    fill(inList ? editing.city_id + "|" + (LIST[editing.game].find((r) => r[0] === editing.city_id) || [])[1] : "__other");
+    if (!inList) typed.value = editing.city;
+    f.elements["size"].value = editing.size; f.elements["upkeep_per_week"].value = editing.upkeep; f.elements["notes"].value = editing.notes;
+    document.getElementById("garage-price").style.display = "none";
+    document.getElementById("garage-title").textContent = "Edit garage in " + editing.city;
+    document.getElementById("garage-submit").textContent = "Save changes";
+    document.getElementById("dlg-garage").showModal();
+  }));
+  document.querySelectorAll("[data-garage-del]").forEach((b) => b.addEventListener("click", () => {
+    const d = document.getElementById("garage-del-form");
+    d.action = "/fleet/garage/" + b.dataset.garageDel + "/delete";
+    document.getElementById("garage-del-city").textContent = b.dataset.city;
+    document.getElementById("garage-del-paid").textContent = money(b.dataset.paid);
+    document.getElementById("garage-del-size").textContent = b.dataset.size;
+    document.getElementById("garage-del-std").textContent = money((SIZES[b.dataset.size] || [0, 0])[1]);
+    document.getElementById("garage-del-price").value = b.dataset.paid;
+    document.getElementById("garage-del-used").textContent = +b.dataset.used
+      ? b.dataset.used + " truck(s) are based here; they stay in the fleet without a home garage."
+      : "No trucks are based here.";
+    document.getElementById("dlg-garage-del").showModal();
+  }));
+  fill();
+})();
+</script>
+{% endblock %}

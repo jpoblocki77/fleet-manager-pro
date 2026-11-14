@@ -1,0 +1,8 @@
+# Fleet Manager licence server - Caddy (HTTPS front door).
+# Goes in: /etc/caddy/Caddyfile   (install.sh fills in your address and puts it there for you)
+# Caddy gets and renews the HTTPS certificate by itself. It sends the buyer's real IP to the
+# licence server in X-Forwarded-For; the server only believes that header from 127.0.0.1 (Caddy).
+
+licence.YOURDOMAIN.com {
+	reverse_proxy 127.0.0.1:8750
+}

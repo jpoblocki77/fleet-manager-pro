@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Achievements{% endblock %}
+{% block content %}
+{% set earned = items|selectattr('earned_at')|list|length %}
+<div class="page-head">
+  <div><h1>Achievements</h1><p>{{ who.display_name }} has unlocked {{ earned }} of {{ items|length }}. Each one is worth +250 XP.</p></div>
+  <div class="actions"><form method="get"><select name="user" onchange="this.form.submit()" style="width:auto">{% for d in drivers %}<option value="{{ d.id }}" {{ 'selected' if d.id == who.id }}>{{ d.display_name }}</option>{% endfor %}</select></form></div>
+</div>
+<div class="card" style="margin-bottom:16px"><div class="between small"><span class="muted">Completion</span><b>{{ (earned / items|length * 100)|round|int }}%</b></div><div class="bar"><i style="width:{{ earned / items|length * 100 }}%"></i></div></div>
+<div class="grid g3">
+{% for a in items %}
+  <div class="ach {{ 'earned' if a.earned_at }}">
+    <div class="icon">{{ a.icon }}</div>
+    <div style="flex:1;min-width:0"><b>{{ a.name }}</b><div class="small muted">{{ a|ach_desc }}</div>
+      {% if a.earned_at %}<div class="small" style="color:var(--crimson-400)">Unlocked {{ a.earned_at|dt('%b %d, %Y') }}</div>
+      {% else %}<div class="bar navy" style="margin-top:6px"><i style="width:{{ a.pct }}%"></i></div><div class="small faint">{{ a|ach_progress }}</div>{% endif %}
+      <div class="small faint">{{ holders.get(a.code, 0) }} of {{ total }} drivers</div></div>
+  </div>
+{% endfor %}
+</div>
+{% endblock %}

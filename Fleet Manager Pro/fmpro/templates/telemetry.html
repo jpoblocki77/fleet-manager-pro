@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Telemetry Data{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Telemetry Data Explorer</h1>
+  <p>Every data point published by <code>scs-telemetry.dll</code> — {{ "{:,}".format(total) }} values across the truck, {{ 10 }} trailer slots and 25 substances, plus derived values. Changing values flash red.</p></div>
+  <div class="actions">
+    <select id="who" style="width:auto">{% for d in drivers %}<option value="{{ d.id }}" {{ 'selected' if d.id == current_user().id }}>{{ d.display_name }}</option>{% endfor %}</select>
+    <button class="btn" id="pause">Pause</button>
+    <button class="btn" id="dl">Download snapshot (JSON)</button>
+  </div>
+</div>
+<div class="card" style="margin-bottom:14px">
+  <div class="row">
+    <input id="q" placeholder="Filter by name, e.g. wear, light, wheel…" style="max-width:340px">
+    <div class="chips" id="chips">
+      <span class="chip on" data-g="all">All</span>
+      {% for g in order %}<span class="chip" data-g="{{ g }}">{{ g }}</span>{% endfor %}
+      <span class="chip" data-g="derived">derived</span>
+    </div>
+  </div>
+  <div class="small muted" style="margin-top:8px" id="state">Waiting for data…</div>
+</div>
+<div class="grid g2" id="groups"></div>
+{% if can('admin') %}
+<div class="card" style="margin-top:16px">
+  <div class="card-head"><h2>Raw shared memory</h2><div class="right row"><input id="raw-off" type="number" value="0" min="0" max="32752" step="16" style="width:110px"><button class="btn sm" id="raw-go">Read 256 bytes</button></div></div>
+  <p class="small muted">Hex view of the local <code>Local\SCSTelemetry</code> block (32 KiB) for debugging offsets.</p>
+  <pre class="mono small" id="raw" style="overflow:auto;max-height:340px;margin:0"></pre>
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+const META = {{ groups|tojson }};
+const ORDER = {{ order|tojson }};
+const TRAILER_FIELDS = {{ trailer_fields|tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/telemetry.js') }}?v={{ VERSION }}"></script>
+{% endblock %}
