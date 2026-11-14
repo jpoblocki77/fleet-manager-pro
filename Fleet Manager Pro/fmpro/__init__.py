@@ -29,7 +29,7 @@ elif not os.path.isfile(os.path.join(RES, "run.py")) and os.path.isfile(os.path.
     AGENT_CMD = '"Driver Agent.bat"'
 else:
     AGENT_CMD = "python run.py agent"
-BUILT_VERSION = "1.2"          # used when the VERSION file is missing (e.g. lost when a copy was re-zipped)
+BUILT_VERSION = "1.3"          # used when the VERSION file is missing (e.g. lost when a copy was re-zipped)
 try:
     with open(os.path.join(RES, "VERSION"), encoding="utf-8") as _f:
         VERSION = _f.read().strip() or BUILT_VERSION

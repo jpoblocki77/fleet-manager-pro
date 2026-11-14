@@ -1,4 +1,4 @@
-# Fleet Manager Pro — RC 1.2
+# Fleet Manager Pro — RC 1.3
 
 A virtual trucking company (VTC) manager for **American Truck Simulator** and **Euro Truck Simulator 2**.
 Built from scratch in **Python · Flask · Waitress · SQLite**, styled in navy blue and crimson red, with the
@@ -220,7 +220,7 @@ python tests\fuzz_test.py      # every page and form, every role, hostile input
 It starts its own throw-away licence server (needs the `Fleet Manager License Host` folder next to this one) and
 never touches your data, your licence or your real server.
 
-## Feature status — RC 1.2
+## Feature status — RC 1.3
 
 | Page | Status |
 |---|---|
@@ -294,7 +294,7 @@ costs; only Owners and Managers can sign, end or change leases.
   end value. Ending early costs the plan's fee on the payments left; buying early pays the rest off.
 * Leased trucks carry a *leased* badge on Fleet and can't be sold; returned trucks leave the fleet.
 
-## Release notes — RC 1.2
+## Release notes — RC 1.3
 
 * **Copies built per buyer, with sealed pages**: each buyer copy carries a hidden build tag (from the purchase key)
   and its pages are encrypted; the licence server hands the key back inside the signed licence, wrapped to the
