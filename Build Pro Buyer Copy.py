@@ -22,7 +22,7 @@ import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, "Fleet Manager Pro")
-DOWNLOADS = os.path.join(os.path.dirname(HERE), "Build Output")   # ...\RC 1.2\Build Output
+DOWNLOADS = os.path.join(os.path.dirname(HERE), "Build Output")   # ...\RC 1.3\Build Output
 os.makedirs(DOWNLOADS, exist_ok=True)
 OUT = os.path.join(DOWNLOADS, "For Buyer")
 PUBLIC_LICENCE_SERVER = "https://fleetmanager.servehttp.com:8750"

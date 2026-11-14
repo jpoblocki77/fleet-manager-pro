@@ -51,15 +51,15 @@ def build():
 
     A(Paragraph("1. Your folders", H1))
     A(table([["Folder", "What it is", "Share?"],
-             ["D:\\Fleet Manager Pro\\Fleet Manager Pro RC 1.2\\Development\\Fleet Manager Pro", "Development copy: source, tests, tools. Change and test here.", "No"],
+             ["D:\\Fleet Manager Pro\\Fleet Manager Pro RC 1.3\\Development\\Fleet Manager Pro", "Development copy: source, tests, tools. Change and test here.", "No"],
              ["...\\Fleet Manager License Host", "Licence server + License Manager WITH your signing key, admin token, purchases and certificate key.", "<b>Never</b>"],
-             ["...RC 1.2\\Zips\\...RC 1.2 - For Buyer (no exe).zip", "<b>What you send buyers</b> (antivirus-friendly).", "Yes"],
-             ["...RC 1.2\\Zips\\...RC 1.2 - For Buyer.zip", "Single-program .exe version (some antivirus programs flag it).", "Yes, if asked"],
-             ["...RC 1.2\\Build Output", "Where the two build scripts put a fresh buyer copy (copied to For Buyer (no exe) and Zips).", "No"],
-             ["D:\\Fleet Manager Pro\\Fleet Manager Pro RC 1.2\\App", "<b>Your own running copy</b>, with your company in data\\.", "No"],
-             ["...RC 1.2\\Source", "The entire source code without keys or data (also as a zip).", "No"],
-             ["...RC 1.2\\License Host (PRIVATE - never share)", "Backup of your licence host with its secrets.", "<b>Never</b>"],
-             ["...RC 1.2\\Zips", "All four zips: program, source, both buyer copies.", "Buyer zips only"],
+             ["...RC 1.3\\Zips\\...RC 1.3 - For Buyer (no exe).zip", "<b>What you send buyers</b> (antivirus-friendly).", "Yes"],
+             ["...RC 1.3\\Zips\\...RC 1.3 - For Buyer.zip", "Single-program .exe version (some antivirus programs flag it).", "Yes, if asked"],
+             ["...RC 1.3\\Build Output", "Where the two build scripts put a fresh buyer copy (copied to For Buyer (no exe) and Zips).", "No"],
+             ["D:\\Fleet Manager Pro\\Fleet Manager Pro RC 1.3\\App", "<b>Your own running copy</b>, with your company in data\\.", "No"],
+             ["...RC 1.3\\Source", "The entire source code without keys or data (also as a zip).", "No"],
+             ["...RC 1.3\\License Host (PRIVATE - never share)", "Backup of your licence host with its secrets.", "<b>Never</b>"],
+             ["...RC 1.3\\Zips", "All four zips: program, source, both buyer copies.", "Buyer zips only"],
              ["D:\\FMP_tester", "A spare copy for testing activation like a buyer would.", "No"]],
             [2.6 * inch, 3.6 * inch, 0.7 * inch]))
 
@@ -78,6 +78,26 @@ def build():
                 "<b>Development\\Buyer Builds (PRIVATE).csv</b> lists every copy you built and for whom - keep it private.", SMALL))
     A(Paragraph("The buyer unzips it, double-clicks <b>Start Fleet Manager Pro.bat</b>, types the key on the Activate screen and "
                 "creates their company. Nothing needs installing.", P))
+
+    A(Paragraph("Selling it online", H2))
+    A(Paragraph("Because every copy is built for one buyer, you need their <b>name and email</b> before you build - and your licence "
+                "keys already capture both (step 3 above asks for the buyer's name and email and stores them with the key; they show "
+                "up in <b>3) List</b> and <b>10) Identify a copy</b>). So any store that gives you the buyer's name and email at "
+                "checkout fits. The loop is always the same:", P))
+    A(steps(["Buyer pays on your store; you receive their <b>name and email</b>.",
+             "License Manager <b>2) New purchase</b> - enter that name and email - gives you the key.",
+             "<b>Build Buyer Copy.bat</b> - paste the key - builds their sealed copy.",
+             "Send them the <b>For Buyer (no exe)</b> zip and the key."]))
+    A(table([["Where to sell", "Best for"],
+             ["<b>Gumroad</b>", "Simplest start. One-time sales; gives you the buyer's name and email; can auto-deliver a download."],
+             ["<b>Lemon Squeezy</b> / <b>Paddle</b>", "More professional: they handle sales tax / VAT for you and have a licence-key "
+                                                      "API for later automation."],
+             ["<b>itch.io</b>", "Reaches the trucking-sim and modding community; supports pay-what-you-want pricing."],
+             ["<b>Ko-fi</b>", "Low fees; one-time shop items or small memberships."],
+             ["<b>Patreon</b>", "Recurring support and updates - less suited to one-off key delivery; not ideal as your only store."]], W))
+    A(Paragraph("<b>Pricing.</b> Price it like an indie sim tool, not business software. A one-time <b>$10-$20</b> (around $15) suits a "
+                "companion app like this, and each key activates 2 PCs. A small <b>$2-$4 / month</b> membership is an option if you "
+                "prefer recurring income, but one-time usually sells better here. These are rough market figures, not a promise.", SMALL))
 
     A(Paragraph("3. Looking after buyers' licences", H1))
     A(table([["Situation", "What to do (License Manager)"],
@@ -149,7 +169,7 @@ def build():
                 "Report each new release as a false positive at microsoft.com/wdsi/filesubmission (Software developer, "
                 "Incorrectly detected). Once you have a code-signing certificate (for example Microsoft's Artifact Signing), "
                 "add signing to the .exe build and remove the temporary section from the guide.", SMALL))
-    A(Paragraph("Only ever send the two <b>For Buyer</b> zips. <b>Fleet Manager Pro RC 1.2.zip</b> and the <b>Source Code</b> zip "
+    A(Paragraph("Only ever send the two <b>For Buyer</b> zips. <b>Fleet Manager Pro RC 1.3.zip</b> and the <b>Source Code</b> zip "
                 "contain the readable source.", NOTE))
 
     A(Paragraph("8. Older guides", H1))
