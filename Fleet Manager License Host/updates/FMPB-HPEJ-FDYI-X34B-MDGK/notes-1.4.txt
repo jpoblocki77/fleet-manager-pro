@@ -1,0 +1,1 @@
+Adds the in-app updater and activity logging, plus stability fixes.

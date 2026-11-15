@@ -25,9 +25,10 @@ To push a new version to **all** buyers at once:
 2. Make sure `license_server.py` is running.
 3. Double-click **`Build and Publish Update (All Buyers).bat`** in the Development folder.
 
-It rebuilds every buyer's sealed copy (from your private ledger) and publishes each one here automatically. Each
-buyer then sees "Update available" and installs with one click. `--keys FMP-… FMP-…` limits it to certain buyers;
-`--stock` also refreshes a stock copy; `--dry-run` just lists who would be updated.
+It rebuilds every buyer's sealed copy in **both** flavours (the single-program `.exe` and the antivirus-friendly
+no-exe build) and publishes each one here automatically, so whichever build a buyer installed gets a matching
+update that self-applies. Each buyer then sees "Update available" and installs with one click. `--keys FMP-… FMP-…`
+limits it to certain buyers; `--stock` also refreshes a stock copy; `--dry-run` just lists who would be updated.
 
 ## Doing one buyer by hand
 
@@ -36,21 +37,25 @@ buyer then sees "Update available" and installs with one click. `--keys FMP-… 
 
 2. **Build the buyer's copy** as usual — `Build Buyer Copy.bat`, choose **Single program (.exe)** or **Both**, and
    enter that buyer's purchase key. You get a zip in `Build Output`, and the build prints the buyer's
-   **build tag** (`FMPB-…`). (The updater can only swap in the compiled **.exe** build, so publish the `.exe`
-   package, not the "no .exe" one.)
+   **build tag** (`FMPB-…`). Both flavours self-apply now, so build (and publish) whichever one the buyer runs —
+   or **Both** if you're not sure which they installed.
 
-3. **Publish it to this server.** From the `Fleet Manager License Host` folder:
+3. **Publish it to this server.** From the `Fleet Manager License Host` folder, naming the flavour you built:
 
    ```
-   python publish_update.py --zip "....\Build Output\For Buyer - FMP-XXXX-XXXX-XXXX-XXXX.zip" --key FMP-XXXX-XXXX-XXXX-XXXX
+   python publish_update.py --zip "....\Build Output\For Buyer - FMP-XXXX-XXXX-XXXX-XXXX.zip" --key FMP-XXXX-XXXX-XXXX-XXXX --flavor exe
+   python publish_update.py --zip "....\Build Output\For Buyer (no exe) - FMP-XXXX-XXXX-XXXX-XXXX.zip" --key FMP-XXXX-XXXX-XXXX-XXXX --flavor noexe
    ```
 
+   - `--flavor` defaults to `exe`; pass `--flavor noexe` for the antivirus-friendly build. The two live side by
+     side in `updates\<BUILD TAG>\` (named `Fleet Manager Pro <ver>.zip` and `Fleet Manager Pro <ver> (no exe).zip`),
+     and the server offers each copy the one matching its flavour.
    - For a **stock** copy: `--stock`.
    - You can also target by build tag: `--tag FMPB-XXXX-XXXX-XXXX-XXXX`.
    - Add short release notes the buyer sees: `--notes "Adds X, fixes Y."`
 
-   The zip's filename **must contain the version** (e.g. `...For Buyer 1.4.zip`). `publish_update.py` copies it
-   into `updates\<BUILD TAG>\` and removes the previous one there.
+   The version is read from the `VERSION` file inside the package. `publish_update.py` copies it into
+   `updates\<BUILD TAG>\` and removes the previous package **of that flavour** there.
 
 4. **Make sure `license_server.py` is running** on this PC. That's it — the buyer's copy offers the update at its
    next daily check or restart.

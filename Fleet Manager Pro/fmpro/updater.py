@@ -7,9 +7,10 @@ How it works
   Nothing is trusted unless the manifest is signed by the very key that signs licences (verified with the
   public key baked into this copy) - so a broken or hostile server can't push a tampered build.
 * The buyer sees an "Update available" banner. When they click *Update now*, the app downloads the package
-  over the pinned channel, checks it against the signed SHA-256, unpacks it beside the program and - on the
-  compiled Fleet Manager Pro.exe copy - hands off to a tiny helper that waits for this program to close, swaps
-  the new files in (keeping the data folder untouched) and relaunches.
+  over the pinned channel, checks it against the signed SHA-256, unpacks it beside the program and - on an
+  installed buyer copy (both the single-program .exe and the no-exe build) - hands off to a tiny helper that
+  waits for this program to close, swaps the new files in (keeping the data folder untouched) and relaunches.
+  The server offers each copy the package built for its flavour, so a no-exe copy never gets an .exe package.
 
 This is deliberately *notify + one click*: it never replaces the app behind the buyer's back.
 """
@@ -29,6 +30,7 @@ from . import licensing
 log = logging.getLogger("fmpro.update")
 
 EXE_NAME = "Fleet Manager Pro.exe"
+LAUNCHER_BAT = "Start Fleet Manager Pro.bat"     # how the no-exe copy is started
 CHECK_EVERY = 24 * 3600          # seconds between background checks
 FIRST_CHECK_DELAY = 25           # let the app finish starting and the licence settle first
 
@@ -59,6 +61,34 @@ def _frozen():
 
 def _install_dir():
     return os.path.dirname(os.path.abspath(sys.executable))
+
+
+def _noexe_root():
+    """For the no-exe copy, the install root (the folder with Start Fleet Manager Pro.bat and app\\run.pyc):
+    the parent of the bundled runtime\\ that python.exe runs from. None when that layout isn't present."""
+    exe = os.path.abspath(sys.executable)
+    if os.path.basename(exe).lower() != "python.exe":
+        return None
+    runtime = os.path.dirname(exe)                      # ...\runtime
+    if os.path.basename(runtime).lower() != "runtime":
+        return None
+    return os.path.dirname(runtime)                     # ...\ (install root)
+
+
+def _flavor():
+    """Which packaged buyer copy this is, and may replace itself: 'exe' (one Fleet Manager Pro.exe),
+    'noexe' (python runtime + app\\run.pyc), or None for a source / developer copy that must not self-apply."""
+    if _frozen():
+        return "exe"
+    root = _noexe_root()
+    if root and os.path.isfile(os.path.join(root, LAUNCHER_BAT)) and os.path.isfile(os.path.join(root, "app", "run.pyc")):
+        return "noexe"
+    return None
+
+
+def _install_root(flavor):
+    """The folder the new files are copied over."""
+    return _noexe_root() if flavor == "noexe" else _install_dir()
 
 
 def _data_dir():
@@ -96,7 +126,8 @@ def check():
     """Ask the server for a newer, signed build. Returns a snapshot of STATE. Never raises."""
     global _manifest
     cur = current_version()
-    body = {"product": licensing.PRODUCT, "version": cur, "machine": licensing.machine_id()}
+    body = {"product": licensing.PRODUCT, "version": cur, "machine": licensing.machine_id(),
+            "flavor": _flavor() or "exe"}
     if licensing.BUILD_TAG:
         body["build"] = licensing.BUILD_TAG
     try:
@@ -162,12 +193,15 @@ def _safe_extract(zf, dest):
             shutil.copyfileobj(src, out)
 
 
-def _find_app_root(staged):
-    """The folder inside the unpacked package that actually holds Fleet Manager Pro.exe."""
-    if os.path.isfile(os.path.join(staged, EXE_NAME)):
+def _find_app_root(staged, flavor):
+    """The folder inside the unpacked package that holds the program: Fleet Manager Pro.exe for an exe copy,
+    Start Fleet Manager Pro.bat for a no-exe copy, or either when flavor is None (a dev copy). Returns None if
+    the package doesn't match - which stops a no-exe copy ever applying an .exe package, and vice versa."""
+    markers = [LAUNCHER_BAT] if flavor == "noexe" else ([EXE_NAME] if flavor == "exe" else [EXE_NAME, LAUNCHER_BAT])
+    if any(os.path.isfile(os.path.join(staged, mk)) for mk in markers):
         return staged
     for cur, _dirs, files in os.walk(staged):
-        if EXE_NAME in files:
+        if any(mk in files for mk in markers):
             return cur
     return None
 
@@ -216,39 +250,41 @@ def install_now():
             STATE.update(status="error", error="Couldn't unpack the update.")
         return f"Couldn't unpack the update: {e}"
 
-    root = _find_app_root(staged)
+    flavor = _flavor()
+    root = _find_app_root(staged, flavor)
     if root is None:
         with _lock:
             STATE.update(status="error", error="The package didn't contain the program.")
-        return "The update package didn't contain Fleet Manager Pro. Nothing was changed."
+        return "The update package didn't match this copy of Fleet Manager Pro. Nothing was changed."
 
     with _lock:
         STATE.update(status="staged", staged=root, error=None)
     log.info("update %s downloaded and verified, staged at %s", m["version"], root)
 
-    if not _frozen():
+    if flavor is None:
         log.info("update %s staged; source copy won't self-apply", m["version"])
-        return ("The update was downloaded to data\\updates, but a source copy can't replace itself "
-                "automatically - only the compiled Fleet Manager Pro.exe copies do. Nothing was changed.")
+        return ("The update was downloaded to data\\updates, but a source / developer copy can't replace "
+                "itself automatically - only installed buyer copies do. Nothing was changed.")
 
     # Give the browser ~2s to receive the redirect, then swap the files and relaunch.
-    log.info("update %s: closing to swap in the new files and relaunch", m["version"])
-    threading.Thread(target=_apply_after, args=(root, ver_dir, 2.0), daemon=True).start()
+    log.info("update %s (%s copy): closing to swap in the new files and relaunch", m["version"], flavor)
+    threading.Thread(target=_apply_after, args=(root, ver_dir, flavor, 2.0), daemon=True).start()
     return None
 
 
-def _apply_after(app_root, ver_dir, delay):
+def _apply_after(app_root, ver_dir, flavor, delay):
     time.sleep(delay)
     try:
-        _launch_swapper(app_root, ver_dir)
+        _launch_swapper(app_root, ver_dir, flavor)
     finally:
         os._exit(0)                     # drop waitress immediately so the files are free to overwrite
 
 
-def _launch_swapper(app_root, ver_dir):
+def _launch_swapper(app_root, ver_dir, flavor):
     """Write and launch a detached .cmd that waits for us to exit, copies the new files over the install
     (keeping data\\), relaunches the app and deletes itself."""
-    install = _install_dir()
+    install = _install_root(flavor)
+    relaunch = os.path.join(install, LAUNCHER_BAT if flavor == "noexe" else EXE_NAME)
     pid = os.getpid()
     data = os.path.join(install, "data")
     helper = os.path.join(tempfile.gettempdir(), f"fmp-update-{pid}.cmd")
@@ -263,7 +299,7 @@ def _launch_swapper(app_root, ver_dir):
         "  goto waitloop\r\n"
         ")\r\n"
         f'robocopy "{app_root}" "{install}" /E /IS /IT /XD "{data}" /R:3 /W:2 /NFL /NDL /NJH /NJS /NP >nul\r\n'
-        f'start "" "{os.path.join(install, EXE_NAME)}"\r\n'
+        f'start "" "{relaunch}"\r\n'
         f'rmdir /s /q "{ver_dir}" >nul 2>&1\r\n'
         'del "%~f0" >nul 2>&1\r\n'
     )

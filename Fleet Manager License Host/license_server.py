@@ -560,11 +560,13 @@ class Server:
         d = os.path.join(base, "GENERIC")
         return d if os.path.isdir(d) else None
 
-    def latest_update(self, build):
-        """(version, filename, folder) of the newest package for a copy, or None."""
+    def latest_update(self, build, flavor="exe"):
+        """(version, filename, folder) of the newest package of this copy's flavour, or None. A package whose
+        name contains 'no exe' is the no-exe build; any other is the single-program .exe build."""
         folder = self._update_folder(build)
         if not folder:
             return None
+        want = "noexe" if "noexe" in str(flavor).lower().replace(" ", "").replace("-", "") else "exe"
         best = None
         try:
             names = os.listdir(folder)
@@ -572,6 +574,10 @@ class Server:
             return None
         for name in names:
             if not name.lower().endswith(".zip"):
+                continue
+            low = name.lower()
+            is_noexe = "no exe" in low or "no-exe" in low or "noexe" in low
+            if ("noexe" if is_noexe else "exe") != want:
                 continue
             m = UPDATE_ZIP_RX.search(name)
             if not m:
@@ -581,9 +587,9 @@ class Server:
                 best = (ver, name, folder)
         return best
 
-    def update_manifest(self, build, client_version):
-        """Signed offer of the newest build for this copy (or {'update': False} when it's current)."""
-        best = self.latest_update(build)
+    def update_manifest(self, build, client_version, flavor="exe"):
+        """Signed offer of the newest build for this copy's flavour (or {'update': False} when it's current)."""
+        best = self.latest_update(build, flavor)
         if not best:
             return {"ok": True, "update": False}
         ver, name, folder = best
@@ -713,7 +719,7 @@ class Server:
                 raise LicenceError("bad_product", "This licence server only serves Fleet Manager Pro updates.")
             build = str(body.get("build") or "").strip().upper()
             build = build if BUILD_RX.match(build) else ""
-            return self.update_manifest(build, str(body.get("version") or ""))
+            return self.update_manifest(build, str(body.get("version") or ""), str(body.get("flavor") or "exe"))
         if path.startswith("/v1/admin/"):
             if peer is not None and not admin_peer_ok(peer):
                 # Straight from the internet (no HTTPS): the admin token must never travel that way.

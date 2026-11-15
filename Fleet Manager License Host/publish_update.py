@@ -58,6 +58,8 @@ def main():
     g.add_argument("--generic", action="store_true", help="the unsealed developer/seller copy")
     ap.add_argument("--notes", default="", help="short release notes shown to the buyer")
     ap.add_argument("--version", default="", help="override the version (otherwise read from the zip name or VERSION)")
+    ap.add_argument("--flavor", choices=["exe", "noexe"], default="exe",
+                    help="which build this package is: exe (single Fleet Manager Pro.exe) or noexe (python runtime + app)")
     a = ap.parse_args()
 
     src = a.zip
@@ -89,10 +91,16 @@ def main():
 
     dest_dir = os.path.join(HERE, "updates", folder)
     os.makedirs(dest_dir, exist_ok=True)
-    dest_name = f"Fleet Manager Pro {version}.zip"      # a clean name the server can always read the version from
-    # Drop older packages so only the newest remains (the server picks the highest version anyway).
+    suffix = " (no exe)" if a.flavor == "noexe" else ""
+    dest_name = f"Fleet Manager Pro {version}{suffix}.zip"   # the server reads both the version and the flavour from this
+    # Drop older packages of the SAME flavour so only the newest of each flavour remains; leave the other
+    # flavour's package in place (a buyer on the .exe build and one on the no-exe build both get served).
     for old in os.listdir(dest_dir):
-        if old.lower().endswith(".zip") and old != dest_name:
+        low = old.lower()
+        if not low.endswith(".zip") or old == dest_name:
+            continue
+        old_is_noexe = "no exe" in low or "no-exe" in low or "noexe" in low
+        if old_is_noexe == (a.flavor == "noexe"):
             os.remove(os.path.join(dest_dir, old))
     dest = os.path.join(dest_dir, dest_name)
     shutil.copy2(src, dest)
@@ -100,7 +108,7 @@ def main():
         with open(os.path.join(dest_dir, f"notes-{version}.txt"), "w", encoding="utf-8") as fh:
             fh.write(a.notes.strip()[:2000])
 
-    print(f"Published Fleet Manager Pro {version} for '{folder}'.")
+    print(f"Published Fleet Manager Pro {version} ({a.flavor}) for '{folder}'.")
     print(f"  -> {dest}")
     print("The licence server offers it the next time that copy checks (start-up or within a day). "
           "Make sure license_server.py is running on this PC.")
