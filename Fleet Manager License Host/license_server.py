@@ -16,6 +16,9 @@ Public API (used by Fleet Manager and Fleet Manager Pro):
   POST /v1/deactivate  {key, machine}   free this PC's slot (moving to a new PC)
   POST /v1/recruit     {key, machine, product, company, intro, open, ack: [ids]}   (Fleet Manager Pro)
                        publishes the company's Apply page and hands over new applications; acked ones are deleted
+  POST /v1/update      {product, build, version}   newest build for this copy -> Ed25519-signed manifest
+                       (version, sha256, file) or {update: false}. Packages live in  updates/<BUILD TAG>/ .
+  GET  /v1/update/file?build=<tag>&name=<zip>   download a package (its SHA-256 is pinned by the signed manifest)
 Public pages (no key):
   GET/POST /apply/<code>   the company's application form (rate-limited, honeypot, length limits)
 Admin API (Authorization: Bearer <admin_token>), used by License Manager:
@@ -40,19 +43,37 @@ import http.server
 import ipaddress
 import json
 import hmac
+import logging
 import os
 import re
 import secrets
+import shutil
 import socket
 import sqlite3
 import ssl
 import sys
 import threading
 import time
+from logging.handlers import RotatingFileHandler
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import ed25519  # noqa: E402
+
+# Purchase keys are masked in the logs (keep the first and last group so entries can be correlated, but never
+# record a whole, usable key). Build tags (FMPB-...) don't unlock anything, so they're left readable.
+_LOG_KEY_RX = re.compile(r"\bFMP-([A-Z0-9]{4})-([A-Z0-9]{4})-([A-Z0-9]{4})-([A-Z0-9]{4})\b", re.I)
+
+
+class _KeyRedactor(logging.Filter):
+    def filter(self, record):
+        try:
+            msg = record.getMessage()
+        except Exception:
+            return True
+        record.msg = _LOG_KEY_RX.sub(lambda m: f"FMP-{m.group(1)}-****-****-{m.group(4)}", msg)
+        record.args = ()
+        return True
 
 PRODUCT = "Fleet Manager Pro"                   # this server only licenses Fleet Manager Pro
 PRODUCTS = {"Fleet Manager Pro": "FMP"}         # product -> purchase key prefix
@@ -131,6 +152,36 @@ def iso(t):
 def canonical(payload):
     body = {k: v for k, v in payload.items() if k != "sig"}
     return json.dumps(body, sort_keys=True, separators=(",", ":")).encode()
+
+
+# ---------------------------------------------------------------------------------------------- updates
+UPDATE_ZIP_RX = re.compile(r"(\d+(?:\.\d+)+)")       # a version like 1.4 or 1.4.2 inside a package filename
+_SHA_CACHE = {}
+
+
+def vtuple(s):
+    """Compare version strings like '1.3', '1.4', '1.4.2' as tuples of ints."""
+    out = []
+    for part in str(s or "").split("."):
+        digits = "".join(c for c in part if c.isdigit())
+        out.append(int(digits) if digits else 0)
+    return tuple(out) or (0,)
+
+
+def file_sha256(path):
+    """SHA-256 of a file, cached by (path, mtime, size) so repeat checks don't re-hash a big zip."""
+    st = os.stat(path)
+    key = (st.st_mtime_ns, st.st_size)
+    hit = _SHA_CACHE.get(path)
+    if hit and hit[0] == key:
+        return hit[1]
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    digest = h.hexdigest()
+    _SHA_CACHE[path] = (key, digest)
+    return digest
 
 
 class LicenceError(Exception):
@@ -435,6 +486,48 @@ class Server:
             ctx.minimum_version = ssl.TLSVersion.TLSv1_2
             ctx.load_cert_chain(cert, key_file)
             self.tls_ctx, self.tls_pin = ctx, tls_fingerprint(cert)
+        self.log = logging.getLogger(f"licence.{id(self)}")
+        self.log.propagate = False
+        self._log_ready = False
+
+    def setup_logging(self):
+        """Write the server's activity to logs/ next to it (server.log + errors.log), plus the console."""
+        if self._log_ready:
+            return
+        logdir = os.path.join(self.folder, "logs")
+        try:
+            os.makedirs(logdir, exist_ok=True)
+        except OSError:
+            self._log_ready = True
+            return
+        self.log.setLevel(logging.INFO)
+        fmt = logging.Formatter("%(asctime)s  %(levelname)-7s %(message)s", "%Y-%m-%d %H:%M:%S")
+        red = _KeyRedactor()
+        for filename, lvl in (("server.log", logging.INFO), ("errors.log", logging.WARNING)):
+            h = RotatingFileHandler(os.path.join(logdir, filename), maxBytes=2_000_000, backupCount=10, encoding="utf-8")
+            h.setLevel(lvl)
+            h.setFormatter(fmt)
+            h.addFilter(red)
+            self.log.addHandler(h)
+        console = logging.StreamHandler()
+        console.setLevel(logging.INFO)
+        console.setFormatter(fmt)
+        console.addFilter(red)
+        self.log.addHandler(console)
+        self._log_ready = True
+
+    def _req_detail(self, path, body, result):
+        """A readable tail for the request log line (keys are masked by the log filter)."""
+        if path in ("/v1/activate", "/v1/check", "/v1/deactivate"):
+            return f"  key={body.get('key')} machine={body.get('machine')} build={body.get('build') or '-'}"
+        if path == "/v1/update":
+            m = (result or {}).get("manifest") or {}
+            return f"  build={body.get('build') or '-'} has={body.get('version')} offer={m.get('version') or 'none'}"
+        if path == "/v1/recruit":
+            return f"  key={body.get('key')}"
+        if path.startswith("/v1/admin/"):
+            return f"  {path.rsplit('/', 1)[-1]} key={body.get('key') or '-'}"
+        return ""
 
     def lease(self, p, act, build=None):
         t = now()
@@ -446,6 +539,80 @@ class Server:
             lease["unlock"] = wrapped_page_key(self.master, build, act["machine"])
         lease["sig"] = ed25519.sign(self.secret, canonical(lease)).hex()
         return lease
+
+    # ---- updates: per-copy signed manifests + downloads, from the updates/ folder next to this server
+    def updates_dir(self):
+        return os.path.join(self.folder, "updates")
+
+    def _update_folder(self, build):
+        """The folder that holds a copy's updates: updates/<BUILD TAG>, or updates/STOCK for a stock copy,
+        or updates/GENERIC for an unsealed developer copy. None when there's nothing for this copy."""
+        base = self.updates_dir()
+        build = (build or "").strip().upper()
+        if BUILD_RX.match(build):
+            d = os.path.join(base, build)
+            if os.path.isdir(d):
+                return d
+            if build == build_tag(self.master, "STOCK"):
+                d = os.path.join(base, "STOCK")
+                return d if os.path.isdir(d) else None
+            return None
+        d = os.path.join(base, "GENERIC")
+        return d if os.path.isdir(d) else None
+
+    def latest_update(self, build):
+        """(version, filename, folder) of the newest package for a copy, or None."""
+        folder = self._update_folder(build)
+        if not folder:
+            return None
+        best = None
+        try:
+            names = os.listdir(folder)
+        except OSError:
+            return None
+        for name in names:
+            if not name.lower().endswith(".zip"):
+                continue
+            m = UPDATE_ZIP_RX.search(name)
+            if not m:
+                continue
+            ver = m.group(1)
+            if best is None or vtuple(ver) > vtuple(best[0]):
+                best = (ver, name, folder)
+        return best
+
+    def update_manifest(self, build, client_version):
+        """Signed offer of the newest build for this copy (or {'update': False} when it's current)."""
+        best = self.latest_update(build)
+        if not best:
+            return {"ok": True, "update": False}
+        ver, name, folder = best
+        if vtuple(ver) <= vtuple(client_version or "0"):
+            return {"ok": True, "update": False, "version": ver}
+        path = os.path.join(folder, name)
+        notes = ""
+        npath = os.path.join(folder, "notes-%s.txt" % ver)
+        if os.path.isfile(npath):
+            with open(npath, encoding="utf-8", errors="replace") as fh:
+                notes = fh.read()[:2000]
+        m = {"product": PRODUCT, "build": (build or "").strip().upper(), "version": ver, "file": name,
+             "size": os.path.getsize(path), "sha256": file_sha256(path), "notes": notes, "issued": iso(now())}
+        m["sig"] = ed25519.sign(self.secret, canonical(m)).hex()
+        return {"ok": True, "update": True, "manifest": m}
+
+    def update_file(self, build, name):
+        """Absolute path to a package a copy may download, or None (guards against path traversal)."""
+        folder = self._update_folder(build)
+        if not folder:
+            return None
+        name = os.path.basename(name or "")
+        if not name.lower().endswith(".zip"):
+            return None
+        root = os.path.realpath(folder)
+        path = os.path.realpath(os.path.join(folder, name))
+        if path != root and not path.startswith(root + os.sep):
+            return None
+        return path if os.path.isfile(path) else None
 
     def rate_ok(self, ip, limit=60):
         t = time.time()
@@ -541,6 +708,12 @@ class Server:
                                                     body.get("ack") if isinstance(body.get("ack"), list) else [], ip)
             return {"ok": True, "code": code, "apply_url": f"{self.cfg['apply_base_url'].rstrip('/')}/apply/{code}",
                     "applications": pending}
+        if path == "/v1/update":
+            if body.get("product") != PRODUCT:
+                raise LicenceError("bad_product", "This licence server only serves Fleet Manager Pro updates.")
+            build = str(body.get("build") or "").strip().upper()
+            build = build if BUILD_RX.match(build) else ""
+            return self.update_manifest(build, str(body.get("version") or ""))
         if path.startswith("/v1/admin/"):
             if peer is not None and not admin_peer_ok(peer):
                 # Straight from the internet (no HTTPS): the admin token must never travel that way.
@@ -582,6 +755,7 @@ class Server:
 
     def serve(self, host="0.0.0.0"):  # nosec B104  # listens on the network on purpose so other PCs can connect; admin is LAN-only + token
         srv = self
+        self.setup_logging()
 
         class H(http.server.BaseHTTPRequestHandler):
             server_version = "FleetManagerLicence/2"
@@ -600,6 +774,7 @@ class Server:
 
             def _go(self, method):
                 ip = client_ip(self.client_address[0], self.headers.get("X-Forwarded-For"))
+                path = self.path.split("?")[0]
                 try:
                     try:
                         n = int(self.headers.get("Content-Length") or 0)
@@ -615,12 +790,15 @@ class Server:
                         raise LicenceError("bad_request", "Invalid JSON")
                     if not isinstance(body, dict):
                         raise LicenceError("bad_request", "Invalid JSON")
-                    self._reply(200, srv.handle(method, self.path.split("?")[0], body, self.headers, ip,
-                                                peer=self.client_address[0]))
+                    result = srv.handle(method, path, body, self.headers, ip, peer=self.client_address[0])
+                    self._reply(200, result)
+                    if path != "/v1/health":
+                        srv.log.info("%s %s -> 200  ip=%s%s", method, path, ip, srv._req_detail(path, body, result))
                 except LicenceError as e:
                     self._reply(e.status, {"ok": False, "code": e.code, "error": e.msg})
+                    srv.log.warning("%s %s -> %s %s: %s  ip=%s", method, path, e.status, e.code, e.msg, ip)
                 except Exception as e:  # never leak a traceback to clients
-                    print("[licence-server] error:", repr(e))
+                    srv.log.error("%s %s -> 500  ip=%s: %r", method, path, ip, e)
                     self._reply(500, {"ok": False, "code": "server_error", "error": "Licence server error"})
 
             def _apply(self, method):
@@ -638,7 +816,7 @@ class Server:
                 except ValueError:
                     status, page = 413, _page("Too long", "<p>That application is too long.</p>")
                 except Exception as e:  # never leak a traceback
-                    print("[licence-server] apply error:", repr(e))
+                    srv.log.error("apply-form error: %r", e)
                     status, page = 500, _page("Error", "<p>Something went wrong. Try again later.</p>")
                 data = page.encode("utf-8")
                 self.send_response(status)
@@ -651,9 +829,38 @@ class Server:
                 self.end_headers()
                 self.wfile.write(data)
 
+            def _download(self):
+                ip = client_ip(self.client_address[0], self.headers.get("X-Forwarded-For"))
+                if not srv.rate_ok(ip, limit=30):
+                    return self._reply(429, {"ok": False, "code": "rate_limited", "error": "Too many requests."})
+                path = None
+                try:
+                    q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+                    path = srv.update_file(q.get("build", [""])[0], q.get("name", [""])[0])
+                except Exception:
+                    path = None
+                if not path:
+                    srv.log.warning("update download refused (not found)  ip=%s", ip)
+                    return self._reply(404, {"ok": False, "code": "not_found", "error": "No such update."})
+                try:
+                    size = os.path.getsize(path)
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/zip")
+                    self.send_header("Content-Length", str(size))
+                    self.send_header("Content-Disposition", 'attachment; filename="%s"' % os.path.basename(path))
+                    self.send_header("Cache-Control", "no-store")
+                    self.end_headers()
+                    with open(path, "rb") as fh:
+                        shutil.copyfileobj(fh, self.wfile, 1 << 20)
+                    srv.log.info("update download: %s (%d bytes)  ip=%s", os.path.basename(path), size, ip)
+                except (ConnectionError, OSError, ssl.SSLError):
+                    pass
+
             def do_GET(self):
                 if self.path.startswith("/apply/"):
                     return self._apply("GET")
+                if self.path.split("?")[0] == "/v1/update/file":
+                    return self._download()
                 self._go("GET")
 
             def do_POST(self):
@@ -678,13 +885,15 @@ class Server:
                 exc = sys.exc_info()[1]
                 if isinstance(exc, (ConnectionError, TimeoutError, socket.timeout, ssl.SSLError)):
                     return
-                print(f"[licence-server] error: request from {client_address[0]} failed: {exc!r}")
+                srv.log.error("request from %s failed: %r", client_address[0], exc)
 
         httpd = Quiet((host, self.port), H)
-        print(f"Fleet Manager licence server on http://{host}:{self.port}  (public key {self.public[:16]}...)")
-        print("Encryption: ON - HTTPS and HTTP on the same port (certificate " + self.tls_pin[:16] + "...)"
-              if self.tls_ctx else "Encryption: off (no tls_cert.pem / tls_key.pem in this folder)")
-        print(f"Purchases: {len(self.store.listing())}. Ctrl+C to stop.")
+        self.log.info("Fleet Manager licence server on %s:%s (public key %s...)", host, self.port, self.public[:16])
+        if self.tls_ctx:
+            self.log.info("Encryption: ON - HTTPS and HTTP on one port (certificate %s...)", self.tls_pin[:16])
+        else:
+            self.log.info("Encryption: off (no tls_cert.pem / tls_key.pem in this folder)")
+        self.log.info("Purchases: %s. Logs in logs/. Ctrl+C to stop.", len(self.store.listing()))
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:

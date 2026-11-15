@@ -18,12 +18,15 @@ import hashlib
 import hmac
 import http.client
 import json
+import logging
 import os
 import ssl
 import sys
 import threading
 import urllib.parse
 import uuid
+
+log = logging.getLogger("fmpro.licence")
 
 PRODUCT = "Fleet Manager Pro"
 PUBLIC_KEY_HEX = "49b187237dea8f82b9dc28d042b9c2b76f000380b22080241a30821fbaf83896"
@@ -316,6 +319,63 @@ def _post_to(base, path, body, timeout=8):
     return reply
 
 
+def fetch(path, timeout=300, max_bytes=500_000_000):
+    """GET raw bytes from the licence server over the same pinned channel (public address first, then the
+    seller's home-network fallback). Used to download a signed update package."""
+    urls = [server_url()]
+    if LAN_FALLBACK and not (_DEV and os.environ.get("FMP_LICENSE_SERVER")) and LAN_FALLBACK.rstrip("/") != urls[0]:
+        urls.append(LAN_FALLBACK.rstrip("/"))
+    for i, base in enumerate(urls):
+        try:
+            return _get_to(base, path, timeout, max_bytes)
+        except ConnectionError:
+            if i == len(urls) - 1:
+                raise
+
+
+def _get_to(base, path, timeout, max_bytes):
+    """GET one URL with the certificate pinned exactly, returning the response body as bytes."""
+    u = urllib.parse.urlsplit(base + path)
+    try:
+        if u.scheme == "https":
+            if tls_pin():
+                ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+                ctx.check_hostname, ctx.verify_mode = False, ssl.CERT_NONE   # trust comes from the pin
+                ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+            else:
+                ctx = ssl.create_default_context()
+            conn = http.client.HTTPSConnection(u.hostname, u.port or 443, timeout=timeout, context=ctx)
+        else:
+            conn = http.client.HTTPConnection(u.hostname, u.port or 80, timeout=timeout)
+        try:
+            conn.connect()
+            if u.scheme == "https" and tls_pin():
+                seen = hashlib.sha256(conn.sock.getpeercert(binary_form=True)).hexdigest()
+                if seen != tls_pin():
+                    raise ConnectionError("The licence server's certificate doesn't match this copy - the connection "
+                                          "may be intercepted, so it was refused.")
+            q = u.path + (("?" + u.query) if u.query else "")
+            conn.request("GET", q or "/", headers={"User-Agent": "FleetManagerPro"})
+            r = conn.getresponse()
+            if r.status >= 400:
+                raise ServerRefused(f"http_{r.status}", f"The update server answered {r.status}.")
+            out = bytearray()
+            while True:
+                chunk = r.read(1 << 16)
+                if not chunk:
+                    break
+                out += chunk
+                if len(out) > max_bytes:
+                    raise ConnectionError("The update is larger than expected; the download was stopped.")
+            return bytes(out)
+        finally:
+            conn.close()
+    except (ConnectionError, ServerRefused):
+        raise
+    except (OSError, http.client.HTTPException) as e:
+        raise ConnectionError(f"Can't reach the update server ({server_url()}).") from e
+
+
 # ---------------------------------------------------------------------------------------------- licence state
 class Licence:
     """This PC's Pro licence, kept in <data>/licence.json."""
@@ -396,6 +456,8 @@ class Licence:
         self.online = True
         self._evaluate()
         self._save()
+        log.info("licence accepted: key=%s slot=%s/%s expires=%s build=%s ok=%s", key, lease.get("slot"),
+                 lease.get("slots"), lease.get("expires"), lease.get("build"), self.ok)
 
     # actions
     def activate(self, key):
@@ -406,18 +468,21 @@ class Licence:
         if key.startswith("FM-"):
             return "That's a key for the original Fleet Manager. Fleet Manager Pro keys start with FMP-."
         with self.lock:
+            log.info("activation requested: key=%s machine=%s", key, self.machine)
             try:
                 body = dict(self._body(), key=key)
                 d = _post("/v1/activate", body)
                 self._accept(key, d.get("lease"))
                 return None if self.ok else self.reason
             except ServerRefused as e:
+                log.warning("activation refused: %s (%s)", e.message, e.code)
                 if e.code == "bad_product" or (e.code == "bad_key" and key.startswith("FMP-")):
                     return ("The licence server hasn't been updated for Fleet Manager Pro yet. "
                             "Ask the seller to update it.")
                 return e.message
             except ConnectionError as e:
                 self.online = False
+                log.warning("activation failed - licence server unreachable: %s", e)
                 return f"{e} Check your internet connection and try again."
 
     def check(self):
@@ -431,15 +496,18 @@ class Licence:
             except ServerRefused as e:
                 self.online = True
                 if e.code in ("revoked", "not_active", "unknown_key", "wrong_product"):
+                    log.warning("licence locked by server: %s (%s)", e.message, e.code)
                     self.lease = None
                     self.last_check = _now().isoformat(timespec="seconds")
                     self._save()
                     self._evaluate()
                     self.reason = e.message
                 else:
+                    log.info("licence check: server refused (%s), keeping current lease", e.code)
                     self._evaluate()
             except ConnectionError:
                 self.online = False
+                log.info("licence check: licence server unreachable, using saved lease (offline grace)")
                 self._evaluate()
                 try:
                     self._save()
@@ -461,6 +529,7 @@ class Licence:
                     return e.message
             except ConnectionError as e:
                 return str(e)
+            log.info("deactivated this PC (key=%s)", self.key)
             self.key = self.lease = self.last_check = None
             try:
                 os.remove(self.path)
@@ -498,4 +567,8 @@ LICENCE = None   # set by create_app()
 
 
 def licensed():
+    # Demo/developer copies (no sealed build tag) can be unlocked for showing the app off with test data by
+    # setting FMP_DEMO=1. Buyer copies are always built with a sealed build tag, so they ignore this entirely.
+    if not BUILD_TAG and os.environ.get("FMP_DEMO") == "1":
+        return True
     return bool(LICENCE and LICENCE.ok)

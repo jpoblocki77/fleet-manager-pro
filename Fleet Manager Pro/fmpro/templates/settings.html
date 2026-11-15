@@ -134,6 +134,19 @@
   If the old PC is gone (broken, reinstalled, sold), ask the seller to release it.</p>
   <p class="muted">Your company data lives in the <code>data</code> folder — copy it to the new PC to keep everything.</p>
 </div>
+<div class="card"><div class="card-head"><h2>Updates</h2><span class="right badge {{ 'warn' if (UPDATE and UPDATE.available) else 'ok' }}">{{ 'update ready' if (UPDATE and UPDATE.available) else 'up to date' }}</span></div>
+  <dl class="kv">
+    <dt>Installed</dt><dd>Fleet Manager Pro {{ VERSION }}</dd>
+    {% if UPDATE and UPDATE.available %}<dt>Available</dt><dd><b>{{ UPDATE.version }}</b>{% if UPDATE.size %} <span class="muted small">({{ (UPDATE.size / 1048576)|round(1) }} MB)</span>{% endif %}</dd>{% endif %}
+  </dl>
+  {% if UPDATE and UPDATE.notes %}<p class="small muted">{{ UPDATE.notes }}</p>{% endif %}
+  {% if UPDATE and UPDATE.error %}<p class="small" style="color:var(--bad,#c8102e)">{{ UPDATE.error }}</p>{% endif %}
+  <p class="small muted">Checked automatically every day. An update installs only when you click <b>Update now</b>; the app then closes and reopens by itself. Your <code>data</code> folder is never touched.</p>
+  <form method="post" action="/settings/update" class="row">{{ csrf() }}
+    <button class="btn" name="action" value="check">Check for updates</button>
+    {% if UPDATE and UPDATE.available %}<button class="btn" name="action" value="install" data-confirm="Download and install Fleet Manager Pro {{ UPDATE.version }} now? The app will close and reopen automatically.">Update now</button>{% endif %}
+  </form>
+</div>
 </div>
 
 {% elif tab == 'data' %}

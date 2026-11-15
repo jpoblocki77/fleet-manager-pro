@@ -5,7 +5,7 @@ import secrets
 import sys
 import time
 
-from flask import Flask, request
+from flask import Flask, request, g
 from flask.sessions import SecureCookieSessionInterface
 
 
@@ -67,12 +67,16 @@ def create_app(data_dir=None, start_telemetry=True, check_licence=True):
 
     data_dir = data_dir or os.path.join(ROOT, "data")
     os.makedirs(data_dir, exist_ok=True)
+    from . import logs
+    logs.setup(data_dir)
     db.init(os.path.join(data_dir, "fleet.db"))
     licensing.LICENCE = licensing.Licence(os.path.join(data_dir, "licence.json"))
     if check_licence:
         licensing.LICENCE.start()
         from . import recruit
         recruit.start()
+        from . import updater
+        updater.start()
 
     app = Flask(__name__)
     emb = licensing.load_build()            # buyer copies: pages compiled in, most of them sealed to the licence
@@ -99,10 +103,42 @@ def create_app(data_dir=None, start_telemetry=True, check_licence=True):
     app.register_blueprint(leasing_views.bp)
     auth.install(app)
     _filters(app)
+    _logging_hooks(app)
 
     if start_telemetry:
         HUB.start_local()
     return app
+
+
+def _logging_hooks(app):
+    """Log every web request (except static files and the high-frequency telemetry feed) and any unhandled error."""
+    from . import logs
+
+    @app.before_request
+    def _log_start():
+        g._log_t0 = time.time()
+
+    @app.after_request
+    def _log_access(resp):
+        try:
+            ep = request.endpoint or ""
+            if ep not in ("static", "api.agent_frame"):
+                from .auth import user as _user
+                u = _user()
+                dt = (time.time() - getattr(g, "_log_t0", time.time())) * 1000
+                logs.get("access").info("%s %s -> %s  %.0fms  user=%s ip=%s", request.method, request.path,
+                                        resp.status_code, dt, (u["display_name"] if u else "-"), request.remote_addr)
+        except Exception:  # logging must never break a response
+            pass
+        return resp
+
+    @app.teardown_request
+    def _log_error(exc):
+        if exc is not None:
+            try:
+                logs.get("error").error("unhandled error on %s %s", request.method, request.path, exc_info=exc)
+            except Exception:
+                pass
 
 
 def _filters(app):
@@ -207,8 +243,9 @@ def _filters(app):
 
     @app.context_processor
     def globals_():
-        from . import tlsfront
+        from . import tlsfront, updater
         return {"APP_NAME": APP_NAME, "COPYRIGHT": COPYRIGHT, "STARTING_CAPITAL": db.STARTING_CAPITAL, "VERSION": VERSION, "progress": economy.progress,
                 "lan_pin": tlsfront.fingerprint(app.config["DATA_DIR"]),
                 "S": db.all_settings(), "now": time.time(), "AGENT_CMD": AGENT_CMD,
+                "UPDATE": updater.state(),
                 "dvir_price": economy.dvir_repair_price}

@@ -2,6 +2,7 @@
 import functools
 import hmac
 import ipaddress
+import logging
 import os
 import secrets
 import socket
@@ -11,6 +12,8 @@ from flask import Blueprint, abort, flash, g, redirect, render_template, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import db, economy, licensing
+
+log = logging.getLogger("fmpro.auth")
 
 bp = Blueprint("auth", __name__)
 
@@ -330,24 +333,29 @@ def login():
         u = db.one("SELECT * FROM users WHERE username=? AND status!='removed'", (name,))
         ip, key = request.remote_addr or "?", name.lower()[:64]
         if _throttled(ip, key):
+            log.warning("login throttled for '%s' from ip=%s (too many failures)", name, ip)
             error = "Too many wrong passwords from this PC. Try again in a few minutes."
         elif u and check_password_hash(u["password_hash"], pw):
             db.ex("DELETE FROM login_failures WHERE ip=? AND username=?", (ip, key))
             db.update("users", u["id"], last_seen=time.time())
             start_session(u["id"])
             db.audit(u["id"], "login")
+            log.info("login ok: user=%s (%s) ip=%s", u["display_name"], name, ip)
             return redirect(safe_next(request.args.get("next", ""), url_for("pages.dashboard")))
         else:
             if not u:   # spend the same time as a real check, so timing doesn't reveal which names exist
                 check_password_hash(_DUMMY_HASH, pw)
             db.ex("INSERT INTO login_failures(ip, username, t) VALUES (?,?,?)", (ip, key, time.time()))
+            log.warning("login failed for '%s' from ip=%s", name, ip)
             error = "Wrong username or password."
     return render_template("login.html", error=error)
 
 
 @bp.route("/logout", methods=["POST"])
 def logout():
+    uid = session.get("uid")
     session.clear()
+    log.info("logout (user id=%s)", uid)
     return redirect(url_for("auth.login"))
 
 

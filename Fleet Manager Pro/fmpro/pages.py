@@ -8,7 +8,7 @@ import time
 
 from flask import Blueprint, current_app, abort, flash, redirect, render_template, request, url_for
 
-from . import RES, db, economy, licensing
+from . import RES, db, economy, licensing, updater
 from .auth import PASSWORD_RULE, ROLES, game_scope, game_sql, can, create_user, login_required, role_level, user, valid_password
 from .telemetry import layout
 from .telemetry.reader import field_count
@@ -1390,6 +1390,28 @@ def licence_action():
         else:
             db.audit(user()["id"], "licence deactivated", lic.machine)
             return redirect(url_for("auth.activate"))
+    return redirect(url_for("pages.settings", tab="licence"))
+
+
+@bp.route("/settings/update", methods=["POST"])
+@login_required(role="admin")
+def update_action():
+    action = request.form.get("action")
+    if action == "check":
+        st = updater.check()
+        if st["available"]:
+            flash(f"Update available: Fleet Manager Pro {st['version']}.", "success")
+        elif st["error"]:
+            flash(st["error"], "error")
+        else:
+            flash(f"You're on the latest version ({updater.current_version()}).", "success")
+    elif action == "install":
+        msg = updater.install_now()
+        if msg is None:
+            flash("Updating… Fleet Manager Pro will close and reopen in a few seconds.", "success")
+        else:
+            ok = msg.startswith("The update was downloaded")
+            flash(msg, "success" if ok else "error")
     return redirect(url_for("pages.settings", tab="licence"))
 
 

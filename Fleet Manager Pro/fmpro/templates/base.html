@@ -73,6 +73,16 @@
     </header>
     <main class="content">
       {% with msgs = get_flashed_messages(with_categories=true) %}{% for cat, m in msgs %}<div class="flash {{ cat }}">{{ m }}</div>{% endfor %}{% endwith %}
+      {% if UPDATE and UPDATE.available and can('admin') %}
+      <div class="flash update-banner" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-left:4px solid var(--accent, #c8102e)">
+        <span>{{ icon('download') }} <b>Fleet Manager Pro {{ UPDATE.version }}</b> is available (you have {{ VERSION }}).{% if UPDATE.notes %} <span class="small muted">{{ UPDATE.notes|truncate(160) }}</span>{% endif %}</span>
+        <form method="post" action="/settings/update" class="inline" style="margin-left:auto">
+          <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+          <input type="hidden" name="action" value="install">
+          <button class="btn sm" data-confirm="Download and install Fleet Manager Pro {{ UPDATE.version }} now? The app will close and reopen automatically.">Update now</button>
+        </form>
+      </div>
+      {% endif %}
       {% block content %}{% endblock %}
     </main>
   </div>
