@@ -22,7 +22,7 @@ import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, "Fleet Manager Pro")
-DOWNLOADS = os.path.join(os.path.dirname(HERE), "Build Output")   # ...\RC 1.3\Build Output
+DOWNLOADS = os.path.join(os.path.dirname(HERE), "Build Output")   # ...\RC 1.3 Alpha\Build Output
 os.makedirs(DOWNLOADS, exist_ok=True)
 OUT = os.path.join(DOWNLOADS, "For Buyer")
 PUBLIC_LICENCE_SERVER = "https://fleetmanager.servehttp.com:8750"
@@ -77,6 +77,9 @@ def main():
     if buyer:
         OUT = os.path.join(DOWNLOADS, f"For Buyer - {buyer}")
     version = open(os.path.join(SRC, "VERSION"), encoding="utf-8").read().strip()
+    # Windows file/product version fields must be purely numeric (e.g. 1.3.0.0), so strip any
+    # suffix like "-alpha" from VERSION for Nuitka while the readable VERSION file ships as-is.
+    numver = ".".join((re.findall(r"\d+", version) + ["0", "0", "0", "0"])[:4])
     work = tempfile.mkdtemp(prefix="fmp-build-")
     stage = os.path.join(work, "stage")
     shutil.copytree(SRC, stage, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "data", "tests", "tools", ".claude"))
@@ -102,8 +105,7 @@ def main():
            "--include-data-files=" + os.path.join(stage, "fmpro", "cargo_list.json") + "=fmpro/cargo_list.json",
            "--include-data-files=" + os.path.join(stage, "fmpro", "EULA.txt") + "=fmpro/EULA.txt",
            "--include-data-files=" + os.path.join(stage, "VERSION") + "=VERSION",
-           f"--product-name={NAME}", f"--file-version={version}.0.0" if version.count(".") == 1 else f"--file-version={version}",
-           f"--product-version={version}.0.0" if version.count(".") == 1 else f"--product-version={version}",
+           f"--product-name={NAME}", f"--file-version={numver}", f"--product-version={numver}",
            f"--file-description={NAME}",
            os.path.join(stage, "run.py")]
     print("Compiling with Nuitka (this takes a few minutes)...")

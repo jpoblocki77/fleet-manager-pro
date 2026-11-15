@@ -1,7 +1,7 @@
 # Fleet Manager Pro - Development (seller folder)
 
 Everything for Fleet Manager Pro in one place: the development copy, the licence server, the build scripts and every
-guide. This folder is `D:\Fleet Manager Pro\Fleet Manager Pro RC 1.3\Development`. **Never share this folder.** Full instructions: **Guides\Fleet Manager Pro - Seller Guide.pdf**.
+guide. This folder is `D:\Fleet Manager Pro\Fleet Manager Pro RC 1.3 Alpha\Development`. **Never share this folder.** Full instructions: **Guides\Fleet Manager Pro - Seller Guide.pdf**.
 
 | Here | What it is | Share it? |
 |---|---|---|
@@ -25,7 +25,7 @@ development with C++*. The no-exe build takes about 20 seconds, the .exe build a
 Fleet Manager Pro is © 2026 Jeff Poblocki. All rights reserved. The licence agreement is
 `Fleet Manager Pro\fmpro\EULA.txt`: it ships with both buyer copies as **Licence Agreement.txt**, is readable in the
 app at `/licence-agreement` (linked from every page) and buyers must tick **I agree** to activate. Edit that one file to
-change the terms, then rebuild. Only ever send the two *For Buyer* zips: `Fleet Manager Pro RC 1.3.zip` and the
+change the terms, then rebuild. Only ever send the two *For Buyer* zips: `Fleet Manager Pro 1.3-alpha.zip` and the
 *Source Code* zip contain the readable source.
 
 ## Making a sale
@@ -48,7 +48,7 @@ After a game update or new DLC run `python tools\build_cargo.py`.
 
 ## The packaged release on D:
 
-`D:\Fleet Manager Pro\Fleet Manager Pro RC 1.3\` holds your running copy (`App\`, with your company data), the
+`D:\Fleet Manager Pro\Fleet Manager Pro RC 1.3 Alpha\` holds your running copy (`App\`, with your company data), the
 entire source without keys or data (`Source\`), the no-exe buyer copy, the guides, a private backup of the licence host
 and all four zips. Its `READ ME FIRST.txt` explains each folder.
 

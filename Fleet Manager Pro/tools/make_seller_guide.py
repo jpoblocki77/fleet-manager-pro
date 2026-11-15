@@ -51,15 +51,15 @@ def build():
 
     A(Paragraph("1. Your folders", H1))
     A(table([["Folder", "What it is", "Share?"],
-             ["D:\\Fleet Manager Pro\\Fleet Manager Pro RC 1.3\\Development\\Fleet Manager Pro", "Development copy: source, tests, tools. Change and test here.", "No"],
+             ["D:\\Fleet Manager Pro\\Fleet Manager Pro RC 1.3 Alpha\\Development\\Fleet Manager Pro", "Development copy: source, tests, tools. Change and test here.", "No"],
              ["...\\Fleet Manager License Host", "Licence server + License Manager WITH your signing key, admin token, purchases and certificate key.", "<b>Never</b>"],
-             ["...RC 1.3\\Zips\\...RC 1.3 - For Buyer (no exe).zip", "<b>What you send buyers</b> (antivirus-friendly).", "Yes"],
-             ["...RC 1.3\\Zips\\...RC 1.3 - For Buyer.zip", "Single-program .exe version (some antivirus programs flag it).", "Yes, if asked"],
-             ["...RC 1.3\\Build Output", "Where the two build scripts put a fresh buyer copy (copied to For Buyer (no exe) and Zips).", "No"],
-             ["D:\\Fleet Manager Pro\\Fleet Manager Pro RC 1.3\\App", "<b>Your own running copy</b>, with your company in data\\.", "No"],
-             ["...RC 1.3\\Source", "The entire source code without keys or data (also as a zip).", "No"],
-             ["...RC 1.3\\License Host (PRIVATE - never share)", "Backup of your licence host with its secrets.", "<b>Never</b>"],
-             ["...RC 1.3\\Zips", "All four zips: program, source, both buyer copies.", "Buyer zips only"],
+             ["...RC 1.3 Alpha\\Zips\\...1.3-alpha - For Buyer (no exe).zip", "<b>What you send buyers</b> (antivirus-friendly).", "Yes"],
+             ["...RC 1.3 Alpha\\Zips\\...1.3-alpha - For Buyer.zip", "Single-program .exe version (some antivirus programs flag it).", "Yes, if asked"],
+             ["...RC 1.3 Alpha\\Build Output", "Where the two build scripts put a fresh buyer copy (copied to For Buyer (no exe) and Zips).", "No"],
+             ["D:\\Fleet Manager Pro\\Fleet Manager Pro RC 1.3 Alpha\\App", "<b>Your own running copy</b>, with your company in data\\.", "No"],
+             ["...RC 1.3 Alpha\\Source", "The entire source code without keys or data (also as a zip).", "No"],
+             ["...RC 1.3 Alpha\\License Host (PRIVATE - never share)", "Backup of your licence host with its secrets.", "<b>Never</b>"],
+             ["...RC 1.3 Alpha\\Zips", "All four zips: program, source, both buyer copies.", "Buyer zips only"],
              ["D:\\FMP_tester", "A spare copy for testing activation like a buyer would.", "No"]],
             [2.6 * inch, 3.6 * inch, 0.7 * inch]))
 
@@ -169,7 +169,7 @@ def build():
                 "Report each new release as a false positive at microsoft.com/wdsi/filesubmission (Software developer, "
                 "Incorrectly detected). Once you have a code-signing certificate (for example Microsoft's Artifact Signing), "
                 "add signing to the .exe build and remove the temporary section from the guide.", SMALL))
-    A(Paragraph("Only ever send the two <b>For Buyer</b> zips. <b>Fleet Manager Pro RC 1.3.zip</b> and the <b>Source Code</b> zip "
+    A(Paragraph("Only ever send the two <b>For Buyer</b> zips. <b>Fleet Manager Pro 1.3-alpha.zip</b> and the <b>Source Code</b> zip "
                 "contain the readable source.", NOTE))
 
     A(Paragraph("8. Older guides", H1))

@@ -25,7 +25,7 @@ import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, "Fleet Manager Pro")
-PARENT = os.path.join(os.path.dirname(HERE), "Build Output")   # ...\RC 1.3\Build Output
+PARENT = os.path.join(os.path.dirname(HERE), "Build Output")   # ...\RC 1.3 Alpha\Build Output
 os.makedirs(PARENT, exist_ok=True)
 OUT = os.path.join(PARENT, "For Buyer (no exe)")
 NAME = "Fleet Manager Pro"
