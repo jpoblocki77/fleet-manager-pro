@@ -128,7 +128,7 @@ def _logging_hooks(app):
                 dt = (time.time() - getattr(g, "_log_t0", time.time())) * 1000
                 logs.get("access").info("%s %s -> %s  %.0fms  user=%s ip=%s", request.method, request.path,
                                         resp.status_code, dt, (u["display_name"] if u else "-"), request.remote_addr)
-        except Exception:  # logging must never break a response
+        except Exception:  # nosec B110  # logging must never break a response
             pass
         return resp
 
@@ -137,7 +137,7 @@ def _logging_hooks(app):
         if exc is not None:
             try:
                 logs.get("error").error("unhandled error on %s %s", request.method, request.path, exc_info=exc)
-            except Exception:
+            except Exception:  # nosec B110  # logging an error must never raise another
                 pass
 
 
