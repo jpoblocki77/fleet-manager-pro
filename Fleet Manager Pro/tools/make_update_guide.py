@@ -218,6 +218,42 @@ def build():
                 "also refresh a stock copy.", TIP))
 
     a(PageBreak())
+    a(Paragraph("Where the update files live on your server", H1))
+    a(Paragraph("Your licence server hands out updates from a folder called <font face='Courier'>updates</font> "
+                "that sits <b>right next to <font face='Courier'>license_server.py</font></b> on the PC that runs "
+                "the server. Inside it there is one folder per buyer, named by that copy's hidden build tag, plus an "
+                "optional <font face='Courier'>STOCK</font> folder for stock copies:", P))
+    a(Paragraph("Fleet Manager License Host\\<br/>"
+                "&nbsp;&nbsp;license_server.py<br/>"
+                "&nbsp;&nbsp;updates\\<br/>"
+                "&nbsp;&nbsp;&nbsp;&nbsp;FMPB-XXXX-XXXX-XXXX-XXXX\\&nbsp;&nbsp;&lt;- one folder per buyer<br/>"
+                "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Fleet Manager Pro 1.4.zip<br/>"
+                "&nbsp;&nbsp;&nbsp;&nbsp;STOCK\\&nbsp;&nbsp;&lt;- for stock copies<br/>"
+                "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Fleet Manager Pro 1.4.zip", CODE))
+    a(Paragraph("The publish tools above <b>create and fill these folders for you</b> – you never build them by "
+                "hand or rename the zip. You only need to know this folder exists because of <i>where</i> the tools "
+                "put it.", P))
+    a(Paragraph("Building on the same PC as the server? You're done.", H2))
+    a(Paragraph("If you build and publish on the very PC that runs <font face='Courier'>license_server.py</font>, "
+                "the zips drop straight into the right place and buyers can download them right away. Nothing else "
+                "to do.", P))
+    a(Paragraph("Building on a different PC from the server?", H2))
+    a(Paragraph("The publish tools write to the <font face='Courier'>updates</font> folder <b>on whatever PC you "
+                "run them on</b>. So if you build on one PC and the server runs on another (for example the server "
+                "on 192.168.1.29), the new zips will not reach the server on their own. Do one of these:", P))
+    a(bullets(["<b>Copy it across.</b> After publishing, copy the whole "
+               "<font face='Courier'>Fleet Manager License Host\\updates</font> folder onto the server PC, into its "
+               "own <font face='Courier'>Fleet Manager License Host</font> folder (next to "
+               "<font face='Courier'>license_server.py</font>). Choose “replace the files in the destination” when "
+               "Windows asks.",
+               "<b>Run the publishing on the server PC</b> instead, if it has the project folder and Python.",
+               "<b>Share one folder.</b> Point both PCs at a single shared "
+               "<font face='Courier'>updates</font> folder (a mapped network drive or a UNC path)."]))
+    a(Paragraph("<b>Check this first:</b> a buyer can only download an update when the server is running <i>and</i> "
+                "<font face='Courier'>fleetmanager.servehttp.com:8750</font> still points to the server PC's current "
+                "address. If you have changed networks or PCs, confirm that before you publish.", NOTE))
+
+    a(PageBreak())
     a(Paragraph("What your buyer sees", H1))
     a(Paragraph("After you publish, a banner appears at the top of the buyer's app, and "
                 "<b>Settings &gt; Licence &gt; Updates</b> shows the same with a <b>Check for updates</b> button. "
