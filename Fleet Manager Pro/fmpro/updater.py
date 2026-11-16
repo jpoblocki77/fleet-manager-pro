@@ -62,6 +62,8 @@ def _frozen():
 
 
 def _install_dir():
+    if "__compiled__" in globals():                     # Nuitka: sys.executable is a phantom python.exe (short path)
+        return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # ...\fmpro -> the .exe's folder
     return os.path.dirname(os.path.abspath(sys.executable))
 
 

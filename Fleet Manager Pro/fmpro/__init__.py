@@ -17,11 +17,19 @@ class _Sessions(SecureCookieSessionInterface):
 
 APP_NAME = "Fleet Manager Pro"
 COPYRIGHT = "© 2026 Jeff Poblocki. All rights reserved."
-# FROZEN: running as the buyer's Fleet Manager Pro.exe (built with Nuitka; PyInstaller builds set sys.frozen)
-FROZEN = bool(getattr(sys, "frozen", False)) or os.path.basename(sys.executable).lower() == "fleet manager pro.exe"
+# FROZEN: running as the buyer's Fleet Manager Pro.exe. Our .exe is built with Nuitka, which never sets sys.frozen
+# and points sys.executable at a phantom python.exe (8.3 short path) in the .exe's folder - it marks compiled
+# modules with __compiled__ instead. PyInstaller builds set sys.frozen.
+_NUITKA = "__compiled__" in globals()
+FROZEN = (_NUITKA or bool(getattr(sys, "frozen", False))
+          or os.path.basename(sys.executable).lower() == "fleet manager pro.exe")
 # ROOT: where the user's files live (data folder).  RES: where the program's own files are.
-RES = (getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.abspath(sys.executable))) if FROZEN     else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ROOT = os.path.dirname(sys.executable) if FROZEN else RES
+_HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Nuitka: the .exe's folder (long path)
+if FROZEN and not _NUITKA:
+    RES = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.abspath(sys.executable))
+    ROOT = os.path.dirname(sys.executable)
+else:
+    RES = ROOT = _HERE
 # how a driver starts the remote agent with this copy: the .exe, the no-exe buyer copy's .bat, or the source
 if FROZEN:
     AGENT_CMD = '"Fleet Manager Pro.exe" agent'

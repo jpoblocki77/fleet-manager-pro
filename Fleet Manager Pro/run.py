@@ -13,7 +13,9 @@ import os
 import sys
 
 if __name__ == "__main__":
-    if getattr(sys, "frozen", False) or os.path.basename(sys.executable).lower() == "fleet manager pro.exe":
+    if "__compiled__" in globals():                     # Nuitka .exe: sys.executable is a phantom python.exe
+        os.chdir(os.path.dirname(os.path.abspath(sys.argv[0])))
+    elif getattr(sys, "frozen", False) or os.path.basename(sys.executable).lower() == "fleet manager pro.exe":
         os.chdir(os.path.dirname(os.path.abspath(sys.executable)))
     from fmpro.launcher import main
     main()
