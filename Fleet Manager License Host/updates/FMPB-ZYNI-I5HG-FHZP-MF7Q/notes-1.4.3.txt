@@ -1,0 +1,1 @@
+Test update: one click, then it restarts on 1.4.3.

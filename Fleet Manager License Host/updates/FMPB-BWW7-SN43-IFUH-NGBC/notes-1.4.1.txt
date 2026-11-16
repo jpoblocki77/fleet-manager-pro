@@ -1,0 +1,1 @@
+Fixes automatic updates for the .exe version, and the driver-agent command shown in the .exe.

@@ -1,0 +1,1 @@
+Test update: proves the .exe installs updates by itself.
