@@ -567,8 +567,4 @@ LICENCE = None   # set by create_app()
 
 
 def licensed():
-    # Demo/developer copies (no sealed build tag) can be unlocked for showing the app off with test data by
-    # setting FMP_DEMO=1. Buyer copies are always built with a sealed build tag, so they ignore this entirely.
-    if not BUILD_TAG and os.environ.get("FMP_DEMO") == "1":
-        return True
     return bool(LICENCE and LICENCE.ok)
