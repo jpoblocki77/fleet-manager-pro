@@ -958,6 +958,36 @@ def main():
           "performance lists each load as on time / late with the margin")
     check(c.get("/performance?period=week").status_code == 200, "performance period filter")
 
+    # Simulate break / 34-hour restart (no live game: the logbook's own clock is "now")
+    from fmpro import compliance_views
+    _live = compliance_views._live_values
+    compliance_views._live_values = lambda _uid: None
+    with c.session_transaction() as s:
+        me = s.get("uid")
+    sm = max(db.val("SELECT MAX(COALESCE(end_min,start_min)) FROM hos_logs WHERE user_id=? AND COALESCE(game,'ats')='ats'",
+                    (me,), 0) or 0, 0) + 5000
+    for st_, a, b in (("off", sm - 700, sm), ("driving", sm, sm + 540), ("on", sm + 540, sm + 545)):
+        db.insert("hos_logs", user_id=me, status=st_, start_min=a, end_min=b, auto=1, created_at=1, game="ats")
+    cl = compliance.clocks(me, None, "ats")
+    check(cl["break"]["over"] and cl["drive"]["used"] == 540, "(9 h driven without a break)")
+    page = c.get("/compliance?tab=logbook&game=ats").get_data(as_text=True)
+    check("Simulate 30-min break" in page and "Simulate 34-hour restart" in page,
+          "the logbook shows the Simulate break / restart buttons")
+    off_before = db.val("SELECT SUM(end_min-start_min) FROM hos_logs WHERE user_id=?", (me,), 0)
+    post("/compliance/simulate", {"kind": "break", "game": "ats"})
+    cl = compliance.clocks(me, None, "ats")
+    check(not cl["break"]["over"] and cl["break"]["used"] == 0 and cl["drive"]["used"] == 540,
+          "a simulated 30-min break resets only the break clock")
+    post("/compliance/simulate", {"kind": "restart", "game": "ats"})
+    cl = compliance.clocks(me, None, "ats")
+    check(cl["drive"]["used"] == 0 and cl["window"]["used"] == 0 and cl["cycle"]["used"] == 0,
+          "a simulated 34 h restart resets the driving, window and cycle clocks")
+    check(cl["status"] == "on", "a simulated rest doesn't change the current duty status")
+    check(db.val("SELECT SUM(end_min-start_min) FROM hos_logs WHERE user_id=?", (me,), 0) == off_before,
+          "simulated rests leave the logged duty time unchanged")
+    check(post("/compliance/simulate", {"kind": "nap", "game": "ats"}).status_code == 400, "unknown simulate kind is refused")
+    compliance_views._live_values = _live
+
     # ELD & Compliance reset
     check(db.val("SELECT COUNT(*) FROM hos_logs WHERE user_id=?", (uid,), 0) > 0, "(driver has logbook lines to reset)")
     post("/compliance/reset", {"driver": str(uid), "game": "both", "logbook": "1", "confirm": "nope"})

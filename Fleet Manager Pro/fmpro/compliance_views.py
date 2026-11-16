@@ -123,6 +123,30 @@ def set_status():
     return redirect(url_for("comp.page", tab="logbook", game=request.form.get("game") or None))
 
 
+@bp.route("/compliance/simulate", methods=["POST"])
+@login_required
+def simulate():
+    kind = request.form.get("kind")
+    if kind not in ("break", "restart"):
+        abort(400)
+    uid = user()["id"]
+    game = request.form.get("game") if request.form.get("game") in ("ats", "ets2") else _game(uid)
+    v = _live_values(uid)
+    gm = _now_min(uid, game)
+    if v and v["game"] == game and abs(v["speed"]) > 1.5:
+        flash("Stop the truck first: a break can't be taken while it's moving.", "error")
+    elif gm is None:
+        flash("No game time yet — drive with telemetry first so the logbook knows the in-game clock.", "error")
+    else:
+        length = compliance.simulate_rest(uid, kind, gm, game)
+        what = f"{length}-minute break" if kind == "break" else f"{length // 60}-hour restart"
+        db.audit(uid, "simulated rest", f"{what} ({game.upper()})")
+        flash(f"Simulated a {what}: the HOS clocks count it as taken now."
+              + (" Driving, window and cycle clocks are reset." if kind == "restart" else " The break clock is reset."),
+              "success")
+    return redirect(url_for("comp.page", tab="logbook", game=request.form.get("game") or None))
+
+
 @bp.route("/compliance/dvir", methods=["POST"])
 @login_required
 def dvir_submit():

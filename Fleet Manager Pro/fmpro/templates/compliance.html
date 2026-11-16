@@ -88,6 +88,14 @@
         <input name="note" placeholder="Note (optional), e.g. home time" maxlength="120" style="flex:1;min-width:160px">
         <button class="btn" name="status" value="off">Off duty</button><button class="btn" name="status" value="sleeper">Sleeper</button><button class="btn" name="status" value="on">On duty</button></form>
       {% else %}<p class="muted small">Only {{ who.display_name }} can change their own status.</p>{% endif %}
+      <h2 style="margin-top:18px">Simulate rest</h2>
+      <p class="small muted">Count a rest as taken right now, without waiting it out in the game. Your driving history stays as it is.</p>
+      {% if who.id == current_user().id %}
+      <form method="post" action="/compliance/simulate" class="row">{{ csrf() }}<input type="hidden" name="game" value="{{ game }}">
+        <button class="btn" name="kind" value="break" title="Resets the break clock">Simulate {{ clocks.break_len }}-min break</button>
+        <button class="btn" name="kind" value="restart" title="Resets the driving, on-duty window and cycle clocks"
+                data-confirm="Simulate a {{ clocks.restart_len // 60 }}-hour restart? Driving, window and cycle clocks start over.">Simulate {{ clocks.restart_len // 60 }}-hour restart</button></form>
+      {% else %}<p class="muted small">Only {{ who.display_name }} can simulate their own rest.</p>{% endif %}
     </div>
     <div class="card"><h2>Rules</h2>
       <dl class="kv small">

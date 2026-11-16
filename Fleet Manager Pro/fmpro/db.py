@@ -228,7 +228,9 @@ def init(path):
                              ("ledger", "manual", "INTEGER DEFAULT 0"), ("ledger", "entered_by", "INTEGER"),
                              ("garages", "city_id", "TEXT DEFAULT ''"), ("garages", "notes", "TEXT DEFAULT ''"),
                              ("applications", "remote_id", "INTEGER"), ("applications", "source", "TEXT DEFAULT 'local'"),
-                             ("event_rsvps", "xp_awarded", "INTEGER DEFAULT 0")):
+                             ("event_rsvps", "xp_awarded", "INTEGER DEFAULT 0"),
+                             # 1.4.4: a simulated rest (minutes) - a zero-length marker line the HOS clocks count as rest
+                             ("hos_logs", "sim_rest", "INTEGER DEFAULT 0")):
         if col not in {r[1] for r in c.execute(f"PRAGMA table_info({table})")}:
             c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
             if col == "game" and table in ("hos_logs", "hos_violations", "dvirs"):

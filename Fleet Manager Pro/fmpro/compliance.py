@@ -82,19 +82,28 @@ def clocks(uid, now_min=None, game="ats"):
     lookback = rules["cycle_days"] * 1440 + rules["restart"]
     segs = _gaps_as_off(_segments(uid, now_min - lookback, now_min, game), now_min - lookback, now_min)
 
+    # simulated rests (the Simulate buttons): count as a rest of that length ending at that minute
+    sims = db.q("SELECT start_min, sim_rest FROM hos_logs WHERE user_id=? AND COALESCE(game,'ats')=? AND sim_rest > 0 "
+                "AND start_min BETWEEN ? AND ?", (uid, game, now_min - lookback, now_min))
+
+    def rest_end(segments, length):
+        real = _last_rest_end(segments, length)
+        sim = max((s["start_min"] for s in sims if s["sim_rest"] >= length), default=None)
+        return max((x for x in (real, sim) if x is not None), default=None)
+
     # a daily rest resets the drive and window clocks; EU rules also accept a reduced daily rest (9 h)
-    reset_end = _last_rest_end(segs, rules.get("reset_min", rules["reset"])) or (now_min - lookback)
+    reset_end = rest_end(segs, rules.get("reset_min", rules["reset"])) or (now_min - lookback)
     after = [x for x in segs if x[2] > reset_end]
     drive = sum(min(e, now_min) - max(s, reset_end) for st, s, e in after if st == "driving")
     work_starts = [max(s, reset_end) for st, s, e in after if st in WORK]
     window_used = now_min - work_starts[0] if work_starts else 0
 
-    brk = _last_rest_end([("off" if st != "driving" else st, s, e) for st, s, e in segs], rules["break_len"])
+    brk = rest_end([("off" if st != "driving" else st, s, e) for st, s, e in segs], rules["break_len"])
     brk = max(brk or reset_end, reset_end)
     since_break = sum(e - max(s, brk) for st, s, e in segs if st == "driving" and e > brk)
 
     cyc_from = now_min - rules["cycle_days"] * 1440
-    restart = _last_rest_end(segs, rules["restart"])
+    restart = rest_end(segs, rules["restart"])
     if restart and restart > cyc_from:
         cyc_from = restart
     if game == "ets2" or ruleset_for(game) == "eu":
@@ -114,7 +123,7 @@ def clocks(uid, now_min=None, game="ats"):
     c["available"] = max(0, min(c["drive"]["left"], c["window"]["left"], c["cycle"]["left"]))
     c["out_of_hours"] = c["available"] <= 0
     cur = db.one("SELECT status, start_min FROM hos_logs WHERE user_id=? AND COALESCE(game,'ats')=? "
-                 "ORDER BY start_min DESC, id DESC LIMIT 1", (uid, game))
+                 "AND COALESCE(sim_rest,0)=0 ORDER BY start_min DESC, id DESC LIMIT 1", (uid, game))
     c["status"] = cur["status"] if cur else "off"
     c["status_since"] = cur["start_min"] if cur else None
     return c
@@ -220,7 +229,7 @@ class HosTracker:
             self.last_write = self.last_check = 0
         if self.status is None:                              # (re)connect: continue the last segment if it fits
             last = db.one("SELECT * FROM hos_logs WHERE user_id=? AND COALESCE(game,'ats')=? "
-                          "ORDER BY start_min DESC, id DESC LIMIT 1", (self.uid, self.game))
+                          "AND COALESCE(sim_rest,0)=0 ORDER BY start_min DESC, id DESC LIMIT 1", (self.uid, self.game))
             if last and 0 <= gm - (last["end_min"] or last["start_min"]) <= 10:
                 self.row, self.status = last["id"], last["status"]
                 self.last_min = last["end_min"] or last["start_min"]
@@ -259,11 +268,23 @@ class HosTracker:
 def set_status(uid, status, game_min, note="", game="ats"):
     """Manual duty-status change from the logbook page (e.g. off duty at home)."""
     open_row = db.one("SELECT id FROM hos_logs WHERE user_id=? AND COALESCE(game,'ats')=? "
-                      "ORDER BY start_min DESC, id DESC LIMIT 1", (uid, game))
+                      "AND COALESCE(sim_rest,0)=0 ORDER BY start_min DESC, id DESC LIMIT 1", (uid, game))
     if open_row:
         db.update("hos_logs", open_row["id"], end_min=game_min)
     db.insert("hos_logs", user_id=uid, status=status, start_min=game_min, end_min=game_min, auto=0, note=note,
               created_at=time.time(), game=game)
+
+
+def simulate_rest(uid, kind, game_min, game="ats"):
+    """Count a break (kind 'break') or a cycle restart (kind 'restart', e.g. 34 h) as taken right now, without
+    waiting it out in the game. Stored as a zero-length marker line, so the driven time in the logbook is unchanged.
+    Returns the simulated length in minutes."""
+    rules = RULESETS[ruleset_for(game)]
+    length = rules["break_len"] if kind == "break" else rules["restart"]
+    label = f"{length}-min break" if kind == "break" else f"{length // 60}-hour restart"
+    db.insert("hos_logs", user_id=uid, status="off", start_min=game_min, end_min=game_min, auto=0,
+              note=f"Simulated {label}", sim_rest=length, created_at=time.time(), game=game)
+    return length
 
 
 # ------------------------------------------------------------------------------------------------ DVIR
