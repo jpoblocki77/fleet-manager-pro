@@ -75,10 +75,14 @@ def create_app(data_dir=None, start_telemetry=True, check_licence=True):
 
     data_dir = data_dir or os.path.join(ROOT, "data")
     os.makedirs(data_dir, exist_ok=True)
-    from . import logs
+    from . import logs, tracelog
     logs.setup(data_dir)
+    tracelog.setup(data_dir)                # logs/debug.log: everything, for troubleshooting
     db.init(os.path.join(data_dir, "fleet.db"))
     licensing.LICENCE = licensing.Licence(os.path.join(data_dir, "licence.json"))
+    if check_licence:                       # the real program (the tests make many throwaway apps)
+        tracelog.system_report(data_dir)
+        tracelog.start_heartbeat()
     if check_licence:
         licensing.LICENCE.start()
         from . import recruit
@@ -120,7 +124,7 @@ def create_app(data_dir=None, start_telemetry=True, check_licence=True):
 
 def _logging_hooks(app):
     """Log every web request (except static files and the high-frequency telemetry feed) and any unhandled error."""
-    from . import logs
+    from . import logs, tracelog
 
     @app.before_request
     def _log_start():
@@ -130,12 +134,14 @@ def _logging_hooks(app):
     def _log_access(resp):
         try:
             ep = request.endpoint or ""
+            dt = (time.time() - getattr(g, "_log_t0", time.time())) * 1000
+            u = None
             if ep not in ("static", "api.agent_frame"):
                 from .auth import user as _user
                 u = _user()
-                dt = (time.time() - getattr(g, "_log_t0", time.time())) * 1000
                 logs.get("access").info("%s %s -> %s  %.0fms  user=%s ip=%s", request.method, request.path,
                                         resp.status_code, dt, (u["display_name"] if u else "-"), request.remote_addr)
+            tracelog.request_line(request, resp, u, dt)
         except Exception:  # nosec B110  # logging must never break a response
             pass
         return resp

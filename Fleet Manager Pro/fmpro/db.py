@@ -5,6 +5,8 @@ import sqlite3
 import threading
 import time
 
+from . import tracelog
+
 _local = threading.local()
 _all = []                      # every connection opened, so close_all() can release the file
 DB_PATH = None
@@ -340,23 +342,36 @@ def close_all():
 
 
 def q(sql, args=()):
-    return [dict(r) for r in conn().execute(sql, args).fetchall()]
+    t = time.perf_counter()
+    rows = [dict(r) for r in conn().execute(sql, args).fetchall()]
+    tracelog.db_read(sql, args, (time.perf_counter() - t) * 1000, len(rows))
+    return rows
 
 
 def one(sql, args=()):
+    t = time.perf_counter()
     r = conn().execute(sql, args).fetchone()
+    tracelog.db_read(sql, args, (time.perf_counter() - t) * 1000, int(r is not None))
     return dict(r) if r else None
 
 
 def val(sql, args=(), default=None):
+    t = time.perf_counter()
     r = conn().execute(sql, args).fetchone()
+    tracelog.db_read(sql, args, (time.perf_counter() - t) * 1000, int(r is not None))
     return default if r is None or r[0] is None else r[0]
 
 
-def ex(sql, args=()):
+def ex(sql, args=(), _cols=None):
+    t = time.perf_counter()
     c = conn()
-    cur = c.execute(sql, args)
-    c.commit()
+    try:
+        cur = c.execute(sql, args)
+        c.commit()
+    except Exception as e:
+        tracelog.db_error(sql, args, e, _cols)
+        raise
+    tracelog.db_write(sql, args, (time.perf_counter() - t) * 1000, _cols, cur.lastrowid)
     return cur.lastrowid
 
 
@@ -376,7 +391,7 @@ def insert(table, **cols):
     ident(table, *cols)
     keys = ",".join(cols)
     marks = ",".join("?" * len(cols))
-    return ex(f"INSERT INTO {table} ({keys}) VALUES ({marks})", tuple(cols.values()))  # nosec B608  # table/column names are fixed in the code; every value is a ? parameter
+    return ex(f"INSERT INTO {table} ({keys}) VALUES ({marks})", tuple(cols.values()), _cols=list(cols))  # nosec B608  # table/column names are fixed in the code; every value is a ? parameter
 
 
 def update(table, row_id, **cols):
@@ -384,7 +399,7 @@ def update(table, row_id, **cols):
         return
     ident(table, *cols)
     sets = ",".join(f"{k}=?" for k in cols)
-    ex(f"UPDATE {table} SET {sets} WHERE id=?", tuple(cols.values()) + (row_id,))  # nosec B608  # table/column names are fixed in the code; every value is a ? parameter
+    ex(f"UPDATE {table} SET {sets} WHERE id=?", tuple(cols.values()) + (row_id,), _cols=list(cols))  # nosec B608  # table/column names are fixed in the code; every value is a ? parameter
 
 
 # ------------------------------------------------------------------ settings

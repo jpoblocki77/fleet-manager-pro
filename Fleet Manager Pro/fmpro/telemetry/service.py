@@ -7,8 +7,10 @@ import threading
 import time
 import urllib.request
 
-from .. import compliance, db, economy
+from .. import compliance, db, economy, tracelog
 from . import reader
+
+jlog = logging.getLogger("fmpro.jobs")
 from .demo import Simulator
 
 EVENT_KINDS = {  # flag -> (kind, amount key, ledger category, detail builder)
@@ -150,6 +152,8 @@ class JobTracker:
                             fuel_capacity=v["fuel_capacity"], assigned_user_id=self.user_id, game=v["game"],
                             auto_detected=1, created_at=now, last_seen=now)
             row = db.one("SELECT * FROM trucks WHERE id=?", (tid,))
+            jlog.info("driver #%s: new truck added to the fleet #%s %s %s (%s)", self.user_id, tid, v["truck_brand"],
+                      v["truck_name"], plate)
             db.notify(self.user_id, f"New truck detected: {v['truck_brand']} {v['truck_name']} ({plate})", f"/fleet/truck/{tid}")
         if not row:
             return
@@ -181,6 +185,8 @@ class JobTracker:
                           v["job_starting_time"], v["job_starting_time"], v["game"]))
             if row:
                 self.job_id = row["id"]
+                jlog.info("driver #%s: picked up open job #%s again (%s %s -> %s)", self.user_id, row["id"], v["cargo"],
+                          v["source_city"], v["destination_city"])
                 self.last_fuel = v["fuel"]
                 self._pos = None                 # picked up again: don't measure a jump from where we were before
                 return
@@ -218,6 +224,11 @@ class JobTracker:
             contract_id=contract["id"] if contract else None,
             flags="" if self.seen_idle else "joined-late",
             started_at=now)
+        jlog.info("driver #%s: job #%s STARTED in %s: %s (%.1f t) %s, %s -> %s, %s; pays %s; %.0f km planned; truck #%s; "
+                  "contract %s%s", self.user_id, self.job_id, v["game"].upper(), v["cargo"], v["cargo_mass"] / 1000,
+                  v["source_company"], v["source_city"], v["destination_city"], v["destination_company"], v["job_income"],
+                  v["planned_distance_km"], self.truck_id, contract["id"] if contract else "none",
+                  "" if self.seen_idle else " (joined mid-job: flagged joined-late)")
         if contract:
             db.update("contracts", contract["id"], status="assigned", assigned_user_id=self.user_id, job_id=self.job_id)
         self.last_fuel = v["fuel"]
@@ -372,6 +383,7 @@ class JobTracker:
                     continue
                 db.insert("job_events", job_id=self.job_id, user_id=self.user_id, kind=kind, amount=amount,
                           detail=detail(v), x=v["x"], z=v["z"], created_at=now)
+                jlog.info("driver #%s: %s %.2f - %s (job #%s)", self.user_id, kind, amount, detail(v), self.job_id)
                 economy.post(category, -amount, f"{kind.title()}: {detail(v)} ({economy.user_name(self.user_id)})",
                              job_id=self.job_id)
                 if self.job_id and kind in JOB_COL:
@@ -385,6 +397,8 @@ class JobTracker:
             return
         if (v["truck_id"], v["license_plate"]) != p["truck"] or now - p["t"] > 120:
             self.pending_refuel = None      # truck swapped / nothing happened: phantom event
+            jlog.debug("driver #%s: refuel event ignored (the tank didn't fill - the game raises it on load too)",
+                       self.user_id)
             return
         p["base"] = min(p["base"], v["fuel"])
         if v["fuel"] - p["base"] >= max(1.0, 0.5 * p["litres"]):
@@ -393,6 +407,7 @@ class JobTracker:
             db.insert("job_events", job_id=p["job_id"], user_id=self.user_id, kind="refuel", amount=cost,
                       detail=p["detail"], x=p["x"], z=p["z"], created_at=now)
             economy.post("fuel", -cost, f"Refuel: {p['detail']} ({economy.user_name(self.user_id)})", job_id=p["job_id"])
+            jlog.info("driver #%s: refuel %.1f L booked as %.2f - %s", self.user_id, p["litres"], cost, p["detail"])
 
     def _finish(self, v, now):
         dsig = delivered_sig(v)
@@ -419,6 +434,12 @@ class JobTracker:
                     self._remember_place(v["game"], dest, v["x"], v["z"])
                 self._pickup = None
                 hold_all = self.remote and db.setting("agent_jobs_need_approval") == "1"
+                jlog.info("driver #%s: job #%s DELIVERED: revenue %s, xp %s, cargo damage %.1f%%, %.1f km, autopark %s, "
+                          "autoload %s; anti-cheat: %s%s", self.user_id, self.job_id, v["job_delivered_revenue"],
+                          v["job_delivered_earned_xp"], v["job_delivered_cargo_damage"] * 100,
+                          v["job_delivered_distance_km"], v["job_delivered_autopark_used"],
+                          v["job_delivered_autoload_used"], ", ".join(problems) if problems else "passed",
+                          " - held for review" if problems or hold_all else " - paid")
                 if problems or hold_all:
                     # nothing is paid until a manager has looked at it
                     db.update("jobs", self.job_id, status="pending_review")
@@ -443,6 +464,7 @@ class JobTracker:
                 db.insert("job_events", job_id=self.job_id, user_id=self.user_id, kind="cancelled", amount=pen,
                           detail="Job cancelled", created_at=now)
                 economy.post("cancellation", -pen, f"Cancelled job #{self.job_id}", job_id=self.job_id)
+                jlog.info("driver #%s: job #%s CANCELLED in the game, penalty %.2f", self.user_id, self.job_id, pen)
                 db.ex("UPDATE contracts SET status='open', job_id=NULL WHERE job_id=?", (self.job_id,))
                 self.job_id = None
         self.sig["cancelled"] = csig
@@ -453,6 +475,8 @@ class JobTracker:
             if now - self.off_job_since > 15:
                 self.flush()
                 db.update("jobs", self.job_id, status="abandoned", finished_at=now)
+                jlog.info("driver #%s: job #%s ABANDONED (gone from the game for 15 s without a delivery or cancel)",
+                          self.user_id, self.job_id)
                 self.job_id = None
         else:
             self.off_job_since = None
@@ -521,8 +545,17 @@ class Hub:
         self.live = {}        # user_id -> {"frame":..., "t":..., "source":...}
         self.trackers = {}
         self.lock = threading.Lock()
-        self.local_status = "starting"
+        self._local_status = "starting"
         self.sampler = None
+
+    @property
+    def local_status(self):
+        return self._local_status
+
+    @local_status.setter
+    def local_status(self, new):          # every change of the game connection goes into the debug log
+        tracelog.TELEMETRY.status(self._local_status, new)
+        self._local_status = new
 
     def tracker(self, uid):
         with self.lock:
@@ -535,6 +568,7 @@ class Hub:
             return
         if frame is not None:
             frame["source"] = source
+        tracelog.TELEMETRY.frame(uid, frame, source)
         self.tracker(uid).feed(frame)
         with self.lock:
             if frame is None:
