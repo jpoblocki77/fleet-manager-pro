@@ -280,8 +280,23 @@ def _apply_after(app_root, ver_dir, flavor, delay):
     time.sleep(delay)
     try:
         _launch_swapper(app_root, ver_dir, flavor)
+    except Exception:
+        log.exception("couldn't start the update helper")
     finally:
-        os._exit(0)                     # drop waitress immediately so the files are free to overwrite
+        _hard_exit()                    # drop waitress immediately so the files are free to overwrite
+
+
+def _hard_exit():
+    """End this process now. TerminateProcess first: unlike os._exit it doesn't run DLL shutdown, which can hang
+    while the web server's threads are still alive (seen on a buyer's .exe, which stayed open after Update now)."""
+    if os.name == "nt":
+        try:
+            import ctypes
+            k32 = ctypes.windll.kernel32
+            k32.TerminateProcess(k32.GetCurrentProcess(), 0)
+        except Exception:  # nosec B110  # fall through to os._exit
+            pass
+    os._exit(0)
 
 
 def _launch_swapper(app_root, ver_dir, flavor):
@@ -299,7 +314,7 @@ def _launch_swapper(app_root, ver_dir, flavor):
         ":waitloop\r\n"
         f'tasklist /fi "PID eq {pid}" | find "{pid}" >nul\r\n'
         "if not errorlevel 1 (\r\n"
-        "  timeout /t 1 /nobreak >nul\r\n"
+        "  ping -n 2 127.0.0.1 >nul\r\n"         # 1s pause; 'timeout' refuses to run without console input
         "  goto waitloop\r\n"
         ")\r\n"
         f'robocopy "{app_root}" "{install}" /E /IS /IT /XD "{data}" /R:3 /W:2 /NFL /NDL /NJH /NJS /NP >nul\r\n'
@@ -309,8 +324,12 @@ def _launch_swapper(app_root, ver_dir, flavor):
     )
     with open(helper, "w", encoding="ascii", errors="replace", newline="") as fh:
         fh.write(script)
-    flags = 0x08000000 | 0x00000008     # CREATE_NO_WINDOW | DETACHED_PROCESS
+    # Its own hidden console, in its own process group, so it outlives us. NOT DETACHED_PROCESS: that leaves cmd
+    # with no console at all (CREATE_NO_WINDOW is ignored alongside it), and then tasklist|find never returns and
+    # the swap never happens - proven with a Nuitka-compiled probe.
+    flags = 0x08000000 | 0x00000200     # CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP
     subprocess.Popen(["cmd", "/c", helper], creationflags=flags, close_fds=True,  # nosec B603 B607
+                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                      cwd=tempfile.gettempdir())
 
 
