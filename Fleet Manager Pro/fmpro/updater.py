@@ -56,7 +56,9 @@ def current_version():
 
 
 def _frozen():
-    return bool(getattr(sys, "frozen", False)) or os.path.basename(sys.executable).lower() == EXE_NAME.lower()
+    return ("__compiled__" in globals()             # Nuitka build (our .exe) - Nuitka never sets sys.frozen
+            or bool(getattr(sys, "frozen", False))  # PyInstaller etc.
+            or os.path.basename(sys.executable).lower() == EXE_NAME.lower())
 
 
 def _install_dir():

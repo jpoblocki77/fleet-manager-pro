@@ -4,7 +4,8 @@ Because each buyer's copy has its pages sealed to that buyer, an update is still
 never do that by hand. This rebuilds every buyer's copy at the current VERSION and publishes each one to the
 licence server's update folder, so each buyer's app then shows "Update available".
 
-    python "Build and Publish Update (All Buyers).py"                 every buyer in Buyer Builds (PRIVATE).csv
+    python "Build and Publish Update (All Buyers).py"                 every active buyer on the licence server
+    python "Build and Publish Update (All Buyers).py" --from-csv      ...or the old local Buyer Builds (PRIVATE).csv
     python "Build and Publish Update (All Buyers).py" --stock         ...and a fresh stock copy too
     python "Build and Publish Update (All Buyers).py" --keys FMP-AAAA-... FMP-BBBB-...   just these buyers
     python "Build and Publish Update (All Buyers).py" --notes "Fixes the map." --dry-run
@@ -55,6 +56,22 @@ def buyers_from_csv():
     return keys
 
 
+def buyers_from_server():
+    """Active (not revoked) Fleet Manager Pro purchase keys, straight from the licence server's database - the
+    single source of truth. Uses License Host\\server_config.json (admin_url + admin_token), so it works from this
+    PC over the home network; nothing needs to move to the server PC."""
+    sys.path.insert(0, HOST)
+    import license_tool  # noqa: E402  # lives in the License Host folder
+    keys = []
+    for p in license_tool.Admin(HOST).purchases():
+        key = (p.get("key") or "").strip().upper()
+        if p.get("revoked") or (p.get("product") or "Fleet Manager Pro") != "Fleet Manager Pro":
+            continue
+        if KEY_RX.match(key) and key not in keys:
+            keys.append(key)
+    return keys
+
+
 def run(cmd, cwd):
     print("    $", " ".join(f'"{c}"' if " " in c else c for c in cmd))
     return subprocess.run(cmd, cwd=cwd).returncode  # nosec B603  # fixed argument list, no shell
@@ -92,7 +109,8 @@ def build_and_publish(key, notes, stock=False):
 
 def main():
     ap = argparse.ArgumentParser(description="Build + publish this version to every buyer")
-    ap.add_argument("--keys", nargs="*", help="only these purchase keys (default: all in the private ledger)")
+    ap.add_argument("--keys", nargs="*", help="only these purchase keys (default: every active key on the licence server)")
+    ap.add_argument("--from-csv", action="store_true", help="use the old local Buyer Builds (PRIVATE).csv instead of the server")
     ap.add_argument("--stock", action="store_true", help="also build + publish a stock copy")
     ap.add_argument("--notes", default="", help="release notes shown to every buyer")
     ap.add_argument("--dry-run", action="store_true", help="list what would be built, do nothing")
@@ -100,15 +118,24 @@ def main():
     a = ap.parse_args()
 
     ver = version()
-    keys = [k.strip().upper() for k in a.keys] if a.keys else buyers_from_csv()
+    if a.keys:
+        keys, source = [k.strip().upper() for k in a.keys], "--keys"
+    elif a.from_csv:
+        keys, source = buyers_from_csv(), os.path.basename(CSV_PATH)
+    else:
+        try:
+            keys, source = buyers_from_server(), "licence server"
+        except Exception as e:
+            sys.exit(f"Couldn't get the buyer list from the licence server: {e}\n"
+                     "Is License Server running on 192.168.1.29? (Or pass --keys / --from-csv.)")
     bad = [k for k in keys if not KEY_RX.match(k)]
     if bad:
         sys.exit(f"Not purchase keys: {bad}")
     if not keys and not a.stock:
-        sys.exit(f"No buyers found in {os.path.basename(CSV_PATH)}. Sell a copy first, or pass --keys / --stock.")
+        sys.exit(f"No buyers found ({source}). Sell a copy first, or pass --keys / --stock.")
 
     print(f"Version to ship: Fleet Manager Pro {ver}")
-    print(f"Buyers to update: {len(keys)}" + ("  (+ stock copy)" if a.stock else ""))
+    print(f"Buyers to update: {len(keys)}  (from {source})" + ("  (+ stock copy)" if a.stock else ""))
     for k in keys:
         print("  -", k)
     if a.dry_run:
