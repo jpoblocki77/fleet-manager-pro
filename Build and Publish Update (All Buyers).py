@@ -10,10 +10,9 @@ licence server's update folder, so each buyer's app then shows "Update available
     python "Build and Publish Update (All Buyers).py" --keys FMP-AAAA-... FMP-BBBB-...   just these buyers
     python "Build and Publish Update (All Buyers).py" --notes "Fixes the map." --dry-run
 
-Steps, per buyer: build BOTH flavours - the .exe copy (Build Pro Buyer Copy.py --buyer KEY) and the no-exe copy
-(Build Pro Buyer Copy (no exe).py --buyer KEY) - and publish each (publish_update.py --zip ... --key KEY
---flavor exe|noexe), so whichever build the buyer installed gets a matching update that self-applies. Bump
-Fleet Manager Pro\VERSION FIRST, or the server won't see the rebuild as newer. The licence server must be running.
+Steps, per buyer: build the .exe copy (Build Pro Buyer Copy.py --buyer KEY) and publish it (publish_update.py
+--zip ... --key KEY --flavor exe), so the buyer's copy updates itself. Only the .exe build is made now - the no-exe
+build was retired. Bump Fleet Manager Pro\VERSION FIRST, or the server won't see the rebuild as newer.
 """
 import argparse
 import csv
@@ -24,11 +23,9 @@ import sys
 DEV = os.path.dirname(os.path.abspath(__file__))
 BUILD_OUTPUT = os.path.join(os.path.dirname(DEV), "Build Output")
 BUILD_SCRIPT = os.path.join(DEV, "Build Pro Buyer Copy.py")
-BUILD_SCRIPT_NOEXE = os.path.join(DEV, "Build Pro Buyer Copy (no exe).py")
-# (flavour, build script, buyer zip name, stock zip name) - a buyer may run either build, so ship both.
+# (flavour, build script, buyer zip name, stock zip name) - the .exe build is the only one shipped now.
 FLAVORS = (
-    ("exe",   BUILD_SCRIPT,       "For Buyer - {key}.zip",          "For Buyer.zip"),
-    ("noexe", BUILD_SCRIPT_NOEXE, "For Buyer (no exe) - {key}.zip", "For Buyer (no exe).zip"),
+    ("exe", BUILD_SCRIPT, "For Buyer - {key}.zip", "For Buyer.zip"),
 )
 HOST = os.path.join(DEV, "Fleet Manager License Host")
 PUBLISH = os.path.join(HOST, "publish_update.py")
@@ -95,8 +92,7 @@ def _build_one(flavor, script, zip_path, notes, key=None, stock=False):
 
 
 def build_and_publish(key, notes, stock=False):
-    """Build and publish BOTH flavours (exe and no-exe) for this buyer, so whichever build they installed
-    gets a matching update. Returns None when every flavour published, else a summary of what failed."""
+    """Build and publish this buyer's .exe copy. Returns None when it published, else a summary of what failed."""
     errs = []
     for flavor, script, buyer_tmpl, stock_name in FLAVORS:
         name = stock_name if stock else buyer_tmpl.format(key=key)

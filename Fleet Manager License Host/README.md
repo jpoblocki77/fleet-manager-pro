@@ -19,10 +19,9 @@ This server licenses **Fleet Manager Pro only**: it issues `FMP-` keys and refus
 
 ## Selling a copy
 
-1. Build the buyer copy (in the folder above this one): `python "Build Pro Buyer Copy (no exe).py"` makes
-   `For Buyer (no exe).zip` - the one to send, because antivirus programs don't flag it. `python "Build Pro Buyer Copy.py"`
-   makes the single-program `.exe` version (`For Buyer.zip`) if a buyer prefers it.
-   Both are compiled (no readable source), contain no data and no secrets, check
+1. Build the buyer copy (in the folder above this one): `Build Buyer Copy.bat`, or
+   `python "Build Pro Buyer Copy.py" --buyer FMP-...`, makes `For Buyer - FMP-....zip` (a single `Fleet Manager Pro.exe`).
+   It is compiled (no readable source), contains no data and no secrets, checks
    `https://fleetmanager.servehttp.com:8750` pinned to `tls_cert.pem`, and can't be pointed at another licence server.
 2. **License Manager → 2) New purchase**: type the buyer's name (email optional). You get a key `FMP-XXXX-XXXX-XXXX-XXXX`
    that works on 2 PCs. Command line: `python license_tool.py new "Name" [email]`.

@@ -53,13 +53,10 @@ def build():
     A(table([["Folder", "What it is", "Share?"],
              ["D:\\Fleet Manager Pro\\Fleet Manager Pro RC 1.3 Alpha\\Development\\Fleet Manager Pro", "Development copy: source, tests, tools. Change and test here.", "No"],
              ["...\\Fleet Manager License Host", "Licence server + License Manager WITH your signing key, admin token, purchases and certificate key.", "<b>Never</b>"],
-             ["...RC 1.3 Alpha\\Zips\\...1.3-alpha - For Buyer (no exe).zip", "<b>What you send buyers</b> (antivirus-friendly).", "Yes"],
-             ["...RC 1.3 Alpha\\Zips\\...1.3-alpha - For Buyer.zip", "Single-program .exe version (some antivirus programs flag it).", "Yes, if asked"],
-             ["...RC 1.3 Alpha\\Build Output", "Where the two build scripts put a fresh buyer copy (copied to For Buyer (no exe) and Zips).", "No"],
-             ["D:\\Fleet Manager Pro\\Fleet Manager Pro RC 1.3 Alpha\\App", "<b>Your own running copy</b>, with your company in data\\.", "No"],
-             ["...RC 1.3 Alpha\\Source", "The entire source code without keys or data (also as a zip).", "No"],
+             ["...RC 1.3 Alpha\\Build Output\\For Buyer - FMP-....zip", "<b>What you send a buyer</b>: their sealed copy, a single "
+              "Fleet Manager Pro.exe.", "Yes, to that buyer"],
              ["...RC 1.3 Alpha\\License Host (PRIVATE - never share)", "Backup of your licence host with its secrets.", "<b>Never</b>"],
-             ["...RC 1.3 Alpha\\Zips", "All four zips: program, source, both buyer copies.", "Buyer zips only"],
+             ["...RC 1.3 Alpha\\Zips", "Old 1.3-alpha zips; the program and Source Code zips hold readable source.", "No"],
              ["D:\\FMP_tester", "A spare copy for testing activation like a buyer would.", "No"]],
             [2.6 * inch, 3.6 * inch, 0.7 * inch]))
 
@@ -68,15 +65,15 @@ def build():
              "If you changed anything since the last build, rebuild the buyer copy (section 4).",
              "On the server PC open <b>License Manager.bat</b> and choose <b>2) New purchase</b>. Type the buyer's name "
              "(email optional). Copy the key it shows: <b>FMP-XXXX-XXXX-XXXX-XXXX</b>. It works on 2 PCs.",
-             "On this PC double-click <b>Development\\Build Buyer Copy.bat</b>. Paste the buyer's key, pick the version "
-             "(Standard is recommended) and confirm. A few minutes later it opens Build Output.",
-             "Send the buyer the zip it made, <b>For Buyer (no exe) - FMP-....zip</b>, and the key. Everything they need, "
+             "On this PC double-click <b>Development\\Build Buyer Copy.bat</b>. Paste the buyer's key and confirm. "
+             "A few minutes later it opens Build Output.",
+             "Send the buyer the zip it made, <b>For Buyer - FMP-....zip</b>, and the key. Everything they need, "
              "including the Installation Guide, is inside the zip."]))
     A(Paragraph("<b>Why one build per buyer:</b> each copy carries a hidden build tag made from that buyer's key, and its pages "
                 "are encrypted so only the licence server can unlock them (a cracked copy that skips the licence check shows "
                 "no pages). If a copy leaks, License Manager <b>10) Identify a copy</b> tells you whose it was. "
                 "<b>Development\\Buyer Builds (PRIVATE).csv</b> lists every copy you built and for whom - keep it private.", SMALL))
-    A(Paragraph("The buyer unzips it, double-clicks <b>Start Fleet Manager Pro.bat</b>, types the key on the Activate screen and "
+    A(Paragraph("The buyer unzips it, double-clicks <b>Fleet Manager Pro.exe</b>, types the key on the Activate screen and "
                 "creates their company. Nothing needs installing.", P))
 
     A(Paragraph("Selling it online", H2))
@@ -87,7 +84,7 @@ def build():
     A(steps(["Buyer pays on your store; you receive their <b>name and email</b>.",
              "License Manager <b>2) New purchase</b> - enter that name and email - gives you the key.",
              "<b>Build Buyer Copy.bat</b> - paste the key - builds their sealed copy.",
-             "Send them the <b>For Buyer (no exe)</b> zip and the key."]))
+             "Send them their <b>For Buyer - FMP-...</b> zip and the key."]))
     A(table([["Where to sell", "Best for"],
              ["<b>Gumroad</b>", "Simplest start. One-time sales; gives you the buyer's name and email; can auto-deliver a download."],
              ["<b>Lemon Squeezy</b> / <b>Paddle</b>", "More professional: they handle sales tax / VAT for you and have a licence-key "
@@ -120,18 +117,15 @@ def build():
     A(Paragraph("4. After you change the program", H1))
     A(Paragraph("Work in the development copy, then:", P))
     A(Paragraph('python tests\\e2e_test.py<br/>python tests\\security_test.py<br/>python tests\\fuzz_test.py', CODE))
-    A(Paragraph("All three must end with <b>ALL PASSED</b>. Then, in the Development folder:", P))
-    A(Paragraph('python "Build Pro Buyer Copy (no exe).py"<br/>python "Build Pro Buyer Copy.py"', CODE))
-    A(Paragraph("Both scripts compile the program to native machine code with <b>Nuitka</b>, so buyers get no Python source or "
+    A(Paragraph("All three must end with <b>ALL PASSED</b>. Then bump <b>Fleet Manager Pro\\VERSION</b> and, in the Development "
+                "folder, double-click <b>Build and Publish Update (All Buyers).bat</b>. It rebuilds every active buyer's copy "
+                "(the buyer list comes from the licence server) and publishes each one as an update; copy the new files in "
+                "License Host\\updates to the server PC and every buyer sees <b>Update available</b>.", P))
+    A(Paragraph("The build compiles the program to native machine code with <b>Nuitka</b>, so buyers get no Python source or "
                 "bytecode. The build PC needs, once: <b>python -m pip install nuitka</b> and Visual Studio (or its Build Tools) with "
-                "<i>Desktop development with C++</i>. The no-exe build takes about 20 seconds, the .exe about 3 minutes.", SMALL))
+                "<i>Desktop development with C++</i>. Each buyer's copy takes about 2-3 minutes.", SMALL))
     A(bullets(["Refresh the guides with <b>python tools\\make_install_guide.py</b> and <b>python tools\\make_seller_guide.py</b>.",
-               "Copy the program files (fmpro, run.py, VERSION, README.md, plugin) into your own App folder on D: - "
-               "<b>never</b> its data folder - and restart it: close its window (or end python.exe running run.py in Task Manager) "
-               "and double-click Start Fleet Manager Pro.bat.",
                "After a game update or new DLC: <b>python tools\\build_cargo.py</b> refreshes the cargo, company and city lists."]))
-    A(Paragraph("Restart your app only when you're not on a job's results screen: a delivery that finishes while it is closed is "
-                "still recorded when it starts again, but it waits on Jobs for you to approve it.", TIP))
 
     A(Paragraph("5. The licence server", H1))
     A(table([["", ""],
@@ -157,7 +151,7 @@ def build():
 
     A(Paragraph("7. Copyright and the licence agreement", H1))
     A(bullets(["Fleet Manager Pro is <b>(c) 2026 Jeff Poblocki. All rights reserved.</b> The notice is on every page of the app.",
-               "The licence agreement is <b>Fleet Manager Pro\\fmpro\\EULA.txt</b>. It ships in both buyer zips as "
+               "The licence agreement is <b>Fleet Manager Pro\\fmpro\\EULA.txt</b>. It ships in every buyer zip as "
                "<b>Licence Agreement.txt</b> and is shown in the app (link on every page).",
                "Buyers must tick <b>I agree to the licence agreement</b> to activate. The app records when and with which key "
                "(Settings &gt; Audit log: <i>licence agreement accepted</i>).",
@@ -165,17 +159,17 @@ def build():
                "copy online: revoke the key it uses (License Manager <b>5) Revoke</b>) and send the site a DMCA takedown notice.",
                "To change the terms, edit EULA.txt and rebuild. Have a lawyer look at it if you sell a lot."]))
     A(Paragraph("<b>Antivirus and code signing.</b> Until the program is code-signed, Microsoft Defender may wrongly flag it "
-                "(mostly the .exe version). The Installation Guide has a section, marked temporary, on restoring and allowing it. "
+                "(Fleet Manager Pro.exe). The Installation Guide has a section, marked temporary, on restoring and allowing it. "
                 "Report each new release as a false positive at microsoft.com/wdsi/filesubmission (Software developer, "
                 "Incorrectly detected). Once you have a code-signing certificate (for example Microsoft's Artifact Signing), "
                 "add signing to the .exe build and remove the temporary section from the guide.", SMALL))
-    A(Paragraph("Only ever send the two <b>For Buyer</b> zips. <b>Fleet Manager Pro 1.3-alpha.zip</b> and the <b>Source Code</b> zip "
+    A(Paragraph("Only ever send a buyer their own <b>For Buyer - FMP-...</b> zip. <b>Fleet Manager Pro 1.3-alpha.zip</b> and the <b>Source Code</b> zip "
                 "contain the readable source.", NOTE))
 
     A(Paragraph("8. Older guides", H1))
     A(Paragraph("<b>Running the Licence Server at Home</b>, <b>Resetting a Licence's Uses</b>, <b>Kamatera Hosting Guide</b> and "
                 "<b>Putting Fleet Manager on GitHub</b> were written for the original Fleet Manager. Their server, router, No-IP, "
-                "cloud and GitHub steps still apply; where they say <i>For_Seller</i> read <i>For Buyer (no exe).zip</i>, where "
+                "cloud and GitHub steps still apply; where they say <i>For_Seller</i> read <i>For Buyer - FMP-....zip</i>, where "
                 "they say <i>FM-</i> keys read <i>FMP-</i>, and where they mention <i>convoy.db</i> read <i>data\\fleet.db</i>. "
                 "The guides for the original app are kept in <b>Guides\\Older (classic Fleet Manager)</b>.", P))
     doc.build(s, onFirstPage=cover, onLaterPages=page)
