@@ -1,0 +1,1 @@
+New: Connect a Tablet - scan a QR code with an iPad or Android tablet to sign in (start with Start Fleet Manager Pro (LAN).bat). Updates page in the sidebar with an Update available notice on every page. Simulated 30-min breaks and 34-hour restarts now show on the logbook graph.
