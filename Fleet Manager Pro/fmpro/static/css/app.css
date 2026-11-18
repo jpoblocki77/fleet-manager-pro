@@ -362,7 +362,7 @@ dialog { border-radius: 16px; }
 .ev-card{position:relative}.ev-card .ev-link{position:absolute;inset:0;z-index:0;border-radius:inherit}
 .ev-card .ev-edit{position:relative;z-index:1}
 
-/* ---------- 1.4.4: Insights, Route Planner, System ---------- */
+/* ---------- 1.4.5: Insights, Route Planner, System ---------- */
 .card-head.pad { padding: 16px 18px 0; }
 table.compact th, table.compact td { padding: 6px 8px; font-size: 12.5px; white-space: nowrap; }
 .section-title { margin: 4px 0 12px; font-size: 20px; }
@@ -383,7 +383,7 @@ pre.logview { margin: 10px 0 0; padding: 12px 18px; max-height: 520px; overflow:
 :root[data-theme="light"] pre.logview { background: #0b1730; }
 pre.logview .lv-err { color: #ff8095; } pre.logview .lv-warn { color: #f3c45b; } pre.logview .lv-dbg { color: #7088aa; }
 
-/* ---------- 1.4.4: look & feel polish ---------- */
+/* ---------- 1.4.5: look & feel polish ---------- */
 @keyframes fmp-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .content > .page-head, .content > .grid, .content > .card, .content > form.card { animation: fmp-rise .28s ease-out both; }
 .content > .grid:nth-of-type(2) { animation-delay: .04s; } .content > .grid:nth-of-type(3) { animation-delay: .08s; }
