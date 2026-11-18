@@ -4,7 +4,7 @@
 {% block content %}
 {% set me = current_user() %}
 <div class="page-head"><div><h1>Messages</h1><p>Company chat and private messages.</p></div></div>
-<div class="grid" style="grid-template-columns: 260px minmax(0,1fr)">
+<div class="grid split-list">
   <div class="card conv" style="padding:10px">
     <a href="/messages" class="{{ 'on' if not other }}"><span class="avatar sm" style="background:var(--navy-600)">#</span><b>Company chat</b></a>
     <hr style="margin:8px 0">

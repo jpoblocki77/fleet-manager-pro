@@ -40,6 +40,7 @@
     if (c) { e.preventDefault(); c.closest("dialog")?.close(); }
     const m = e.target.closest(".menu-btn");
     if (m) $(".side")?.classList.toggle("open");
+    if (e.target.closest(".side-scrim")) $(".side")?.classList.remove("open");
     const bell = e.target.closest("#bell");
     const dd = $("#notif-dd");
     if (bell && dd) { dd.classList.toggle("open"); }

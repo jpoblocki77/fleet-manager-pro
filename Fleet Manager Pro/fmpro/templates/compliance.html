@@ -57,7 +57,8 @@
         <a class="btn sm" href="?tab=logbook&amp;driver={{ who.id }}&amp;game={{ game }}&amp;day={{ day - 1 }}">◀ Previous day</a>
         <a class="btn sm" href="?tab=logbook&amp;driver={{ who.id }}&amp;game={{ game }}&amp;day={{ day + 1 }}">Next day ▶</a></div></div>
     {% set W, rowh, lab = 960, 34, 150 %}
-    <svg viewBox="0 0 {{ W + lab + 70 }} {{ rowh * 4 + 30 }}" style="width:100%;height:auto" font-family="Segoe UI, sans-serif">
+    <div class="log-graph">
+    <svg viewBox="0 0 {{ W + lab + 70 }} {{ rowh * 4 + 30 }}" font-family="Segoe UI, sans-serif">
       {% for st in ['off','sleeper','driving','on'] %}
         {% set y = loop.index0 * rowh %}
         <rect x="{{ lab }}" y="{{ y }}" width="{{ W }}" height="{{ rowh }}" fill="{{ 'rgba(143,168,204,.05)' if loop.index0 % 2 else 'transparent' }}" stroke="var(--line)"/>
@@ -78,7 +79,7 @@
         {% if b.sim and x2 - x1 > 34 %}<text x="{{ (x1 + x2) / 2 }}" y="{{ y - 7 }}" fill="#2fb67c" font-size="11" font-weight="700" text-anchor="middle">{{ 'Break (simulated)' if b.b - b.a <= 60 else 'Restart (simulated)' }}</text>{% endif %}
         {% set ns.px = x2 %}{% set ns.py = y %}
       {% endfor %}
-    </svg>
+    </svg></div>
     {% if day_viol %}<div style="margin-top:10px">{% for x in day_viol %}<div class="small neg">⚠ {{ x.game_min|gametime }} — {{ x.rule }}: {{ x.detail }}</div>{% endfor %}</div>{% endif %}
   </div>
   <div class="grid g2">
