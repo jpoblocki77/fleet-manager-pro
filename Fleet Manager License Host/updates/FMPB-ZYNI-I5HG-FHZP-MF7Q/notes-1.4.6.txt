@@ -1,0 +1,1 @@
+New: Install updates automatically (Settings > Updates). Off by default; when on, updates install by themselves only while nobody is driving.
