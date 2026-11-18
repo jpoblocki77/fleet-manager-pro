@@ -1412,6 +1412,18 @@ def update_action():
         else:
             ok = msg.startswith("The update was downloaded")
             flash(msg, "success" if ok else "error")
+    elif action in ("auto_on", "auto_off"):
+        on = action == "auto_on"
+        db.set_setting("auto_update", "1" if on else "0")
+        db.audit(user()["id"], "automatic updates", "on" if on else "off")
+        flash("Updates will now install automatically when nobody is driving." if on else
+              "Automatic updates off: updates wait for you to click Update now.", "success")
+        if on and updater.state()["available"]:
+            res = updater.auto_install()
+            if res == "installing":
+                flash("Installing the waiting update… Fleet Manager Pro will close and reopen in a few seconds.", "success")
+            elif res.startswith("busy"):
+                flash(f"The waiting update will install once nobody is driving ({res[6:]}).", "success")
     return redirect(url_for("pages.settings", tab="licence"))
 
 

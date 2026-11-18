@@ -1018,6 +1018,42 @@ def main():
     check(db.setting("auto_backup") == "0", "automatic backups can be turned off")
     post("/system/auto-backup", {"on": "1"})
 
+    # Automatic updates (off by default; installs only when nobody is driving; never on a source copy)
+    from fmpro import updater
+    check(db.setting("auto_update") == "0", "automatic updates are off by default")
+    page = c.get("/settings?tab=licence").get_data(as_text=True)
+    check("Install updates automatically" in page, "settings offer automatic updates")
+    calls = []
+    saved = (updater._manifest, dict(updater.STATE), updater._flavor, updater.busy, updater.install_now)
+    updater.install_now = lambda: calls.append("install") or None
+    updater._flavor = lambda: "exe"
+    with updater._lock:
+        updater._manifest = {"version": "99.0", "file": "x.zip", "sha256": "0" * 64}
+        updater.STATE.update(available=True, version="99.0", status="available")
+    check(updater.auto_install() == "off" and not calls, "auto-install does nothing while the setting is off")
+    updater.busy = lambda: "1 driver connected to the game"
+    post("/settings/update", {"action": "auto_on"})
+    check(db.setting("auto_update") == "1", "automatic updates can be turned on")
+    check(not calls and updater.auto_install().startswith("busy"), "auto-install waits while someone is driving")
+    updater.busy = lambda: None
+    check(updater.auto_install() == "installing" and calls == ["install"], "auto-install runs once nobody is driving")
+    updater._flavor = lambda: None
+    check(updater.auto_install() == "source copy" and calls == ["install"], "a source copy never auto-installs")
+    updater._flavor = lambda: "exe"
+    with updater._lock:
+        updater.STATE.update(status="staged")
+    check(updater.auto_install() == "none" and calls == ["install"], "an update already being installed isn't started twice")
+    page = c.get("/settings?tab=licence").get_data(as_text=True)
+    check("Turn off automatic updates" in page, "settings show automatic updates as on")
+    post("/settings/update", {"action": "auto_off"})
+    check(db.setting("auto_update") == "0", "automatic updates can be turned off")
+    with updater._lock:
+        updater._manifest = saved[0]
+        updater.STATE.clear(); updater.STATE.update(saved[1])
+    updater._flavor, updater.busy, updater.install_now = saved[2], saved[3], saved[4]
+    from fmpro.telemetry.service import HUB as _HUB
+    check(updater.busy() is None or bool(_HUB.all_live()), "busy() reports live drivers only")
+
     # ELD & Compliance reset
     check(db.val("SELECT COUNT(*) FROM hos_logs WHERE user_id=?", (uid,), 0) > 0, "(driver has logbook lines to reset)")
     post("/compliance/reset", {"driver": str(uid), "game": "both", "logbook": "1", "confirm": "nope"})

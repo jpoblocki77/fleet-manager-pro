@@ -117,7 +117,8 @@ def main():
                    f"/drivers/{mgr_id}/edit", f"/drivers/{mgr_id}/remove", "/finance/loan/1/payoff",
                    "/fleet/truck/1/sell", "/events/1/manage", "/events/1/edit", "/leasing/new", "/leasing/plans/save",
                    "/leasing/plans/1/toggle", "/fleet/lease/1/end", f"/drivers/{mgr_id}/fire",
-                   "/fleet/truck/1/delete", "/fleet/trailer/1/delete", "/fleet/clear-sold", "/drivers/purge-former"]
+                   "/fleet/truck/1/delete", "/fleet/trailer/1/delete", "/fleet/clear-sold", "/drivers/purge-former",
+                   "/settings/update"]
     bad = [u for u in admin_posts if drv.post(u, {"title": "x", "body": "y", "amount": "999", "plan": "standard",
                                                   "username": "evil", "password": "evilpw12", "brand": "a", "model": "b",
                                                   "city": "c", "name": "n", "destination_city": "d", "action": "delete",
@@ -134,6 +135,8 @@ def main():
     for u in ("/system/backup", "/system/auto-backup"):
         check(drv.post(u, {"on": "0"}).status_code == 403, f"driver can't post {u}")
     check(db.setting("auto_backup", "1") == "1", "driver couldn't turn automatic backups off")
+    check(drv.post("/settings/update", {"action": "auto_on"}).status_code == 403 and db.setting("auto_update", "0") == "0",
+          "driver can't turn on automatic updates")
     nb = len(insights.list_backups())
     boss.post("/system/backup", {})
     bk = insights.list_backups()

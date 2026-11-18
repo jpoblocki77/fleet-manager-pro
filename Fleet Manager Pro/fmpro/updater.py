@@ -12,7 +12,9 @@ How it works
   waits for this program to close, swaps the new files in (keeping the data folder untouched) and relaunches.
   The server offers each copy the package built for its flavour, so a no-exe copy never gets an .exe package.
 
-This is deliberately *notify + one click*: it never replaces the app behind the buyer's back.
+By default this is *notify + one click*: it never replaces the app behind the buyer's back. An Owner or
+Manager can turn on "Install updates automatically" (setting auto_update); then a verified update installs by
+itself, but only while nobody is connected to the game, so the app never restarts in the middle of a delivery.
 """
 import hashlib
 import logging
@@ -33,6 +35,7 @@ EXE_NAME = "Fleet Manager Pro.exe"
 LAUNCHER_BAT = "Start Fleet Manager Pro.bat"     # how the no-exe copy is started
 CHECK_EVERY = 24 * 3600          # seconds between background checks
 FIRST_CHECK_DELAY = 25           # let the app finish starting and the licence settle first
+BUSY_RETRY = 600                 # auto-install: while someone is driving, look again every 10 minutes
 
 _lock = threading.RLock()
 _manifest = None                 # the verified manifest we're offering, if any
@@ -344,11 +347,50 @@ def start():
     threading.Thread(target=_loop, daemon=True, name="updater").start()
 
 
+def auto_enabled():
+    from . import db
+    return db.setting("auto_update", "0") == "1"
+
+
+def busy():
+    """Why an automatic install must wait (someone connected to the game), or None when it's safe now."""
+    from .telemetry.service import HUB
+    live = HUB.all_live()
+    if live:
+        return f"{len(live)} driver{'' if len(live) == 1 else 's'} connected to the game"
+    return None
+
+
+def auto_install():
+    """Install the offered update now if automatic updates are on and nobody is driving.
+    Returns 'installing', 'off', 'none', 'busy: ...', 'source copy' or an error message."""
+    if not auto_enabled():
+        return "off"
+    with _lock:
+        ready = bool(_manifest) and STATE["status"] == "available"
+    if not ready:
+        return "none"
+    if _flavor() is None:
+        return "source copy"            # a developer copy never replaces itself
+    why = busy()
+    if why:
+        log.info("automatic update %s waiting: %s", STATE["version"], why)
+        return "busy: " + why
+    log.info("automatic update: installing %s", STATE["version"])
+    msg = install_now()
+    return "installing" if msg is None else msg
+
+
 def _loop():
     time.sleep(FIRST_CHECK_DELAY)
+    last_check = 0
     while True:
         try:
-            check()
+            if time.time() - last_check >= CHECK_EVERY:
+                check()
+                last_check = time.time()
+            res = auto_install()
         except Exception:  # nosec B110  # background thread must never die
-            pass
-        time.sleep(CHECK_EVERY)
+            res = "error"
+        # while an update is waiting for drivers to stop, look again soon; otherwise until the next daily check
+        time.sleep(BUSY_RETRY if str(res).startswith("busy") else max(60, CHECK_EVERY - (time.time() - last_check)))
