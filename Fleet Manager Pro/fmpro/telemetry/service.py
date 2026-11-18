@@ -8,7 +8,7 @@ import time
 import urllib.request
 
 from .. import compliance, db, economy, tracelog
-from . import reader
+from . import fluids, reader
 
 jlog = logging.getLogger("fmpro.jobs")
 from .demo import Simulator
@@ -576,6 +576,7 @@ class Hub:
                     self.live[uid]["frame"] = None
                 return
             self.live[uid] = {"frame": frame, "t": time.time(), "source": source}
+        fluids.record(uid, frame)
 
     def get(self, uid):
         e = self.live.get(uid)

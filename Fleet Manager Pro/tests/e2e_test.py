@@ -1234,6 +1234,64 @@ def main():
     app.config.pop("TABLET_PORT", None)
     tablet.lan_addresses = _addrs
 
+    # Fuel & AdBlue: live tanks + bar graph of the last hour
+    from fmpro.telemetry import fluids as _fl
+    from fmpro.telemetry.service import HUB as _FHUB
+    check('href="/fuel"' in c.get("/").get_data(as_text=True), "Fuel & AdBlue is in the sidebar")
+    fpage = c.get("/fuel").get_data(as_text=True)
+    check("Fuel &amp; AdBlue" in fpage and 'id="fl-fuel-chart"' in fpage and 'id="fl-ad-chart"' in fpage and "fluids.js" in fpage,
+          "the Fuel & AdBlue page has a live tank and a bar graph for each")
+    check(uc.get("/fuel").status_code == 200, "drivers can open Fuel & AdBlue")
+    check(app.test_client().get("/api/fluids").status_code in (302, 401), "the fuel data needs a sign-in")
+
+    class _Clk:
+        t = 1_000_000.0
+
+        def time(self):
+            return self.t
+    _clk, _real_time = _Clk(), _fl.time
+    _fl.time = _clk
+    _fl.clear()
+    fuid = db.val("SELECT id FROM users WHERE username='up_driver'")
+    fbase = {"sdk_active": True, "game_id": 2, "truck_brand": "Kenworth", "truck_name": "W900", "fuel_capacity": 568.0,
+             "fuel_warning_factor": 0.15, "adblue_capacity": 80.0, "adblue_warning_factor": 0.15}
+    fl_rt = [0]
+
+    def fl_feed(fuel, adblue, extra=None):
+        fl_rt[0] += 1
+        _FHUB.ingest(fuid, reader.parse(reader.pack(dict(fbase, fuel=fuel, adblue=adblue, render_time=fl_rt[0],
+                                                         simulated_time=fl_rt[0], **(extra or {})))), "test")
+    fuel_l, ad_l = 400.0, 60.0
+    for _ in range(4 * 60):                                  # one minute at 4 frames a second
+        _clk.t += 0.25
+        fuel_l -= 0.01
+        ad_l -= 0.0005
+        fl_feed(fuel_l, ad_l)
+    h = _fl.history(fuid)
+    check(4 <= len(h) <= 6, f"one sample every {_fl.SAMPLE_S} seconds, not every frame ({len(h)} in a minute)")
+    _clk.t += 1
+    fl_feed(560.0, 79.0)                                     # refuel + AdBlue top-up
+    h = _fl.history(fuid)
+    check(h[-1]["f"] == 560.0 and h[-1]["a"] == 79.0, "a refuel shows on the graph at once, without waiting for the next bar")
+    s = _fl.summary(h)
+    check(s["refuels"] == 1 and s["topups"] == 1 and 1.5 <= s["fuel_used"] <= 2.5,
+          f"the hour's totals count fuel used, refuels and top-ups ({s})")
+    d = c.get(f"/api/fluids?user={fuid}").get_json()
+    check(d["online"] and d["live"]["fuel_capacity"] == 568.0 and round(d["live"]["fuel_pct"]) == 99 and d["live"]["adblue"] == 79.0
+          and len(d["history"]) == len(h) and d["window_s"] == 3600, "the page gets the live levels and the hour's bars")
+    check(set(d["live"]) <= set(__import__("fmpro.fluids_views", fromlist=["x"])._LIVE_KEYS),
+          "only fuel and AdBlue readings are sent to the page")
+    _clk.t += 2 * 3600
+    check(_fl.history(fuid) == [], "readings older than an hour drop off the graph")
+    _FHUB.ingest(fuid, reader.parse(reader.pack({"sdk_active": True, "game_id": 2, "render_time": 9999})), "test")
+    check(_fl.history(fuid) == [], "frames without a truck (menus, loading) aren't recorded")
+    nobody = c.get("/api/fluids?user=987654").get_json()
+    check(not nobody["online"] and nobody["history"] == [] and "live" not in nobody, "a driver who isn't driving shows as waiting")
+    _FHUB.ingest(fuid, None, "test")
+    _FHUB.live.pop(fuid, None)
+    _fl.time = _real_time
+    _fl.clear()
+
     # ELD & Compliance reset
     check(db.val("SELECT COUNT(*) FROM hos_logs WHERE user_id=?", (uid,), 0) > 0, "(driver has logbook lines to reset)")
     post("/compliance/reset", {"driver": str(uid), "game": "both", "logbook": "1", "confirm": "nope"})

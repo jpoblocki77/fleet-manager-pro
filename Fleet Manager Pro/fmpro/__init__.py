@@ -116,6 +116,8 @@ def create_app(data_dir=None, start_telemetry=True, check_licence=True):
     app.register_blueprint(insights.bp)
     from . import tablet
     app.register_blueprint(tablet.bp)
+    from . import fluids_views
+    app.register_blueprint(fluids_views.bp)
     app.register_blueprint(cleanup.bp)
     app.register_blueprint(leasing_views.bp)
     auth.install(app)

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Fuel &amp; AdBlue{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Fuel &amp; AdBlue</h1><p>Live tank levels and a bar graph of the last {{ window_min }} minutes, straight from the game.</p></div>
+  <div class="actions">
+    <select id="who" style="width:auto" aria-label="Driver">{% for d in drivers %}<option value="{{ d.id }}" {{ 'selected' if d.id == me }}>{{ d.display_name }}</option>{% endfor %}</select>
+  </div>
+</div>
+
+<div id="fl-offline" class="card offline" style="display:none">
+  <svg viewBox="0 0 120 60" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 40h52V16h22l14 12v12h6"/><circle cx="28" cy="44" r="6"/><circle cx="84" cy="44" r="6"/></svg>
+  <h2>Waiting for the game</h2>
+  <p class="muted">This driver isn't driving right now. The levels show here as soon as their game sends telemetry.<br>
+  The graph keeps the last hour while Fleet Manager Pro is running.</p>
+</div>
+
+<div class="grid g2 fl-top" id="fl-live" style="display:none">
+  <div class="card fl-tank-card">
+    <div class="card-head"><h2>{{ icon('fuel') }} Fuel</h2><span class="right" id="fl-fuel-badge"></span></div>
+    <div class="fl-tank-row">
+      <div class="fl-tank" id="fl-fuel-tank" role="meter" aria-label="Fuel level" aria-valuemin="0" aria-valuemax="100">
+        <div class="fl-fill fuel" id="fl-fuel-fill"></div><div class="fl-warn" id="fl-fuel-warn" title="Low-fuel warning"></div>
+        <div class="fl-pct" id="fl-fuel-pct">—</div>
+      </div>
+      <dl class="kv fl-kv" id="fl-fuel-kv"></dl>
+    </div>
+  </div>
+  <div class="card fl-tank-card">
+    <div class="card-head"><h2>{{ icon('drop') }} AdBlue</h2><span class="right" id="fl-ad-badge"></span></div>
+    <div class="fl-tank-row">
+      <div class="fl-tank" id="fl-ad-tank" role="meter" aria-label="AdBlue level" aria-valuemin="0" aria-valuemax="100">
+        <div class="fl-fill adblue" id="fl-ad-fill"></div><div class="fl-warn" id="fl-ad-warn" title="Low-AdBlue warning"></div>
+        <div class="fl-pct" id="fl-ad-pct">—</div>
+      </div>
+      <dl class="kv fl-kv" id="fl-ad-kv"></dl>
+    </div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <div class="card-head"><h2>Last {{ window_min }} minutes</h2><span class="right small muted">one bar every {{ sample_s }} seconds · updates live</span></div>
+  <div class="fl-legend small muted">
+    <span><i class="sw fuel"></i>Fuel</span><span><i class="sw adblue"></i>AdBlue</span>
+    <span><i class="sw warn"></i>Getting low</span><span><i class="sw bad"></i>Below the game's warning</span>
+  </div>
+  <h3 style="margin-top:10px">Fuel</h3>
+  <div class="fl-chart"><svg id="fl-fuel-chart" viewBox="0 0 960 200" role="img" aria-label="Fuel level bar graph"></svg></div>
+  <h3 style="margin-top:14px">AdBlue</h3>
+  <div class="fl-chart"><svg id="fl-ad-chart" viewBox="0 0 960 200" role="img" aria-label="AdBlue level bar graph"></svg></div>
+  <div class="between small muted fl-axis"><span>{{ window_min }} min ago</span><span>{{ window_min // 2 }} min ago</span><span>now</span></div>
+  <div class="grid g4" style="margin-top:14px" id="fl-sum"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/fluids.js') }}?v={{ VERSION }}"></script>
+{% endblock %}
