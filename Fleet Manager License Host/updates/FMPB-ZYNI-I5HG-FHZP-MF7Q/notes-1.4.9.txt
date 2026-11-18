@@ -1,0 +1,1 @@
+Phone and tablet friendly: every page now fits small screens - top bar, slide-in menu, two stat cards per row, swipeable logbook graph, full-width Messages and Fleet Map.
