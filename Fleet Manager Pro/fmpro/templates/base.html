@@ -43,6 +43,7 @@
       <a href="/messages" class="{{ 'active' if ep == 'pages.messages' }}">{{ icon('chat') }}Messages <span class="pill" id="nav-msg-pill" style="display:none">0</span><span class="nav-ok" title="Complete and working">✓</span></a>
       {% if can('admin') %}<div class="nav-sec">Admin</div>
       <a href="/settings" class="{{ 'active' if ep == 'pages.settings' }}">{{ icon('cog') }}Settings</a>
+      <a href="/updates" class="{{ 'active' if ep == 'pages.updates' }}">{{ icon('download') }}Updates{% if UPDATE and UPDATE.available %} <span class="pill">new</span>{% endif %}</a>
       <a href="/system" class="{{ 'active' if ep == 'insights.system' }}">{{ icon('server') }}System &amp; Backups</a>{% endif %}
     </nav>
     <div class="side-foot">{{ APP_NAME }} {{ VERSION }}<br>{{ 'Release candidate · alpha' if (VERSION.endswith('a') or 'alpha' in VERSION) else 'Release candidate' }} · <span class="nav-ok">✓</span> = complete<br><span class="copyright">{{ COPYRIGHT }}</span> · <a href="/licence-agreement">Licence agreement</a></div>
@@ -61,6 +62,8 @@
           <option value="both" {{ 'selected' if gp == 'both' }}>Both games · {{ 'mi, mph' if S.units == 'imperial' else 'km, km/h' }}</option>
         </select>
       </label>
+      {% if UPDATE and UPDATE.available %}{% if can('admin') %}<a class="update-chip" href="/updates" title="Fleet Manager Pro {{ UPDATE.version }} is available - open Updates">{{ icon('download') }}<span>Update available</span></a>
+      {% else %}<span class="update-chip" title="Fleet Manager Pro {{ UPDATE.version }} is available - ask your Owner or a Manager to install it">{{ icon('download') }}<span>Update available</span></span>{% endif %}{% endif %}
       <button class="btn ghost sm" onclick="FMP.toggleTheme()" title="Light / dark">{{ icon('sun') }}</button>
       <span class="rel">
         <button class="btn ghost sm bell" id="bell" title="Notifications">{{ icon('bell') }}<span class="pill" style="display:none">0</span></button>
@@ -76,14 +79,19 @@
     </header>
     <main class="content">
       {% with msgs = get_flashed_messages(with_categories=true) %}{% for cat, m in msgs %}<div class="flash {{ cat }}">{{ m }}</div>{% endfor %}{% endwith %}
-      {% if UPDATE and UPDATE.available and can('admin') %}
-      <div class="flash update-banner" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-left:4px solid var(--accent, #c8102e)">
-        <span>{{ icon('download') }} <b>Fleet Manager Pro {{ UPDATE.version }}</b> is available (you have {{ VERSION }}).{% if UPDATE.notes %} <span class="small muted">{{ UPDATE.notes|truncate(160) }}</span>{% endif %}{% if S.get('auto_update') == '1' %} <span class="small muted">It will install by itself as soon as nobody is driving.</span>{% endif %}</span>
-        <form method="post" action="/settings/update" class="inline" style="margin-left:auto">
-          <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-          <input type="hidden" name="action" value="install">
-          <button class="btn sm" data-confirm="Download and install Fleet Manager Pro {{ UPDATE.version }} now? The app will close and reopen automatically.">Update now</button>
-        </form>
+      {% if UPDATE and UPDATE.available %}
+      <div class="update-banner" role="status">
+        <span class="ub-tag">{{ icon('download') }}Update available</span>
+        <span class="ub-text"><b>Fleet Manager Pro {{ UPDATE.version }}</b> is ready (you have {{ VERSION }}).{% if UPDATE.notes %} <span class="small muted">{{ UPDATE.notes|truncate(160) }}</span>{% endif %}
+          {% if S.get('auto_update') == '1' %}<span class="small muted">It will install by itself as soon as nobody is driving.</span>
+          {% elif not can('admin') %}<span class="small muted">Ask your Owner or a Manager to install it.</span>{% endif %}</span>
+        {% if can('admin') %}<span class="ub-actions">
+          <a class="btn sm ghost" href="/updates">Details</a>
+          <form method="post" action="/settings/update" class="inline">
+            <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="install">
+            <button class="btn sm primary" data-confirm="Download and install Fleet Manager Pro {{ UPDATE.version }} now? The app will close and reopen automatically.">Update now</button>
+          </form></span>{% endif %}
       </div>
       {% endif %}
       {% block content %}{% endblock %}

@@ -134,25 +134,8 @@
   If the old PC is gone (broken, reinstalled, sold), ask the seller to release it.</p>
   <p class="muted">Your company data lives in the <code>data</code> folder — copy it to the new PC to keep everything.</p>
 </div>
-<div class="card"><div class="card-head"><h2>Updates</h2><span class="right badge {{ 'warn' if (UPDATE and UPDATE.available) else 'ok' }}">{{ 'update ready' if (UPDATE and UPDATE.available) else 'up to date' }}</span></div>
-  <dl class="kv">
-    <dt>Installed</dt><dd>Fleet Manager Pro {{ VERSION }}</dd>
-    {% if UPDATE and UPDATE.available %}<dt>Available</dt><dd><b>{{ UPDATE.version }}</b>{% if UPDATE.size %} <span class="muted small">({{ (UPDATE.size / 1048576)|round(1) }} MB)</span>{% endif %}</dd>{% endif %}
-  </dl>
-  {% if UPDATE and UPDATE.notes %}<p class="small muted">{{ UPDATE.notes }}</p>{% endif %}
-  {% if UPDATE and UPDATE.error %}<p class="small" style="color:var(--bad,#c8102e)">{{ UPDATE.error }}</p>{% endif %}
-  {% set auto_up = S.get('auto_update') == '1' %}
-  <dl class="kv"><dt>Install automatically</dt><dd>{% if auto_up %}<span class="badge ok">On</span>{% else %}<span class="badge">Off</span>{% endif %}</dd></dl>
-  <p class="small muted">Checked automatically every day.
-    {% if auto_up %}A new version installs by itself, but only while nobody is connected to the game, so a delivery is never interrupted. If someone is driving it waits and tries again every 10 minutes.
-    {% else %}An update installs only when you click <b>Update now</b>.{% endif %}
-    The app then closes and reopens by itself. Your <code>data</code> folder is never touched.</p>
-  <form method="post" action="/settings/update" class="row">{{ csrf() }}
-    <button class="btn" name="action" value="check">Check for updates</button>
-    {% if auto_up %}<button class="btn ghost" name="action" value="auto_off">Turn off automatic updates</button>
-    {% else %}<button class="btn" name="action" value="auto_on" data-confirm="Install new versions automatically? Fleet Manager Pro will close and reopen by itself when an update arrives, but only while nobody is driving.">Install updates automatically</button>{% endif %}
-    {% if UPDATE and UPDATE.available %}<button class="btn" name="action" value="install" data-confirm="Download and install Fleet Manager Pro {{ UPDATE.version }} now? The app will close and reopen automatically.">Update now</button>{% endif %}
-  </form>
+<div class="card"><div class="card-head"><h2>Updates</h2></div>
+  <p class="muted">Checking for and installing new versions has its own page now: <a href="/updates">Updates</a>.</p>
 </div>
 </div>
 

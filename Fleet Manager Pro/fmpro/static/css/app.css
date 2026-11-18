@@ -411,3 +411,18 @@ td.empty { padding: 28px 12px; text-align: center; color: var(--muted); }
   .page-head .actions { flex-wrap: wrap; }
   .seg { overflow-x: auto; max-width: 100%; }
 }
+
+/* ---------- 1.4.6: update available banner + top-bar chip (every page, every member) ---------- */
+.update-banner { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; padding: 12px 16px;
+  border-radius: 12px; border: 1px solid color-mix(in srgb, #2fb67c 45%, transparent);
+  background: linear-gradient(90deg, color-mix(in srgb, #2fb67c 18%, var(--card, #111a2e)), var(--card, #111a2e)); }
+.update-banner .ub-tag { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+  background: #2fb67c; color: #fff; font-weight: 700; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+.update-banner .ub-tag svg { width: 14px; height: 14px; }
+.update-banner .ub-text { flex: 1 1 260px; }
+.update-banner .ub-actions { display: inline-flex; gap: 8px; margin-left: auto; }
+.update-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; background: #2fb67c;
+  color: #fff !important; font-size: 12px; font-weight: 700; text-decoration: none; white-space: nowrap; animation: fmp-pulse 2.4s ease-in-out infinite; }
+.update-chip svg { width: 14px; height: 14px; }
+@keyframes fmp-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(47,182,124,.5); } 50% { box-shadow: 0 0 0 6px rgba(47,182,124,0); } }
+@media (max-width: 700px) { .update-chip span { display: none; } }

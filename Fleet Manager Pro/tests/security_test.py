@@ -137,6 +137,7 @@ def main():
     check(db.setting("auto_backup", "1") == "1", "driver couldn't turn automatic backups off")
     check(drv.post("/settings/update", {"action": "auto_on"}).status_code == 403 and db.setting("auto_update", "0") == "0",
           "driver can't turn on automatic updates")
+    check(drv.get("/updates").status_code == 403, "driver can't open the Updates page")
     nb = len(insights.list_backups())
     boss.post("/system/backup", {})
     bk = insights.list_backups()

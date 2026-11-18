@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, csrf %}
+{% block title %}Updates{% endblock %}
+{% block content %}
+{% set avail = UPDATE and UPDATE.available %}
+{% set auto_up = S.get('auto_update') == '1' %}
+<div class="page-head">
+  <div><h1>Updates</h1><p>New versions of Fleet Manager Pro come from your licence server. Your <code>data</code> folder is never touched by an update.</p></div>
+  <div class="actions"><form method="post" action="/settings/update">{{ csrf() }}<button class="btn" name="action" value="check">{{ icon('download') }}Check for updates</button></form></div>
+</div>
+
+<div class="grid g4" style="margin-bottom:16px">
+  <div class="card stat"><div class="label">Installed</div><div class="value">{{ VERSION }}</div><div class="sub">this copy</div></div>
+  <div class="card stat"><div class="label">Newest</div><div class="value {{ 'pos' if avail }}">{{ UPDATE.version if avail else VERSION }}</div>
+    <div class="sub">{{ 'ready to install' if avail else 'you are up to date' }}</div></div>
+  <div class="card stat"><div class="label">Install automatically</div><div class="value {{ 'pos' if auto_up }}">{{ 'On' if auto_up else 'Off' }}</div>
+    <div class="sub">{{ 'when nobody is driving' if auto_up else 'waits for Update now' }}</div></div>
+  <div class="card stat"><div class="label">Last checked</div><div class="value small-value">{{ UPDATE.checked|ago if UPDATE and UPDATE.checked else 'not yet' }}</div>
+    <div class="sub">checked at start-up and daily</div></div>
+</div>
+
+<div class="grid g3">
+  <div class="card span2">
+    <div class="card-head"><h2>{% if avail %}Fleet Manager Pro {{ UPDATE.version }} is ready{% else %}You're on the latest version{% endif %}</h2>
+      <span class="right badge {{ 'warn' if avail else 'ok' }}">{{ 'update ready' if avail else 'up to date' }}</span></div>
+    {% if avail %}
+      <dl class="kv">
+        <dt>Installed</dt><dd>{{ VERSION }}</dd>
+        <dt>New version</dt><dd><b>{{ UPDATE.version }}</b>{% if UPDATE.size %} <span class="muted small">({{ (UPDATE.size / 1048576)|round(1) }} MB)</span>{% endif %}</dd>
+      </dl>
+      {% if UPDATE.notes %}<h3 class="small muted" style="margin:14px 0 4px">What's new</h3><p>{{ UPDATE.notes }}</p>{% endif %}
+      <form method="post" action="/settings/update" class="row" style="margin-top:12px">{{ csrf() }}
+        <button class="btn primary" name="action" value="install" data-confirm="Download and install Fleet Manager Pro {{ UPDATE.version }} now? The app will close and reopen automatically.">{{ icon('download') }}Update now</button>
+        {% if auto_up %}<span class="small muted">or leave it: it installs by itself as soon as nobody is driving.</span>{% endif %}
+      </form>
+    {% else %}
+      <p class="muted">Fleet Manager Pro {{ VERSION }} is the newest version for this copy. When a new one is published you'll see a banner at the top of every page{% if auto_up %}, and it will install by itself when nobody is driving{% endif %}.</p>
+    {% endif %}
+    {% if UPDATE and UPDATE.error %}<p class="small" style="color:var(--bad,#c8102e)">{{ UPDATE.error }}</p>{% endif %}
+    {% if UPDATE and UPDATE.status in ('downloading', 'staged') %}<p class="small muted">Status: {{ 'downloading…' if UPDATE.status == 'downloading' else 'installing — the app will reopen in a moment' }}</p>{% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Automatic updates</h2></div>
+    <p>{% if auto_up %}<span class="badge ok">On</span> New versions install by themselves, but only while nobody is connected to the game, so a delivery is never interrupted. If someone is driving it waits and tries again every 10 minutes.
+       {% else %}<span class="badge">Off</span> An update installs only when you click <b>Update now</b>.{% endif %}</p>
+    <form method="post" action="/settings/update">{{ csrf() }}
+      {% if auto_up %}<button class="btn ghost" name="action" value="auto_off">Turn off automatic updates</button>
+      {% else %}<button class="btn primary" name="action" value="auto_on" data-confirm="Install new versions automatically? Fleet Manager Pro will close and reopen by itself when an update arrives, but only while nobody is driving.">Install updates automatically</button>{% endif %}
+    </form>
+    <p class="hint">Every update is signed by your licence server and checked before it's installed, so a tampered download is refused.</p>
+  </div>
+</div>
+{% endblock %}

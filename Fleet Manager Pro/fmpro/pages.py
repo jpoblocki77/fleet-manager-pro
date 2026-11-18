@@ -1424,7 +1424,13 @@ def update_action():
                 flash("Installing the waiting update… Fleet Manager Pro will close and reopen in a few seconds.", "success")
             elif res.startswith("busy"):
                 flash(f"The waiting update will install once nobody is driving ({res[6:]}).", "success")
-    return redirect(url_for("pages.settings", tab="licence"))
+    return redirect(url_for("pages.updates"))
+
+
+@bp.route("/updates")
+@login_required(role="admin")
+def updates():
+    return render_template("updates.html")
 
 
 @bp.route("/settings/webhook-test", methods=["POST"])
