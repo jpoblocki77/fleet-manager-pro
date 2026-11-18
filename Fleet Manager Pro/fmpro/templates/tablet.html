@@ -1,13 +1,27 @@
 {% extends "base.html" %}
-{% from "_macros.html" import icon %}
+{% from "_macros.html" import icon, csrf %}
 {% block title %}Connect a Tablet{% endblock %}
 {% block content %}
 <div class="page-head">
   <div><h1>Connect a Tablet</h1><p>Use Fleet Manager Pro on an iPad, Android tablet or phone: scan the code with its camera and it opens here, already signed in as you.</p></div>
-  {% if lan and ip %}<div class="actions"><a class="btn" href="/tablet{{ '?ip=' ~ ip if addrs|length > 1 else '' }}">{{ icon('refresh') }}New code</a></div>{% endif %}
+  {% if lan and ip %}<div class="actions"><a class="btn" href="/tablet{{ '?ip=' ~ ip if addrs|length > 1 else '' }}">{{ icon('refresh') }}New code</a>
+    {% if door_open and can('admin') %}<form method="post" action="/tablet/access" class="inline">{{ csrf() }}<input type="hidden" name="action" value="off">
+      <button class="btn ghost" data-confirm="Turn off tablet access? Tablets and phones will no longer reach Fleet Manager Pro until you turn it back on.">Turn off tablet access</button></form>{% endif %}</div>{% endif %}
 </div>
 
-{% if not lan %}
+{% if not lan and switchable %}
+<div class="card" style="max-width:760px">
+  <div class="card-head"><h2>Tablet access is off</h2><span class="right badge warn">this PC only</span></div>
+  <p>Right now only this PC can open Fleet Manager Pro. Turn on tablet access and tablets or phones on your Wi-Fi can connect by scanning a QR code. No restart needed, and it stays on next time you open the app.</p>
+  {% if can('admin') %}
+  <form method="post" action="/tablet/access">{{ csrf() }}<input type="hidden" name="action" value="on">
+    <button class="btn primary">{{ icon('tablet') }}Turn on tablet access</button></form>
+  <p class="hint">Tablets connect over an encrypted (HTTPS) link. If Windows asks whether to allow Fleet Manager Pro on networks, choose <b>Private networks</b> and click <b>Allow</b>.</p>
+  {% else %}
+  <p class="muted">Ask your Owner or a Manager to open this page and turn on tablet access.</p>
+  {% endif %}
+</div>
+{% elif not lan %}
 <div class="card" style="max-width:760px">
   <div class="card-head"><h2>Turn on network mode first</h2><span class="right badge warn">this PC only</span></div>
   <p>Right now Fleet Manager Pro only accepts this PC, so a tablet can't reach it.</p>

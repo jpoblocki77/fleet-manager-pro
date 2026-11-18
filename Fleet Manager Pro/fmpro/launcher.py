@@ -63,6 +63,11 @@ def main():
     print(f"\n  {APP_NAME} {VERSION}\n  Open {url}")
     kw = dict(threads=12, ident=f"{APP_NAME}/{VERSION}")
     if not a.lan:
+        app.config["PORT"] = a.port
+        from fmpro import tablet
+        tablet.autostart(app)
+        if app.config.get("LAN"):
+            print(f"  Tablets: on (https, port {app.config['LAN']['port']}) - open Connect a Tablet for the QR code")
         print("  Press Ctrl+C to stop.\n")
         if not a.no_browser:
             threading.Timer(1.2, lambda: webbrowser.open(url)).start()

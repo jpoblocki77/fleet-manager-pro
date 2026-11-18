@@ -1165,8 +1165,74 @@ def main():
     import glob as _glob
     logged = "".join(open(f, encoding="utf-8", errors="replace").read() for f in _glob.glob(os.path.join(tmp, "logs", "*.log")))
     check("/pair/****" in logged and code not in logged and dc not in logged, "pairing codes never appear in the logs")
-    tablet.lan_addresses = _addrs
     app.config.pop("LAN", None)
+
+    # Tablet access from the normal exe (no LAN .bat): a switch opens an HTTPS door on port+1, no restart
+    import socket as _sock
+    import ssl as _ssl
+    import threading as _thr
+    import urllib.request as _ur
+    from waitress import create_server as _cs
+
+    def _free():
+        s_ = _sock.socket()
+        s_.bind(("127.0.0.1", 0))
+        p_ = s_.getsockname()[1]
+        s_.close()
+        return p_
+    _srv = _cs(app, host="127.0.0.1", port=_free(), threads=4)
+    _thr.Thread(target=_srv.run, daemon=True).start()
+    app.config["PORT"] = _srv.effective_port
+    app.config["TABLET_PORT"] = _free()
+    page = c.get("/tablet").get_data(as_text=True)
+    check("Tablet access is off" in page and 'value="on"' in page and "LAN).bat" not in page,
+          "with the normal exe the tablet page offers a 'Turn on tablet access' switch (no .bat needed)")
+    dpage = uc.get("/tablet").get_data(as_text=True)
+    check("Ask your Owner or a Manager" in dpage and 'value="on"' not in dpage, "drivers are told to ask an Owner or Manager")
+    with uc.session_transaction() as s_:
+        utok = s_.get("csrf")
+    check(uc.post("/tablet/access", data={"action": "on", "csrf": utok}).status_code == 403 and app.config.get("LAN") is None,
+          "a driver can't turn tablet access on")
+    post("/tablet/access", {"action": "on"})
+    tport = app.config["TABLET_PORT"]
+    check(db.setting("tablet_access") == "1" and app.config.get("LAN") == {"scheme": "https", "port": tport},
+          "turning tablet access on opens the door at once and remembers it")
+    link = qr_link(c.get("/tablet").get_data(as_text=True))
+    check(link.startswith(f"https://192.168.1.50:{tport}/pair/"), "the QR code points tablets at the HTTPS door")
+    _ctx = _ssl.create_default_context()
+    _ctx.check_hostname, _ctx.verify_mode = False, _ssl.CERT_NONE
+    with _ur.urlopen(f"https://127.0.0.1:{tport}/login", context=_ctx, timeout=10) as r_:
+        check(r_.status == 200 and b"Sign in" in r_.read(), "a tablet reaches the sign-in page over HTTPS through the door")
+    code = link.rsplit("/", 1)[1]
+
+    class _NoRedir(_ur.HTTPRedirectHandler):
+        def redirect_request(self, *a_, **k_):
+            return None
+    _op = _ur.build_opener(_NoRedir, _ur.HTTPSHandler(context=_ctx))
+    try:
+        _op.open(f"https://127.0.0.1:{tport}/pair/{code}", timeout=10)
+        _st, _ck = 200, ""
+    except _ur.HTTPError as e_:
+        _st, _ck = e_.code, e_.headers.get("Set-Cookie", "")
+    check(_st == 302 and _ck, "scanning the code over the door signs the tablet in")
+    check(db.val("SELECT detail FROM audit_log WHERE action='tablet signed in' ORDER BY id DESC LIMIT 1", default="").startswith("ip 127.0.0.1"),
+          "the sign-in is logged with the tablet's own address")
+    app.config.pop("LAN", None)
+    tablet.stop_network(app)
+    tablet.autostart(app)
+    check(app.config.get("LAN", {}).get("port") == tport, "tablet access comes back on by itself the next time the app starts")
+    post("/tablet/access", {"action": "off"})
+    try:
+        _sock.create_connection(("127.0.0.1", tport), timeout=2).close()
+        _closed = False
+    except OSError:
+        _closed = True
+    check(db.setting("tablet_access") == "0" and app.config.get("LAN") is None and _closed,
+          "turning tablet access off closes the door")
+    _srv.close()
+    app.config.pop("PORT", None)
+    app.config.pop("TABLET_PORT", None)
+    tablet.lan_addresses = _addrs
 
     # ELD & Compliance reset
     check(db.val("SELECT COUNT(*) FROM hos_logs WHERE user_id=?", (uid,), 0) > 0, "(driver has logbook lines to reset)")

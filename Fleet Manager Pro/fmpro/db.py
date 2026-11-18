@@ -187,6 +187,7 @@ STARTING_CAPITAL = 275000          # every new company starts with this; it can'
 DEFAULT_SETTINGS = {
     "company_name": "", "company_tag": "", "company_motto": "", "company_color": "#c8102e",
     "currency": "$", "units": "imperial", "default_game": "ats",
+    "tablet_access": "0",               # 1 = tablets/phones on this network can connect (HTTPS on port+1)
     "auto_update": "0",                 # 1 = install verified updates by themselves when nobody is driving
     "auto_backup": "1",                 # daily copy of fleet.db in data/backups (newest 14 kept)
     "fuel_price": "1.25",               # per litre, used to cost fuel burnt on a job

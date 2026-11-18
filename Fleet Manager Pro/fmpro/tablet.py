@@ -4,8 +4,14 @@
   /pair/<code>      opened by the tablet: signs it in as the member who made the code, then goes to the dashboard
 
 A code works once, for 10 minutes, and only for the member who made it. Codes live in memory only (a restart
-voids them) and are masked in every log. The tablet must be on the same network, and Fleet Manager Pro must be
-running in network mode ("Start Fleet Manager Pro (LAN).bat"), which the launcher records in app.config["LAN"].
+voids them) and are masked in every log. The tablet must be on the same network.
+
+Tablets need the app to answer on the network. Two ways:
+  * Tablet access (Owner/Manager switch on this page, remembered in the tablet_access setting): the normal
+    exe / Start Fleet Manager Pro.bat keeps the PC itself on http://127.0.0.1:PORT and opens an encrypted
+    (HTTPS) door for tablets on PORT+1, at once, no restart. The launcher calls autostart() on start-up.
+  * Network mode (Start Fleet Manager Pro (LAN).bat): the whole app is on the network already.
+Either way app.config["LAN"] holds the scheme and port the QR link uses.
 """
 import ipaddress
 import logging
@@ -17,8 +23,8 @@ import time
 from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
 from markupsafe import Markup
 
-from . import db, qr
-from .auth import login_required, start_session, user
+from . import db, qr, tlsfront
+from .auth import can, login_required, start_session, user
 
 bp = Blueprint("tablet", __name__)
 log = logging.getLogger("fmpro.tablet")
@@ -27,6 +33,68 @@ CODE_LIFE = 600              # seconds a code stays valid
 KEEP_PER_USER = 3            # newest codes kept per member (older ones stop working)
 _codes = {}                  # code -> (user id, expires at)
 _lock = threading.Lock()
+
+
+_front = {"srv": None}      # the tablet door's listening socket while tablet access is on
+
+
+def tablet_port(app):
+    return app.config.get("TABLET_PORT") or (app.config["PORT"] + 1)
+
+
+def network_on(app):
+    """True while tablets can reach the app (tablet access or network mode)."""
+    return bool(app.config.get("LAN"))
+
+
+def can_switch(app):
+    """Tablet access can be switched here only in a normal (this-PC-only) start; network mode is always on."""
+    return bool(app.config.get("PORT")) and (_front["srv"] is not None or not app.config.get("LAN"))
+
+
+def start_network(app):
+    """Open the encrypted tablet door (0.0.0.0:PORT+1 -> this app). Returns None, or a message saying why not."""
+    if _front["srv"] is not None:
+        return None
+    if not app.config.get("PORT"):
+        return "This copy wasn't started by the Fleet Manager Pro launcher."
+    try:
+        cert, key, _pin = tlsfront.ensure_cert(app.config["DATA_DIR"])
+    except ImportError:
+        return "This copy is missing the encryption package (cryptography), so tablets can't connect securely."
+    port = tablet_port(app)
+    try:
+        srv = tlsfront.start("0.0.0.0", port, app.config["PORT"], cert, key)  # nosec B104  # tablets on the same network connect here; HTTPS only, plain HTTP is redirected
+    except OSError as e:
+        log.warning("tablet access: couldn't open port %s: %s", port, e)
+        return f"Port {port} is already in use on this PC, so tablets can't connect. Close whatever uses it and try again."
+    if not app.config.get("_TLS_MW"):
+        app.wsgi_app = tlsfront.Middleware(app.wsgi_app)   # real tablet address + https for requests through the door
+        app.config["_TLS_MW"] = True
+    _front["srv"] = srv
+    app.config["LAN"] = {"scheme": "https", "port": port}
+    log.info("tablet access on: https on port %s", port)
+    return None
+
+
+def stop_network(app):
+    srv, _front["srv"] = _front["srv"], None
+    if srv is not None:
+        try:
+            srv.close()
+        except OSError:
+            pass
+        app.config.pop("LAN", None)
+        log.info("tablet access off")
+
+
+def autostart(app):
+    """Launcher, normal start: reopen the tablet door if an Owner or Manager left tablet access on."""
+    with app.app_context():
+        if db.setting("tablet_access", "0") == "1":
+            err = start_network(app)
+            if err:
+                log.warning("tablet access: %s", err)
 
 
 def new_code(uid):
@@ -83,11 +151,13 @@ def lan_addresses():
 @bp.route("/tablet")
 @login_required
 def page():
-    lan = current_app.config.get("LAN")
+    app = current_app._get_current_object()
+    lan = app.config.get("LAN")
     addrs = lan_addresses()
     ip = request.args.get("ip", "")
     ip = ip if ip in addrs else (addrs[0] if addrs else "")
-    ctx = {"lan": lan, "addrs": addrs, "ip": ip, "life_min": CODE_LIFE // 60}
+    ctx = {"lan": lan, "addrs": addrs, "ip": ip, "life_min": CODE_LIFE // 60,
+           "switchable": can_switch(app), "door_open": _front["srv"] is not None}
     if lan and ip:
         base = f"{lan['scheme']}://{ip}:{lan['port']}"
         code = new_code(user()["id"])
@@ -95,6 +165,26 @@ def page():
         ctx.update(base=base, link=link, qr=Markup(qr.svg(link, border=4, px=7)))  # nosec B704  # SVG built by qr.py from our own URL
         log.info("tablet sign-in code made for member #%s (%s)", user()["id"], base)
     return render_template("tablet.html", **ctx)
+
+
+@bp.route("/tablet/access", methods=["POST"])
+@login_required(role="admin")
+def access():
+    app = current_app._get_current_object()
+    if request.form.get("action") == "off":
+        db.set_setting("tablet_access", "0")
+        stop_network(app)
+        db.audit(user()["id"], "tablet access off", "")
+        flash("Tablet access is off. Tablets already signed in can no longer reach Fleet Manager Pro.", "success")
+    else:
+        err = start_network(app)
+        if err:
+            flash(err, "error")
+        else:
+            db.set_setting("tablet_access", "1")
+            db.audit(user()["id"], "tablet access on", f"port {tablet_port(app)}")
+            flash("Tablet access is on. If Windows asks, allow Fleet Manager Pro on Private networks.", "success")
+    return redirect(url_for("tablet.page"))
 
 
 @bp.route("/pair/<code>")
