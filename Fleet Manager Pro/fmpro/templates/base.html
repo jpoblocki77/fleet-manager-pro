@@ -41,6 +41,7 @@
       <a href="/achievements" class="{{ 'active' if ep == 'pages.achievements' }}">{{ icon('medal') }}Achievements<span class="nav-ok" title="Complete and working">✓</span></a>
       <a href="/announcements" class="{{ 'active' if ep == 'pages.announcements' }}">{{ icon('megaphone') }}Announcements<span class="nav-ok" title="Complete and working">✓</span></a>
       <a href="/messages" class="{{ 'active' if ep == 'pages.messages' }}">{{ icon('chat') }}Messages <span class="pill" id="nav-msg-pill" style="display:none">0</span><span class="nav-ok" title="Complete and working">✓</span></a>
+      <a href="/tablet" class="{{ 'active' if ep == 'tablet.page' }}">{{ icon('tablet') }}Connect a Tablet</a>
       {% if can('admin') %}<div class="nav-sec">Admin</div>
       <a href="/settings" class="{{ 'active' if ep == 'pages.settings' }}">{{ icon('cog') }}Settings</a>
       <a href="/updates" class="{{ 'active' if ep == 'pages.updates' }}">{{ icon('download') }}Updates{% if UPDATE and UPDATE.available %} <span class="pill">new</span>{% endif %}</a>

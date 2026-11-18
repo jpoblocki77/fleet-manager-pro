@@ -1103,6 +1103,71 @@ def main():
     from fmpro.telemetry.service import HUB as _HUB
     check(updater.busy() is None or bool(_HUB.all_live()), "busy() reports live drivers only")
 
+    # Connect a Tablet: QR code -> one-time sign-in link
+    import re as _re
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from qr_decode import decode as _qr_decode
+    from fmpro import tablet
+    check('href="/tablet"' in c.get("/").get_data(as_text=True), "Connect a Tablet is in the sidebar")
+    app.config.pop("LAN", None)
+    page = c.get("/tablet").get_data(as_text=True)
+    check("Turn on network mode first" in page and "Start Fleet Manager Pro (LAN).bat" in page and "<svg" not in page.split("Connect a Tablet</h1>")[1],
+          "without network mode the tablet page explains how to turn it on (no QR)")
+    app.config["LAN"] = {"scheme": "https", "port": 8760}
+    _addrs = tablet.lan_addresses
+    tablet.lan_addresses = lambda: ["192.168.1.50", "10.0.0.9"]
+
+    def qr_link(pg):
+        svg = pg[pg.index('<div class="qr-box">'):]
+        vb = int(_re.search(r'viewBox="0 0 (\d+) ', svg).group(1))
+        size = vb - 8
+        mtx = [[False] * size for _ in range(size)]
+        for x, y in _re.findall(r"M(\d+),(\d+)h1v1h-1z", svg[:svg.index("</svg>")]):
+            mtx[int(y) - 4][int(x) - 4] = True
+        return _qr_decode(mtx)
+    page = c.get("/tablet").get_data(as_text=True)
+    link = qr_link(page)
+    check(link.startswith("https://192.168.1.50:8760/pair/") and len(link.rsplit("/", 1)[1]) >= 32,
+          f"the QR code holds this PC's network address and a one-time code ({link[:40]}...)")
+    check('value="10.0.0.9"' in page, "with two networks the page lets you pick the address")
+    check(qr_link(c.get("/tablet?ip=10.0.0.9").get_data(as_text=True)).startswith("https://10.0.0.9:8760/pair/"),
+          "picking the other network changes the QR code")
+    check(qr_link(c.get("/tablet?ip=8.8.8.8").get_data(as_text=True)).startswith("https://192.168.1.50:8760/pair/"),
+          "an address that isn't this PC's is ignored")
+    code = link.rsplit("/", 1)[1]
+    tab = app.test_client()
+    r = tab.get(f"/pair/{code}")
+    check(r.status_code == 302 and r.headers["Location"].endswith("/"), "scanning the code signs the tablet in")
+    me_name = db.val("SELECT display_name FROM users WHERE id=?", (me,))
+    dash = tab.get("/").get_data(as_text=True)
+    check(r.status_code == 302 and "Welcome back" in dash and me_name in dash, "the tablet lands on the dashboard as that member")
+    tab2 = app.test_client()
+    r = tab2.get(f"/pair/{code}")
+    check("/login" in r.headers.get("Location", "") and tab2.get("/").status_code == 302, "a code works only once")
+    check("/login" in app.test_client().get("/pair/not-a-real-code").headers.get("Location", ""), "an unknown code is refused")
+    old = tablet.new_code(me)
+    with tablet._lock:
+        tablet._codes[old] = (me, __import__("time").time() - 1)
+    check("/login" in app.test_client().get(f"/pair/{old}").headers.get("Location", ""), "an expired code is refused")
+    codes = [tablet.new_code(me) for _ in range(5)]
+    check(tablet.use_code(codes[0]) is None and tablet.use_code(codes[-1]) == me,
+          "only the newest few codes per member stay valid")
+    gone = create_user("tab_gone", "Gone Driver", "gonepw1234", role="driver")
+    gcode = tablet.new_code(gone)
+    db.update("users", gone, status="removed")
+    check("/login" in app.test_client().get(f"/pair/{gcode}").headers.get("Location", ""), "a removed member's code is refused")
+    db.ex("DELETE FROM users WHERE id=?", (gone,))           # (leave no extra former member for later tests)
+    dc = tablet.new_code(db.val("SELECT id FROM users WHERE username='up_driver'"))
+    tab3 = app.test_client()
+    tab3.get(f"/pair/{dc}")
+    check(tab3.get("/settings").status_code == 403 and tab3.get("/").status_code == 200,
+          "a driver's tablet gets the driver's rights, nothing more")
+    import glob as _glob
+    logged = "".join(open(f, encoding="utf-8", errors="replace").read() for f in _glob.glob(os.path.join(tmp, "logs", "*.log")))
+    check("/pair/****" in logged and code not in logged and dc not in logged, "pairing codes never appear in the logs")
+    tablet.lan_addresses = _addrs
+    app.config.pop("LAN", None)
+
     # ELD & Compliance reset
     check(db.val("SELECT COUNT(*) FROM hos_logs WHERE user_id=?", (uid,), 0) > 0, "(driver has logbook lines to reset)")
     post("/compliance/reset", {"driver": str(uid), "game": "both", "logbook": "1", "confirm": "nope"})

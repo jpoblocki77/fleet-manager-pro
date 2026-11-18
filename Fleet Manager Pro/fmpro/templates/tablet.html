@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Connect a Tablet{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Connect a Tablet</h1><p>Use Fleet Manager Pro on an iPad, Android tablet or phone: scan the code with its camera and it opens here, already signed in as you.</p></div>
+  {% if lan and ip %}<div class="actions"><a class="btn" href="/tablet{{ '?ip=' ~ ip if addrs|length > 1 else '' }}">{{ icon('refresh') }}New code</a></div>{% endif %}
+</div>
+
+{% if not lan %}
+<div class="card" style="max-width:760px">
+  <div class="card-head"><h2>Turn on network mode first</h2><span class="right badge warn">this PC only</span></div>
+  <p>Right now Fleet Manager Pro only accepts this PC, so a tablet can't reach it.</p>
+  <ol class="steps">
+    <li>Close Fleet Manager Pro.</li>
+    <li>In its folder, double-click <b>Start Fleet Manager Pro (LAN).bat</b>.</li>
+    <li>If Windows asks whether to allow it on networks, choose <b>Private networks</b> and click <b>Allow</b>.</li>
+    <li>Come back to this page: the QR code will be here.</li>
+  </ol>
+  <p class="hint">Network mode is encrypted (HTTPS). Only devices on your own Wi-Fi can reach it.</p>
+</div>
+{% elif not ip %}
+<div class="card" style="max-width:760px"><h2>No network connection found</h2>
+  <p class="muted">This PC doesn't seem to be on a network. Connect it to the same Wi-Fi or router as the tablet, then reload this page.</p></div>
+{% else %}
+<div class="grid g3">
+  <div class="card qr-card">
+    <div class="qr-box">{{ qr }}</div>
+    <p class="small muted" style="text-align:center;margin:10px 0 0">Works once, for {{ life_min }} minutes. Signs the tablet in as <b>{{ current_user().display_name }}</b>.</p>
+    {% if addrs|length > 1 %}
+    <form method="get" class="row" style="justify-content:center;margin-top:10px;gap:6px">
+      <label class="small muted" for="ip-pick">Network</label>
+      <select id="ip-pick" name="ip">{% for a in addrs %}<option value="{{ a }}" {{ 'selected' if a == ip }}>{{ a }}</option>{% endfor %}</select>
+      <button class="btn sm">Use</button>
+    </form>{% endif %}
+  </div>
+  <div class="card span2">
+    <div class="card-head"><h2>How to connect</h2></div>
+    <ol class="steps">
+      <li>Put the tablet on the <b>same Wi-Fi</b> as this PC.</li>
+      <li>Open the <b>Camera</b> app and point it at the code. Tap the link that appears.</li>
+      <li>The first time, the browser warns that the connection isn't private. That's expected: this PC makes its own certificate.
+        <ul class="small">
+          <li><b>iPad / iPhone (Safari):</b> tap <i>Show Details</i>, then <i>visit this website</i>, then <i>Visit Website</i>.</li>
+          <li><b>Android (Chrome):</b> tap <i>Advanced</i>, then <i>Proceed to {{ ip }} (unsafe)</i>.</li>
+        </ul></li>
+      <li>You're in. To open it like an app next time: <b>Share → Add to Home Screen</b> (iPad) or <b>⋮ → Add to Home screen</b> (Android).</li>
+    </ol>
+    <dl class="kv small" style="margin-top:12px">
+      <dt>Address</dt><dd><code>{{ base }}</code></dd>
+      <dt>Sign in by hand</dt><dd>Type the address above into the tablet's browser and sign in with your username and password.</dd>
+    </dl>
+    <p class="hint">Keep this code private: anyone who scans it in the next {{ life_min }} minutes is signed in as you. Pressing <b>New code</b> or leaving it unused is safe; each code works only once.</p>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

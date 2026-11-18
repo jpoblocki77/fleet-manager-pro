@@ -30,12 +30,17 @@ _SECRET_RX = re.compile(r"(?i)\b(password|passwd|pwd|token|secret|authorization|
                         r"(\s*[=:]\s*)(\S+)")
 
 
+# A tablet pairing link (/pair/<one-time code>) signs a device in, so the code is never written to a log.
+_PAIR_RX = re.compile(r"/pair/[A-Za-z0-9_\-]+")
+
+
 def _mask_key(m):
     return f"FMP-{m.group(1)}-****-****-{m.group(4)}"
 
 
 def redact(text):
     text = _KEY_RX.sub(_mask_key, text)
+    text = _PAIR_RX.sub("/pair/****", text)
     text = _SECRET_RX.sub(lambda m: f"{m.group(1)}{m.group(2)}****", text)
     return text
 
