@@ -83,6 +83,8 @@ def create_app(data_dir=None, start_telemetry=True, check_licence=True):
     if check_licence:                       # the real program (the tests make many throwaway apps)
         tracelog.system_report(data_dir)
         tracelog.start_heartbeat()
+        from . import insights
+        insights.start_auto_backup()           # a daily copy of the company database in data/backups
     if check_licence:
         licensing.LICENCE.start()
         from . import recruit
@@ -109,8 +111,9 @@ def create_app(data_dir=None, start_telemetry=True, check_licence=True):
     app.register_blueprint(pages.bp)
     app.register_blueprint(api.bp)
     app.register_blueprint(compliance_views.bp)
-    from . import ops, leasing_views, cleanup
+    from . import ops, leasing_views, cleanup, insights
     app.register_blueprint(ops.bp)
+    app.register_blueprint(insights.bp)
     app.register_blueprint(cleanup.bp)
     app.register_blueprint(leasing_views.bp)
     auth.install(app)

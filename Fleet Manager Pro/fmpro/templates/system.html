@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, csrf %}
+{% block title %}System{% endblock %}
+{% macro size(b) %}{% if b >= 1048576 %}{{ '%.1f'|format(b / 1048576) }} MB{% else %}{{ '%.0f'|format(b / 1024) }} KB{% endif %}{% endmacro %}
+{% block content %}
+<div class="page-head">
+  <div><h1>System</h1><p>Backups, logs and the health of this copy of Fleet Manager Pro.</p></div>
+  <div class="actions"><a class="btn" href="/system/logs.zip">{{ icon('download') }}Download all logs</a></div>
+</div>
+
+<div class="grid g4" style="margin-bottom:16px">
+  <div class="card stat"><div class="label">Version</div><div class="value">{{ health.version }}</div><div class="sub">running for {{ health.uptime|dur }}</div></div>
+  <div class="card stat"><div class="label">Licence</div><div class="value {{ 'pos' if health.licence else 'neg' }}">{{ 'Active' if health.licence else 'Locked' }}</div><div class="sub">{{ health.licence_reason or 'checked online' }}</div></div>
+  <div class="card stat"><div class="label">Database</div><div class="value {{ 'pos' if health.db_check == 'ok' else 'neg' }}">{{ 'Healthy' if health.db_check == 'ok' else 'Problem' }}</div><div class="sub">{{ size(health.db_size) }} · {{ '{:,}'.format(health.jobs) }} jobs · {{ health.members }} members</div></div>
+  <div class="card stat"><div class="label">Game connection</div><div class="value small-value">{{ health.telemetry.split(' — ')[0]|capitalize }}</div><div class="sub">{{ health.live }} driver{{ '' if health.live == 1 else 's' }} live now</div></div>
+</div>
+
+<div class="grid g3" style="margin-bottom:16px">
+  <div class="card span2 flush"><div class="card-head pad"><h2>Backups</h2>
+      <form method="post" action="/system/backup" class="right">{{ csrf() }}<button class="btn primary sm">{{ icon('download') }}Back up now</button></form></div>
+    <div class="table-wrap"><table><thead><tr><th>Backup</th><th>Made</th><th class="num">Size</th><th></th></tr></thead><tbody>
+    {% for b in backups %}<tr><td>{{ b.name }} {% if b.auto %}<span class="badge info">automatic</span>{% endif %}</td><td class="small muted">{{ b.t|dt('%b %d %Y %H:%M') }}</td><td class="num">{{ size(b.size) }}</td>
+      <td class="num">{% if can('owner') %}<span class="row" style="justify-content:flex-end;gap:6px"><a class="btn sm" href="/system/backup/{{ b.name }}">Download</a>
+        <form method="post" action="/system/backup/{{ b.name }}/delete">{{ csrf() }}<button class="btn ghost sm" data-confirm="Delete backup {{ b.name }}? This can't be undone.">Delete</button></form></span>{% endif %}</td></tr>
+    {% else %}<tr><td colspan="4" class="empty">No backups yet. Press "Back up now", or wait for the automatic one.</td></tr>{% endfor %}</tbody></table></div></div>
+  <div class="card"><div class="card-head"><h2>Automatic backups</h2></div>
+    <p>{% if auto %}<span class="badge ok">On</span> A copy of the company database is saved once a day; the newest {{ keep }} are kept.{% else %}<span class="badge warn">Off</span> No automatic copies are being made.{% endif %}</p>
+    <p class="small muted">Last automatic backup: {{ last_auto.t|ago if last_auto else 'none yet' }}</p>
+    <form method="post" action="/system/auto-backup">{{ csrf() }}<input type="hidden" name="on" value="{{ '0' if auto else '1' }}">
+      <button class="btn {{ '' if auto else 'primary' }}">{{ 'Turn off' if auto else 'Turn on' }}</button></form>
+    <p class="hint">Backups are in the <b>data\backups</b> folder next to the program. To restore one, close Fleet Manager Pro and copy it over <b>data\fleet.db</b>.</p></div>
+</div>
+
+<div class="card flush">
+  <div class="card-head pad"><h2>Logs</h2>
+    <form method="get" class="right row" style="gap:6px">
+      <select name="log">{% for f in files %}<option value="{{ f.name }}" {{ 'selected' if f.name == sel }}>{{ f.name }} ({{ size(f.size) }})</option>{% endfor %}</select>
+      <input name="q" value="{{ q }}" placeholder="Filter lines" style="width:160px"><button class="btn sm">Filter</button></form></div>
+  <p class="small muted" style="padding:0 18px">Newest first, last 400 lines. Passwords, tokens and purchase keys are hidden in every log, so you can safely send them for support.</p>
+  <pre class="logview">{% for ln in lines %}<span class="{{ 'lv-err' if ' ERROR ' in ln or ' CRITICAL ' in ln else 'lv-warn' if ' WARNING ' in ln else 'lv-dbg' if ' DEBUG ' in ln else '' }}">{{ ln }}</span>
+{% else %}<span class="faint">Nothing to show.</span>{% endfor %}</pre>
+</div>
+{% endblock %}
+{% block scripts %}<script>document.querySelector('select[name=log]')?.addEventListener('change', e => e.target.form.submit());</script>{% endblock %}

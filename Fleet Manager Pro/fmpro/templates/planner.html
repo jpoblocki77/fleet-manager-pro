@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Route Planner{% endblock %}
+{% macro per(v) %}{% if v is none %}<span class="faint">—</span>{% else %}{{ (v * per_km)|money(2) }}{% endif %}{% endmacro %}
+{% macro pct(v) %}{% if v is none %}<span class="faint">—</span>{% else %}{{ '%.0f'|format(v) }}%{% endif %}{% endmacro %}
+{% macro hrs(h) %}{% if h %}{{ (h|int) }}h {{ '%02d'|format(((h - (h|int)) * 60)|int) }}m{% else %}<span class="faint">—</span>{% endif %}{% endmacro %}
+{% macro lanebox(title, l, note) %}
+<div class="card lane-card"><div class="card-head"><h2>{{ title }}</h2><span class="right small muted">{{ note }}</span></div>
+{% if l %}<div class="lane-figs">
+  <div><span>Loads run</span><b>{{ l.loads }}</b></div>
+  <div><span>Average pay</span><b>{{ l.revenue|money }}</b></div>
+  <div><span>Average profit</span><b class="{{ 'pos' if l.profit > 0 else 'neg' }}">{{ l.profit|money }}</b></div>
+  <div><span>Distance</span><b>{{ l.km|dist }}</b></div>
+  <div><span>Pays per {{ unit }}</span><b>{{ per(l.rev_per_km) }}</b></div>
+  <div><span>Profit per {{ unit }}</span><b>{{ per(l.profit_per_km) }}</b></div>
+  <div><span>On time</span><b>{{ pct(l.on_time_pct) }}</b></div>
+  <div><span>Cargo damage</span><b>{{ '%.1f'|format((l.damage or 0) * 100) }}%</b></div>
+</div>{% else %}<p class="muted">Nobody in the company has run this yet.</p>{% endif %}</div>
+{% endmacro %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Route Planner</h1><p>Before you take a job: what this lane has really paid your company, what it costs, and where to head next. Built from your own delivered loads.</p></div>
+  <div class="actions"><a class="btn" href="/insights">{{ icon('data') }}Insights</a></div>
+</div>
+
+<form class="card planner-form" method="get" style="margin-bottom:16px">
+  <div class="fields">
+    <div class="field"><label>From city</label><input name="from" value="{{ src }}" list="cities" placeholder="e.g. Sacramento" required></div>
+    <div class="field"><label>To city</label><input name="to" value="{{ dst }}" list="cities" placeholder="e.g. Las Vegas" required></div>
+    <div class="field"><label>Cargo (optional)</label><input name="cargo" value="{{ cargo }}" list="cargos" placeholder="any"></div>
+    <div class="field"><label>Distance in {{ unit }} (if new)</label><input name="distance" type="number" min="0" step="1" value="{{ distance }}" placeholder="from the job offer"></div>
+  </div>
+  <div class="row" style="justify-content:flex-end;gap:8px"><a class="btn ghost" href="/planner">Clear</a><button class="btn primary">{{ icon('map') }}Check this lane</button></div>
+  <datalist id="cities">{% for c in cities %}<option value="{{ c }}">{% endfor %}</datalist>
+  <datalist id="cargos">{% for c in cargos %}<option value="{{ c }}">{% endfor %}</datalist>
+</form>
+
+{% if result %}
+  <h2 class="section-title">{{ src }} → {{ dst }}{% if cargo %} · {{ cargo }}{% endif %}</h2>
+  {% if result.est %}
+  <div class="card estimate" style="margin-bottom:16px">
+    <div class="card-head"><h2>Estimate for one load</h2><span class="right small muted">company averages per {{ unit }} × distance from {{ result.est.source }}</span></div>
+    <div class="lane-figs big">
+      <div><span>Distance</span><b>{{ result.est.km|dist }}</b></div>
+      <div><span>Expected pay</span><b>{{ result.est.revenue|money }}</b></div>
+      <div><span>Expected costs</span><b class="neg">{{ (-result.est.cost)|money }}</b></div>
+      <div><span>Expected profit</span><b class="{{ 'pos' if result.est.profit > 0 else 'neg' }}">{{ result.est.profit|money }}</b></div>
+      <div><span>Driving time</span><b>{{ hrs(result.est.hours) }}</b></div>
+    </div>
+    {% if result.same and result.same.revenue %}<p class="small muted" style="margin:8px 0 0">This lane has paid {{ result.same.revenue|money }} a load on average — {{ 'more' if result.same.revenue > result.est.revenue else 'less' }} than the company average for that distance.</p>{% endif %}
+  </div>
+  {% elif not result.same %}
+  <div class="card" style="margin-bottom:16px"><p class="muted" style="margin:0">No history for this lane yet. Enter the distance from the job offer to get an estimate from the company's averages.</p></div>
+  {% endif %}
+  <div class="grid g{{ 3 if cargo else 2 }}" style="margin-bottom:16px">
+    {% if cargo %}{{ lanebox('This lane, ' ~ cargo, result.exact, 'same cargo') }}{% endif %}
+    {{ lanebox('This lane', result.same, 'any cargo') }}
+    {{ lanebox('The way back', result.back, dst ~ ' → ' ~ src) }}
+  </div>
+  <div class="grid g2" style="margin-bottom:16px">
+    <div class="card flush"><div class="card-head pad"><h2>Best next legs from {{ src }}</h2><span class="right small muted">profit per {{ unit }}</span></div>
+      <div class="table-wrap"><table><thead><tr><th>To</th><th class="num">Loads</th><th class="num">Avg profit</th><th class="num">Per {{ unit }}</th></tr></thead><tbody>
+      {% for o in result.onward %}<tr><td><a href="/planner?from={{ src|urlencode }}&to={{ o.dst|urlencode }}">{{ o.dst }}</a></td><td class="num">{{ o.loads }}</td><td class="num">{{ o.profit|money }}</td><td class="num">{{ per(o.profit_per_km) }}</td></tr>
+      {% else %}<tr><td colspan="4" class="empty">No loads from {{ src }} yet.</td></tr>{% endfor %}</tbody></table></div></div>
+    <div class="card flush"><div class="card-head pad"><h2>Recent loads on this lane</h2></div>
+      <div class="table-wrap"><table><thead><tr><th>Job</th><th>Driver</th><th>Cargo</th><th class="num">Pay</th><th class="num">Profit</th></tr></thead><tbody>
+      {% for j in result.jobs %}<tr><td><a href="/jobs/{{ j.id }}">#{{ j.id }}</a> <span class="small faint">{{ j.finished_at|ago if j.finished_at }}</span></td><td>{{ j.display_name }}</td><td>{{ j.cargo }}</td><td class="num">{{ j.revenue|money }}</td><td class="num {{ 'pos' if j.profit > 0 else 'neg' }}">{{ j.profit|money }}</td></tr>
+      {% else %}<tr><td colspan="5" class="empty">None yet.</td></tr>{% endfor %}</tbody></table></div></div>
+  </div>
+{% endif %}
+
+<div class="grid g3">
+  <div class="card flush span2"><div class="card-head pad"><h2>Most profitable lanes</h2><span class="right small muted">profit per {{ unit }}, all time</span></div>
+    <div class="table-wrap"><table><thead><tr><th>Lane</th><th class="num">Loads</th><th class="num">Avg pay</th><th class="num">Avg profit</th><th class="num">Per {{ unit }}</th><th class="num">On time</th></tr></thead><tbody>
+    {% for l in best %}<tr><td><a href="/planner?from={{ l.src|urlencode }}&to={{ l.dst|urlencode }}">{{ l.src }} → {{ l.dst }}</a></td><td class="num">{{ l.loads }}</td><td class="num">{{ l.revenue|money }}</td>
+      <td class="num {{ 'pos' if l.profit > 0 else 'neg' }}">{{ l.profit|money }}</td><td class="num"><b>{{ per(l.profit_per_km) }}</b></td><td class="num">{{ pct(l.on_time_pct) }}</td></tr>
+    {% else %}<tr><td colspan="6" class="empty">Deliver some loads and the best lanes appear here.</td></tr>{% endfor %}</tbody></table></div></div>
+  <div class="card"><div class="card-head"><h2>Company averages</h2></div>
+    {% if company %}<div class="lane-figs one">
+      <div><span>Pays per {{ unit }}</span><b>{{ per(company.rev_per_km) }}</b></div>
+      <div><span>Costs per {{ unit }}</span><b>{{ per(company.cost_per_km) }}</b></div>
+      <div><span>Profit per {{ unit }}</span><b class="{{ 'pos' if (company.profit_per_km or 0) > 0 else 'neg' }}">{{ per(company.profit_per_km) }}</b></div>
+      <div><span>Average load</span><b>{{ company.km|dist }} · {{ company.revenue|money }}</b></div>
+      <div><span>On time</span><b>{{ pct(company.on_time_pct) }}</b></div>
+    </div><p class="hint">A lane beating the company's profit per {{ unit }} is worth taking again.</p>
+    {% else %}<p class="muted">No deliveries yet.</p>{% endif %}</div>
+</div>
+{% endblock %}

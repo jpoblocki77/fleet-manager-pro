@@ -988,6 +988,36 @@ def main():
     check(post("/compliance/simulate", {"kind": "nap", "game": "ats"}).status_code == 400, "unknown simulate kind is refused")
     compliance_views._live_values = _live
 
+    # Insights, Route Planner, System & Backups
+    from fmpro import insights
+    for per in ("30d", "90d", "year", "all", "bogus"):
+        r = c.get(f"/insights?period={per}")
+        check(r.status_code == 200 and "Profit per" in r.get_data(as_text=True), f"insights renders for period {per}")
+    lane = db.one("SELECT source_city s, destination_city d FROM jobs WHERE status='delivered' AND source_city<>'' LIMIT 1")
+    r = c.get("/planner")
+    check(r.status_code == 200 and "Most profitable lanes" in r.get_data(as_text=True), "route planner renders")
+    if lane:
+        page = c.get("/planner", query_string={"from": lane["s"], "to": lane["d"]}).get_data(as_text=True)
+        check("This lane" in page and "The way back" in page, "route planner shows a known lane")
+    page = c.get("/planner", query_string={"from": "Nowhere", "to": "Elsewhere", "distance": "300"}).get_data(as_text=True)
+    check("Estimate for one load" in page or "No history" in page, "route planner estimates a new lane")
+    check(c.get("/system").status_code == 200, "system page renders")
+    before = {b["name"] for b in insights.list_backups()}
+    post("/system/backup", {})
+    new = [b["name"] for b in insights.list_backups() if b["name"] not in before]
+    check(len(new) == 1, "Back up now makes a backup")
+    name = new[0] if new else "missing"
+    r = c.get(f"/system/backup/{name}")
+    check(r.status_code == 200 and r.data[:16] == b"SQLite format 3\x00", "a backup downloads as a SQLite database")
+    r.close()
+    check(c.get("/system/backup/..%2Ffleet.db").status_code == 404, "backup download refuses other paths")
+    check(c.get("/system/logs.zip").status_code == 200, "logs download as a zip")
+    post(f"/system/backup/{name}/delete", {})
+    check({b["name"] for b in insights.list_backups()} == before, "a backup can be deleted")
+    post("/system/auto-backup", {"on": "0"})
+    check(db.setting("auto_backup") == "0", "automatic backups can be turned off")
+    post("/system/auto-backup", {"on": "1"})
+
     # ELD & Compliance reset
     check(db.val("SELECT COUNT(*) FROM hos_logs WHERE user_id=?", (uid,), 0) > 0, "(driver has logbook lines to reset)")
     post("/compliance/reset", {"driver": str(uid), "game": "both", "logbook": "1", "confirm": "nope"})

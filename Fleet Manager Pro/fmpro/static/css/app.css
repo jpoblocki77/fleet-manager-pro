@@ -361,3 +361,53 @@ dialog { border-radius: 16px; }
 /* events list: whole card opens the event, the Edit button sits above that link */
 .ev-card{position:relative}.ev-card .ev-link{position:absolute;inset:0;z-index:0;border-radius:inherit}
 .ev-card .ev-edit{position:relative;z-index:1}
+
+/* ---------- 1.4.4: Insights, Route Planner, System ---------- */
+.card-head.pad { padding: 16px 18px 0; }
+table.compact th, table.compact td { padding: 6px 8px; font-size: 12.5px; white-space: nowrap; }
+.section-title { margin: 4px 0 12px; font-size: 20px; }
+.lane-figs { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+.lane-figs > div { background: var(--panel-2); border: 1px solid var(--line-soft); border-radius: 10px; padding: 10px 12px; }
+.lane-figs span { display: block; color: var(--muted); font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+.lane-figs b { display: block; font-size: 17px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.lane-figs.big b { font-size: 22px; }
+.lane-figs.one { grid-template-columns: 1fr; }
+.lane-figs.one > div { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 12px; }
+.lane-figs.one b { margin: 0; font-size: 15px; }
+.card.estimate { border-top: 3px solid var(--crimson); background: linear-gradient(160deg, color-mix(in srgb, var(--crimson) 9%, var(--panel)), var(--panel) 55%); }
+.planner-form .fields { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.stat .value.small-value { font-size: 18px; }
+.stat .value.pos { color: var(--ok); } .stat .value.neg { color: var(--bad); }
+pre.logview { margin: 10px 0 0; padding: 12px 18px; max-height: 520px; overflow: auto; background: var(--navy-950);
+  border-top: 1px solid var(--line); font: 12px/1.55 var(--mono); white-space: pre-wrap; word-break: break-word; color: #b9c8de; }
+:root[data-theme="light"] pre.logview { background: #0b1730; }
+pre.logview .lv-err { color: #ff8095; } pre.logview .lv-warn { color: #f3c45b; } pre.logview .lv-dbg { color: #7088aa; }
+
+/* ---------- 1.4.4: look & feel polish ---------- */
+@keyframes fmp-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.content > .page-head, .content > .grid, .content > .card, .content > form.card { animation: fmp-rise .28s ease-out both; }
+.content > .grid:nth-of-type(2) { animation-delay: .04s; } .content > .grid:nth-of-type(3) { animation-delay: .08s; }
+.card.stat { transition: transform .15s, border-color .15s, box-shadow .15s; }
+.card.stat:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--crimson) 45%, var(--line)); box-shadow: 0 10px 28px rgba(0,0,0,.4); }
+.card.stat::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: linear-gradient(var(--crimson), transparent); opacity: .7; }
+.table-wrap { max-height: none; }
+.table-wrap thead th { position: sticky; top: 0; background: var(--panel); z-index: 1; }
+td.num, th.num { font-variant-numeric: tabular-nums; }
+a:focus-visible, .btn:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible {
+  outline: 2px solid var(--crimson-400); outline-offset: 2px; }
+.btn:active { transform: translateY(1px); }
+.btn.primary { box-shadow: 0 6px 18px rgba(200, 16, 46, .28); }
+.btn.primary:hover { box-shadow: 0 8px 22px rgba(200, 16, 46, .4); }
+.nav a.active { box-shadow: inset 3px 0 0 var(--crimson); }
+* { scrollbar-width: thin; scrollbar-color: var(--navy-600) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--navy-600); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--crimson-600); background-clip: padding-box; border: 2px solid transparent; }
+::selection { background: var(--crimson); color: #fff; }
+td.empty { padding: 28px 12px; text-align: center; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+@media (max-width: 640px) {
+  .lane-figs { grid-template-columns: 1fr 1fr; }
+  .page-head .actions { flex-wrap: wrap; }
+  .seg { overflow-x: auto; max-width: 100%; }
+}

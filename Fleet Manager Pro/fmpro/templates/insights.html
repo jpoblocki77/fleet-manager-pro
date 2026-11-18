@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, stat, who %}
+{% block title %}Insights{% endblock %}
+{% macro rate(v, d=2) %}{% if v is none %}<span class="faint">—</span>{% else %}{{ v|money(d) }}{% endif %}{% endmacro %}
+{% macro pct(v) %}{% if v is none %}<span class="faint">—</span>{% else %}{{ '%.0f'|format(v) }}%{% endif %}{% endmacro %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Insights</h1><p>How the company really makes money: trends, cost and pay per {{ unit }}, best lanes, cargo, trucks and drivers. Delivered loads only.</p></div>
+  <div class="actions">
+    <span class="seg">{% for k, p in periods.items() %}<a class="{{ 'on' if period == k }}" href="?period={{ k }}">{{ p[0] }}</a>{% endfor %}</span>
+    <a class="btn" href="/planner">{{ icon('map') }}Route planner</a>
+  </div>
+</div>
+
+<div class="grid g4 kpis" style="margin-bottom:16px">
+  {{ stat('Loads delivered', '{:,}'.format(kpi.loads), periods[period][0]) }}
+  {{ stat('Revenue', kpi.revenue|money, 'profit ' ~ kpi.profit|money) }}
+  <div class="card stat"><div class="label">Profit margin</div><div class="value {{ 'pos' if (kpi.margin or 0) > 0 else 'neg' if kpi.margin }}">{{ pct(kpi.margin) }}</div><div class="sub">of revenue kept after costs</div></div>
+  <div class="card stat"><div class="label">On time</div><div class="value">{{ pct(kpi.on_time_pct) }}</div><div class="sub">{{ kpi.timed or 0 }} loads with a deadline</div></div>
+  <div class="card stat"><div class="label">Revenue per {{ unit }}</div><div class="value">{{ rate(kpi.rev_per) }}</div><div class="sub">{{ kpi.km|dist }} driven</div></div>
+  <div class="card stat"><div class="label">Cost per {{ unit }}</div><div class="value">{{ rate(kpi.cost_per) }}</div><div class="sub">pay, fuel, tolls, fines, ferries</div></div>
+  <div class="card stat"><div class="label">Profit per {{ unit }}</div><div class="value {{ 'pos' if (kpi.profit_per or 0) > 0 else 'neg' if kpi.profit_per }}">{{ rate(kpi.profit_per) }}</div><div class="sub">the number to grow</div></div>
+  <div class="card stat"><div class="label">Average load</div><div class="value">{{ kpi.mass|mass }}</div><div class="sub">score {{ '%.0f'|format(kpi.score or 0) }} · damage {{ '%.1f'|format((kpi.damage or 0) * 100) }}%</div></div>
+</div>
+
+<div class="card" style="margin-bottom:16px">
+  <div class="card-head"><h2>12 months</h2>
+    <div class="right legend"><span><i style="background:#2fb67c"></i>Revenue</span><span><i style="background:#c8102e"></i>Costs</span><span><i style="background:#4d8fe0"></i>Profit</span></div></div>
+  <div id="chart-months" style="height:260px"></div>
+  <div class="table-wrap" style="margin-top:10px"><table class="compact"><thead><tr><th>Month</th>{% for m in months %}<th class="num">{{ m.label }}</th>{% endfor %}</tr></thead><tbody>
+    <tr><td class="muted">Loads</td>{% for m in months %}<td class="num">{{ m.loads or '·' }}</td>{% endfor %}</tr>
+    <tr><td class="muted">Profit</td>{% for m in months %}<td class="num {{ 'pos' if m.profit > 0 else 'neg' if m.profit < 0 }}">{{ m.profit|money if m.loads else '·' }}</td>{% endfor %}</tr>
+  </tbody></table></div>
+</div>
+
+<div class="grid g2" style="margin-bottom:16px">
+  <div class="card flush"><div class="card-head pad"><h2>Best lanes</h2><span class="right small muted">by total profit</span></div>
+    <div class="table-wrap"><table><thead><tr><th>Lane</th><th class="num">Loads</th><th class="num">Profit</th><th class="num">Per {{ unit }}</th><th class="num">On time</th></tr></thead><tbody>
+    {% for l in lanes %}<tr><td><a href="/planner?from={{ l.src|urlencode }}&to={{ l.dst|urlencode }}">{{ l.src }} → {{ l.dst }}</a></td><td class="num">{{ l.loads }}</td>
+      <td class="num {{ 'pos' if l.profit > 0 else 'neg' }}">{{ l.profit|money }}</td><td class="num">{{ rate(l.profit_per) }}</td><td class="num">{{ pct(l.on_time_pct) }}</td></tr>
+    {% else %}<tr><td colspan="5" class="empty">No deliveries in this period.</td></tr>{% endfor %}</tbody></table></div></div>
+  <div class="card flush"><div class="card-head pad"><h2>Cargo</h2><span class="right small muted">by revenue</span></div>
+    <div class="table-wrap"><table><thead><tr><th>Cargo</th><th class="num">Loads</th><th class="num">Revenue</th><th class="num">Pays per {{ unit }}</th><th class="num">Margin</th></tr></thead><tbody>
+    {% for c in cargo %}<tr><td>{{ c.name }}</td><td class="num">{{ c.loads }}</td><td class="num">{{ c.revenue|money }}</td><td class="num">{{ rate(c.rev_per) }}</td><td class="num">{{ pct(c.margin) }}</td></tr>
+    {% else %}<tr><td colspan="5" class="empty">No deliveries in this period.</td></tr>{% endfor %}</tbody></table></div></div>
+</div>
+
+<div class="grid g2">
+  <div class="card flush"><div class="card-head pad"><h2>Trucks</h2><span class="right small muted">profit after repairs &amp; services</span></div>
+    <div class="table-wrap"><table><thead><tr><th>Truck</th><th class="num">Loads</th><th class="num">Driven</th><th class="num">Profit</th><th class="num">Upkeep</th><th class="num">Net</th></tr></thead><tbody>
+    {% for t in trucks %}<tr><td><a href="/fleet/truck/{{ t.id }}">{{ t.brand }} {{ t.model }}</a> <span class="small faint">{{ t.plate }}</span></td><td class="num">{{ t.loads }}</td><td class="num">{{ t.km|dist }}</td>
+      <td class="num">{{ t.profit|money }}</td><td class="num neg">{{ (-(t.upkeep or 0))|money if t.upkeep else '—' }}</td><td class="num {{ 'pos' if t.net > 0 else 'neg' }}"><b>{{ t.net|money }}</b></td></tr>
+    {% else %}<tr><td colspan="6" class="empty">No deliveries in this period.</td></tr>{% endfor %}</tbody></table></div></div>
+  <div class="card flush"><div class="card-head pad"><h2>Drivers</h2><span class="right small muted">profit brought in</span></div>
+    <div class="table-wrap"><table><thead><tr><th>Driver</th><th class="num">Loads</th><th>Profit</th><th class="num">Per {{ unit }}</th><th class="num">On time</th><th class="num">Score</th></tr></thead><tbody>
+    {% for d in drivers %}<tr><td>{{ who(d.id, d.display_name, d.color) }}</td><td class="num">{{ d.loads }}</td>
+      <td style="min-width:140px"><div class="between small"><span class="{{ 'pos' if d.profit > 0 else 'neg' }}">{{ d.profit|money }}</span></div>
+        <div class="bar"><i style="width:{{ ((d.profit if d.profit > 0 else 0) / best_profit * 100) if best_profit > 0 else 0 }}%"></i></div></td>
+      <td class="num">{{ rate(d.profit_per) }}</td><td class="num">{{ pct(d.on_time_pct) }}</td><td class="num">{{ '%.0f'|format(d.score or 0) }}</td></tr>
+    {% else %}<tr><td colspan="6" class="empty">No deliveries in this period.</td></tr>{% endfor %}</tbody></table></div></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const months = {{ months|tojson }};
+FMP.chart(document.getElementById("chart-months"), { labels: months.map(m => m.label), prefix: FMP.cur, series: [
+  { name: "Revenue", color: "#2fb67c", values: months.map(m => m.revenue) },
+  { name: "Costs", color: "#c8102e", values: months.map(m => m.cost) },
+  { name: "Profit", color: "#4d8fe0", values: months.map(m => m.profit), type: "line" }] });
+</script>
+{% endblock %}

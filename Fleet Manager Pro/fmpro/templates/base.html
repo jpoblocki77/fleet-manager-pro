@@ -32,6 +32,8 @@
       <a href="/expenses" class="{{ 'active' if ep.startswith('ops.expense') }}">{{ icon('download') }}Expenses<span class="nav-ok" title="Complete and working (0.02 Alpha)">✓</span></a>
       <a href="/drivers" class="{{ 'active' if ep in ('pages.drivers', 'pages.driver_profile') }}">{{ icon('users') }}Drivers<span class="nav-ok" title="Complete and working (0.02 Alpha)">✓</span></a>
       <a href="/performance" class="{{ 'active' if ep == 'ops.performance' }}">{{ icon('trophy') }}Driver Performance<span class="nav-ok" title="Complete and working (0.02 Alpha)">✓</span></a>
+      <a href="/insights" class="{{ 'active' if ep == 'insights.page' }}">{{ icon('chart') }}Insights<span class="nav-ok" title="Complete and working">✓</span></a>
+      <a href="/planner" class="{{ 'active' if ep == 'insights.planner' }}">{{ icon('route') }}Route Planner<span class="nav-ok" title="Complete and working">✓</span></a>
       {% if can('admin') %}<a href="/recruitment" class="{{ 'active' if ep == 'pages.recruitment' }}">{{ icon('apply') }}Recruitment<span class="nav-ok" title="Complete and working">✓</span></a>{% endif %}
       <div class="nav-sec">Community</div>
       <a href="/events" class="{{ 'active' if ep.startswith('pages.event') }}">{{ icon('cal') }}Events &amp; Convoys<span class="nav-ok" title="Complete and working">✓</span></a>
@@ -40,7 +42,8 @@
       <a href="/announcements" class="{{ 'active' if ep == 'pages.announcements' }}">{{ icon('megaphone') }}Announcements<span class="nav-ok" title="Complete and working">✓</span></a>
       <a href="/messages" class="{{ 'active' if ep == 'pages.messages' }}">{{ icon('chat') }}Messages <span class="pill" id="nav-msg-pill" style="display:none">0</span><span class="nav-ok" title="Complete and working">✓</span></a>
       {% if can('admin') %}<div class="nav-sec">Admin</div>
-      <a href="/settings" class="{{ 'active' if ep == 'pages.settings' }}">{{ icon('cog') }}Settings</a>{% endif %}
+      <a href="/settings" class="{{ 'active' if ep == 'pages.settings' }}">{{ icon('cog') }}Settings</a>
+      <a href="/system" class="{{ 'active' if ep == 'insights.system' }}">{{ icon('server') }}System &amp; Backups</a>{% endif %}
     </nav>
     <div class="side-foot">{{ APP_NAME }} {{ VERSION }}<br>{{ 'Release candidate · alpha' if (VERSION.endswith('a') or 'alpha' in VERSION) else 'Release candidate' }} · <span class="nav-ok">✓</span> = complete<br><span class="copyright">{{ COPYRIGHT }}</span> · <a href="/licence-agreement">Licence agreement</a></div>
   </aside>
