@@ -82,9 +82,11 @@ def clocks(uid, now_min=None, game="ats"):
     lookback = rules["cycle_days"] * 1440 + rules["restart"]
     segs = _gaps_as_off(_segments(uid, now_min - lookback, now_min, game), now_min - lookback, now_min)
 
-    # simulated rests (the Simulate buttons): count as a rest of that length ending at that minute
+    # simulated rests are real off-duty lines in the logbook now; only the zero-length markers made before 1.4.7
+    # need counting here, as a rest of that length ending at that minute
     sims = db.q("SELECT start_min, sim_rest FROM hos_logs WHERE user_id=? AND COALESCE(game,'ats')=? AND sim_rest > 0 "
-                "AND start_min BETWEEN ? AND ?", (uid, game, now_min - lookback, now_min))
+                "AND COALESCE(end_min, start_min) <= start_min AND start_min BETWEEN ? AND ?",
+                (uid, game, now_min - lookback, now_min))
 
     def rest_end(segments, length):
         real = _last_rest_end(segments, length)
@@ -123,7 +125,8 @@ def clocks(uid, now_min=None, game="ats"):
     c["available"] = max(0, min(c["drive"]["left"], c["window"]["left"], c["cycle"]["left"]))
     c["out_of_hours"] = c["available"] <= 0
     cur = db.one("SELECT status, start_min FROM hos_logs WHERE user_id=? AND COALESCE(game,'ats')=? "
-                 "AND COALESCE(sim_rest,0)=0 ORDER BY start_min DESC, id DESC LIMIT 1", (uid, game))
+                 "AND (COALESCE(sim_rest,0)=0 OR COALESCE(end_min, start_min) > start_min) "   # skip pre-1.4.7 markers
+                 "ORDER BY start_min DESC, id DESC LIMIT 1", (uid, game))
     c["status"] = cur["status"] if cur else "off"
     c["status_since"] = cur["start_min"] if cur else None
     return c
@@ -133,6 +136,27 @@ def last_game_min(uid, game="ats"):
     """The driver's latest in-game minute in that game's logbook (each game has its own clock)."""
     return db.val("SELECT MAX(COALESCE(end_min, start_min)) FROM hos_logs WHERE user_id=? AND COALESCE(game,'ats')=?",
                   (uid, game))
+
+
+# The logbook keeps its own clock: the in-game minute plus every simulated rest the driver has taken (the Simulate
+# buttons write a real off-duty line of that length, so the time after it moves on by the same amount). A logbook
+# reset clears those lines, and with them the extra time.
+EPOCH = [0]          # bumped whenever simulated rests or the logbook change, so live trackers re-read the offset
+
+
+def log_offset(uid, game="ats"):
+    """Minutes of simulated rest in this driver's logbook for that game (added to the game clock)."""
+    return int(db.val("SELECT COALESCE(SUM(sim_rest), 0) FROM hos_logs WHERE user_id=? AND COALESCE(game,'ats')=? "
+                      "AND sim_rest > 0 AND COALESCE(end_min, start_min) > start_min", (uid, game), 0) or 0)
+
+
+def log_min(uid, game, game_min):
+    """An in-game minute (telemetry game_time_abs) on this driver's logbook clock."""
+    return game_min + log_offset(uid, game) if game_min else game_min
+
+
+def logbook_changed():
+    EPOCH[0] += 1
 
 
 # ------------------------------------------------------------------------------------------------ violations
@@ -222,11 +246,15 @@ class HosTracker:
         gm = v["game_time_abs"]
         if not gm or v["paused"] or v.get("game") not in ("ats", "ets2"):
             return
-        if v["game"] != getattr(self, "game", None):         # switched game: that game's own logbook and clock
+        if v["game"] != getattr(self, "game", None) or getattr(self, "epoch", None) != EPOCH[0]:
+            # switched game (that game's own logbook and clock), or a simulated rest / reset changed the logbook
             self.game = v["game"]
+            self.epoch = EPOCH[0]
+            self.offset = log_offset(self.uid, self.game)
             self.row = self.status = self.last_min = None
             self.cand = None
             self.last_write = self.last_check = 0
+        gm += self.offset                                    # the logbook's own clock (see log_offset)
         if self.status is None:                              # (re)connect: continue the last segment if it fits
             last = db.one("SELECT * FROM hos_logs WHERE user_id=? AND COALESCE(game,'ats')=? "
                           "AND COALESCE(sim_rest,0)=0 ORDER BY start_min DESC, id DESC LIMIT 1", (self.uid, self.game))
@@ -276,14 +304,24 @@ def set_status(uid, status, game_min, note="", game="ats"):
 
 
 def simulate_rest(uid, kind, game_min, game="ats"):
-    """Count a break (kind 'break') or a cycle restart (kind 'restart', e.g. 34 h) as taken right now, without
-    waiting it out in the game. Stored as a zero-length marker line, so the driven time in the logbook is unchanged.
-    Returns the simulated length in minutes."""
+    """Take a break (kind 'break') or a cycle restart (kind 'restart', e.g. 34 h) right now without waiting it out
+    in the game: an off-duty line of that length goes into the logbook (it shows on the graph like any rest) and
+    the driver's logbook clock moves on by the same amount, so what they drive next comes after the rest.
+    game_min is on the logbook clock. Returns the simulated length in minutes."""
     rules = RULESETS[ruleset_for(game)]
     length = rules["break_len"] if kind == "break" else rules["restart"]
     label = f"{length}-min break" if kind == "break" else f"{length // 60}-hour restart"
-    db.insert("hos_logs", user_id=uid, status="off", start_min=game_min, end_min=game_min, auto=0,
+    last = db.val("SELECT MAX(COALESCE(end_min, start_min)) FROM hos_logs WHERE user_id=? AND COALESCE(game,'ats')=?",
+                  (uid, game))
+    if last is not None and last > game_min:
+        game_min = last                                     # never overlap what's already logged
+    open_row = db.one("SELECT id, end_min FROM hos_logs WHERE user_id=? AND COALESCE(game,'ats')=? "
+                      "AND COALESCE(sim_rest,0)=0 ORDER BY start_min DESC, id DESC LIMIT 1", (uid, game))
+    if open_row and (open_row["end_min"] or 0) < game_min:
+        db.update("hos_logs", open_row["id"], end_min=game_min)  # the open line ends where the rest starts
+    db.insert("hos_logs", user_id=uid, status="off", start_min=game_min, end_min=game_min + length, auto=0,
               note=f"Simulated {label}", sim_rest=length, created_at=time.time(), game=game)
+    logbook_changed()
     return length
 
 
@@ -352,7 +390,7 @@ def inspect(uid, v, job_id=None, truck_id=None, level=None):
     def add(code, text, severity, fine):
         findings.append({"code": code, "text": text, "severity": severity, "fine": fine})
 
-    gm = v.get("game_time_abs") or last_game_min(uid, game)
+    gm = log_min(uid, game, v.get("game_time_abs")) or last_game_min(uid, game)
     hos_fine = db.setting_f("hos_fine", 500)
     # Level 1-3: driver credentials and hours
     c = clocks(uid, gm, game) if gm else None

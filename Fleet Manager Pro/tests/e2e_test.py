@@ -973,18 +973,48 @@ def main():
     page = c.get("/compliance?tab=logbook&game=ats").get_data(as_text=True)
     check("Simulate 30-min break" in page and "Simulate 34-hour restart" in page,
           "the logbook shows the Simulate break / restart buttons")
-    off_before = db.val("SELECT SUM(end_min-start_min) FROM hos_logs WHERE user_id=?", (me,), 0)
+    off0 = compliance.log_offset(me, "ats")
     post("/compliance/simulate", {"kind": "break", "game": "ats"})
     cl = compliance.clocks(me, None, "ats")
     check(not cl["break"]["over"] and cl["break"]["used"] == 0 and cl["drive"]["used"] == 540,
           "a simulated 30-min break resets only the break clock")
+    brk = db.one("SELECT * FROM hos_logs WHERE user_id=? AND sim_rest=30 ORDER BY id DESC LIMIT 1", (me,))
+    check(brk and brk["status"] == "off" and brk["start_min"] == sm + 545 and brk["end_min"] == sm + 575,
+          f"the simulated break is a real 30-minute off-duty line right after the last one ({dict(brk) if brk else None})")
+    check(compliance.last_game_min(me, "ats") == sm + 575 and compliance.log_offset(me, "ats") == off0 + 30,
+          "the logbook clock moves on by the 30 minutes")
+    check(cl["status"] == "off", "after a simulated rest the current status is off duty")
+    page = c.get(f"/compliance?tab=logbook&game=ats&day={(sm + 560) // 1440}").get_data(as_text=True)
+    check("#2fb67c" in page and "Simulated 30-min break" in page, "the simulated break is drawn on the logbook graph")
     post("/compliance/simulate", {"kind": "restart", "game": "ats"})
     cl = compliance.clocks(me, None, "ats")
     check(cl["drive"]["used"] == 0 and cl["window"]["used"] == 0 and cl["cycle"]["used"] == 0,
           "a simulated 34 h restart resets the driving, window and cycle clocks")
-    check(cl["status"] == "on", "a simulated rest doesn't change the current duty status")
-    check(db.val("SELECT SUM(end_min-start_min) FROM hos_logs WHERE user_id=?", (me,), 0) == off_before,
-          "simulated rests leave the logged duty time unchanged")
+    rs = db.one("SELECT * FROM hos_logs WHERE user_id=? AND sim_rest=2040 ORDER BY id DESC LIMIT 1", (me,))
+    check(rs and rs["start_min"] == sm + 575 and rs["end_min"] == sm + 575 + 2040,
+          "the simulated 34 h restart is a real 34-hour off-duty line, after the break")
+    page = c.get(f"/compliance?tab=logbook&game=ats&day={(sm + 575 + 1440) // 1440}").get_data(as_text=True)
+    check("Simulated 34-hour restart" in page and "Restart (simulated)" in page, "the restart is drawn across the next day")
+
+    # the live tracker continues on the logbook clock: game minute g is logged as g + simulated rest
+    from fmpro.compliance import HosTracker
+    tr = HosTracker(me)
+    g0 = sm + 600 - compliance.log_offset(me, "ats") + 2040   # a game minute that lands after the restart
+    base = {"speed": 20, "engine_enabled": 1, "on_job": 0, "parking_brake": 0, "paused": 0, "game": "ats"}
+    for i_ in range(4):
+        tr.feed(dict(base, game_time_abs=g0 + i_))
+    row = db.one("SELECT * FROM hos_logs WHERE id=?", (tr.row,)) if tr.row else None
+    check(row and row["start_min"] == g0 + compliance.log_offset(me, "ats") and row["status"] == "driving",
+          f"telemetry after a simulated rest is logged on the logbook clock ({dict(row) if row else None})")
+    check(row["start_min"] >= rs["end_min"], "driving after the restart comes after it on the graph")
+
+    # a logbook made before 1.4.7 (zero-length marker) still counts as a rest for the clocks
+    db.insert("hos_logs", user_id=me, status="driving", start_min=row["end_min"], end_min=row["end_min"] + 500,
+              auto=1, created_at=1, game="ats")
+    db.insert("hos_logs", user_id=me, status="off", start_min=row["end_min"] + 500, end_min=row["end_min"] + 500,
+              auto=0, note="Simulated 30-min break", sim_rest=30, created_at=1, game="ats")
+    cl = compliance.clocks(me, row["end_min"] + 501, "ats")
+    check(cl["break"]["used"] <= 1, "an old zero-length simulated break still resets the break clock")
     check(post("/compliance/simulate", {"kind": "nap", "game": "ats"}).status_code == 400, "unknown simulate kind is refused")
     compliance_views._live_values = _live
 
@@ -1021,8 +1051,12 @@ def main():
     # Automatic updates (off by default; installs only when nobody is driving; never on a source copy)
     from fmpro import updater
     check(db.setting("auto_update") == "0", "automatic updates are off by default")
-    page = c.get("/settings?tab=licence").get_data(as_text=True)
-    check("Install updates automatically" in page, "settings offer automatic updates")
+    r = c.get("/updates")
+    page = r.get_data(as_text=True)
+    check(r.status_code == 200 and "Install updates automatically" in page and "Check for updates" in page,
+          "the Updates page offers checking and automatic updates")
+    check('href="/updates"' in c.get("/").get_data(as_text=True), "Updates is in the sidebar")
+    check('href="/updates"' in c.get("/settings?tab=licence").get_data(as_text=True), "Settings points to the Updates page")
     calls = []
     saved = (updater._manifest, dict(updater.STATE), updater._flavor, updater.busy, updater.install_now)
     updater.install_now = lambda: calls.append("install") or None
@@ -1043,8 +1077,23 @@ def main():
     with updater._lock:
         updater.STATE.update(status="staged")
     check(updater.auto_install() == "none" and calls == ["install"], "an update already being installed isn't started twice")
-    page = c.get("/settings?tab=licence").get_data(as_text=True)
-    check("Turn off automatic updates" in page, "settings show automatic updates as on")
+    page = c.get("/updates").get_data(as_text=True)
+    check("Turn off automatic updates" in page and "Update now" in page and "99.0" in page,
+          "the Updates page shows the waiting update and automatic updates on")
+    for url in ("/", "/fleet", "/jobs", "/insights"):
+        page = c.get(url).get_data(as_text=True)
+        check('class="update-banner"' in page and "Update available" in page and "update-chip" in page,
+              f"'Update available' shows on {url}")
+    from fmpro.auth import create_user as _cu_up
+    _cu_up("up_driver", "Update Driver", "updrvpw12", role="driver")
+    uc = app.test_client()
+    uc.get("/login")
+    with uc.session_transaction() as s_:
+        utok = s_.get("csrf")
+    uc.post("/login", data={"username": "up_driver", "password": "updrvpw12", "csrf": utok})
+    page = uc.get("/").get_data(as_text=True)
+    check("Update available" in page and "99.0" in page and 'value="install"' not in page,
+          "drivers see 'Update available' too, without the install button")
     post("/settings/update", {"action": "auto_off"})
     check(db.setting("auto_update") == "0", "automatic updates can be turned off")
     with updater._lock:

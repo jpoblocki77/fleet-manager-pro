@@ -39,7 +39,7 @@ def _now_min(uid, game=None):
     game = game or _game(uid)
     v = _live_values(uid)
     if v and v["game"] == game and v.get("game_time_abs"):
-        return v["game_time_abs"]
+        return compliance.log_min(uid, game, v["game_time_abs"])
     return compliance.last_game_min(uid, game)
 
 
@@ -65,7 +65,8 @@ def page():
         for s in segs:
             a, b = max(s["start_min"], start), min(s["end_min"] or s["start_min"], end, now_min or end)
             if b > a:
-                bars.append({"status": s["status"], "a": a - start, "b": b - start, "note": s["note"], "auto": s["auto"]})
+                bars.append({"status": s["status"], "a": a - start, "b": b - start, "note": s["note"], "auto": s["auto"],
+                             "sim": bool(s["sim_rest"])})
                 totals[s["status"]] += b - a
         viol = db.q("SELECT * FROM hos_violations WHERE user_id=? AND COALESCE(game,'ats')=? AND game_min BETWEEN ? AND ? "
                     "ORDER BY game_min", (uid, game, start, end))
@@ -141,7 +142,8 @@ def simulate():
         length = compliance.simulate_rest(uid, kind, gm, game)
         what = f"{length}-minute break" if kind == "break" else f"{length // 60}-hour restart"
         db.audit(uid, "simulated rest", f"{what} ({game.upper()})")
-        flash(f"Simulated a {what}: the HOS clocks count it as taken now."
+        flash(f"Simulated a {what}: it's in your logbook as off-duty time, and your logbook clock has moved on "
+              f"by {length // 60}h {length % 60:02d}m."
               + (" Driving, window and cycle clocks are reset." if kind == "restart" else " The break clock is reset."),
               "success")
     return redirect(url_for("comp.page", tab="logbook", game=request.form.get("game") or None))

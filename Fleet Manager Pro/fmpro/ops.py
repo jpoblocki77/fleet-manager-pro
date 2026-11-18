@@ -234,6 +234,7 @@ RESET_PARTS = {"logbook": "hos_logs", "violations": "hos_violations", "dvir": "d
 @bp.route("/compliance/reset", methods=["POST"])
 @login_required(role="admin")
 def compliance_reset():
+    from . import compliance
     from .telemetry.service import HUB
     parts = [p for p in RESET_PARTS if request.form.get(p) == "1"]
     who = request.form.get("driver", "")
@@ -270,6 +271,7 @@ def compliance_reset():
                 db.update("trucks", tid, status="active")
                 released += 1
     if "logbook" in parts:
+        compliance.logbook_changed()                      # simulated rest went with the lines: re-read the clock
         for uid in uids:                                  # the live tracker starts a fresh log line
             h = HUB.tracker(uid).hos
             h.row = h.status = h.last_min = None

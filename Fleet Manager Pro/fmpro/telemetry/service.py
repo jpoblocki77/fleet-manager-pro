@@ -288,8 +288,8 @@ class JobTracker:
 
     def _compliance_at_start(self, v):
         """Pre-trip DVIR and out-of-service defects are checked when a load is picked up."""
-        gm = v["game_time_abs"] or None
         g = v["game"] if v["game"] in ("ats", "ets2") else "ats"
+        gm = compliance.log_min(self.user_id, g, v["game_time_abs"]) or None    # on the logbook clock
         if db.setting("dvir_required") == "1" and not compliance.has_pretrip(self.user_id, self.truck_id, gm, g):
             compliance.record_violation(self.user_id, "DVIR-PRE", f"job{self.job_id}", gm,
                                         compliance.RULE_TEXT["DVIR-PRE"], fine=db.setting_f("dvir_fine", 250),
