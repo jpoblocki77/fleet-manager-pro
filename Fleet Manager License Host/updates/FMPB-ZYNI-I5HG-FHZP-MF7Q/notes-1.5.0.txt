@@ -1,0 +1,1 @@
+New: Fuel & AdBlue page - live fuel and AdBlue tanks plus a bar graph of the last hour, with fuel used, refuels and top-ups.
