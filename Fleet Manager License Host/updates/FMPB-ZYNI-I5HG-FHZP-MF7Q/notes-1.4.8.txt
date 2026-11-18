@@ -1,0 +1,1 @@
+Tablets without the LAN .bat: open Connect a Tablet and press Turn on tablet access (Owner or Manager), then scan the QR code. If Windows asks, allow Private networks.
