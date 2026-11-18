@@ -127,6 +127,40 @@ def main():
         check(drv.get(u).status_code == 403, f"driver can't open {u}")
     check((db.val("SELECT COUNT(*) FROM ledger"), db.val("SELECT COUNT(*) FROM users")) == before, "nothing changed by refused requests")
 
+    print("System & Backups")
+    from fmpro import insights
+    for u in ("/system", "/system/logs.zip"):
+        check(drv.get(u).status_code == 403, f"driver can't open {u}")
+    for u in ("/system/backup", "/system/auto-backup"):
+        check(drv.post(u, {"on": "0"}).status_code == 403, f"driver can't post {u}")
+    check(db.setting("auto_backup", "1") == "1", "driver couldn't turn automatic backups off")
+    nb = len(insights.list_backups())
+    boss.post("/system/backup", {})
+    bk = insights.list_backups()
+    check(len(bk) == nb + 1, "(owner made a backup)")
+    name = bk[0]["name"]
+    boss.post("/system/backup", {})
+    check(len(insights.list_backups()) == nb + 1, "a second manual backup within a minute is refused (no disk filling)")
+    r = boss.get("/system/logs.zip")
+    check(r.status_code == 200 and r.data[:2] == b"PK", "logs download as a real zip (owner)")
+    r.close()
+    check(mgr.get(f"/system/backup/{name}").status_code == 403, "manager can't download a database backup")
+    check(drv.get(f"/system/backup/{name}").status_code == 403, "driver can't download a database backup")
+    check(mgr.post(f"/system/backup/{name}/delete").status_code == 403 and len(insights.list_backups()) == nb + 1,
+          "manager can't delete a backup")
+    r = boss.c.post(f"/system/backup/{name}/delete", data={})
+    check(r.status_code == 400 and len(insights.list_backups()) == nb + 1, "deleting a backup needs the CSRF token")
+    for evil in ("..%2Ffleet.db", "..%5Cfleet.db", "fleet.db", "secret.key", "fleet-x-20260101-000000.db%00.txt",
+                 "..%2F..%2Fsecret.key"):
+        check(boss.get(f"/system/backup/{evil}").status_code == 404, f"backup download refuses {evil}")
+    for evil in ("../secret.key", "..\\fleet.db", "fleet.db", "C:\\Windows\\win.ini", "/etc/passwd"):
+        page = boss.get("/system", query_string={"log": evil}).get_data(as_text=True)
+        check("Fleet Manager" in page and "SQLite format" not in page, f"log viewer refuses {evil!r}")
+    check(b"<script>alert(1)</script>" not in boss.get("/system", query_string={"q": "<script>alert(1)</script>"}).data,
+          "log filter text is escaped")
+    check(b"<script>alert(1)</script>" not in boss.get("/planner", query_string={"from": "<script>alert(1)</script>", "to": "x"}).data,
+          "route planner escapes city names")
+
     print("Privilege escalation")
     drv.post(f"/drivers/{drv_id}/edit", {"display_name": "Driver", "role": "owner", "status": "active", "pay_per_km": "99"})
     d = db.one("SELECT role, pay_per_km FROM users WHERE id=?", (drv_id,))

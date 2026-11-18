@@ -4,15 +4,15 @@
   /planner    what a lane has really paid the company, best lanes to run, an estimate for a new lane
   /system     automatic + manual database backups, log viewer / download, health of this copy
 """
-import io
 import logging
 import os
 import re
+import tempfile
 import threading
 import time
 import zipfile
 
-from flask import Blueprint, Response, abort, flash, redirect, render_template, request, send_file, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, send_file, url_for
 
 from . import VERSION, db
 from .auth import current_units, game_sql, login_required, user
@@ -196,6 +196,7 @@ def _per_load(r, per_km):
 
 # ------------------------------------------------------------------------------------------------ backups
 BACKUP_KEEP = 14
+MANUAL_GAP = 60                                     # seconds between manual backups (stops disk-filling)
 _NAME = re.compile(r"^fleet-[A-Za-z0-9-]+-\d{8}-\d{6}\.db$")
 
 
@@ -311,6 +312,10 @@ def system():
 @bp.route("/system/backup", methods=["POST"])
 @login_required(role="admin")
 def backup_now():
+    last = next((b for b in list_backups() if "-manual-" in b["name"]), None)
+    if last and time.time() - last["t"] < MANUAL_GAP:
+        flash("A backup was made less than a minute ago. Wait a moment before making another.", "error")
+        return redirect(url_for("insights.system"))
     path = make_backup("manual")
     db.audit(user()["id"], "database backup", os.path.basename(path))
     flash(f"Backup saved: {os.path.basename(path)}", "success")
@@ -357,12 +362,12 @@ def backup_delete(name):
 @login_required(role="admin")
 def logs_zip():
     """All log files in one zip, for sending to support. Secrets are already masked inside the logs."""
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+    tmp = tempfile.TemporaryFile()                     # logs can be 100+ MB: build the zip on disk, not in memory
+    with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as z:
         for f in _log_files():
             z.write(os.path.join(_logs_dir(), f["name"]), f["name"])
         z.writestr("about.txt", f"Fleet Manager Pro {VERSION}\nlogs zipped {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
-    buf.seek(0)
+    tmp.seek(0)
     db.audit(user()["id"], "logs downloaded", "")
-    return Response(buf.getvalue(), mimetype="application/zip",
-                    headers={"Content-Disposition": f"attachment; filename=fleet-manager-logs-{time.strftime('%Y%m%d-%H%M')}.zip"})
+    return send_file(tmp, mimetype="application/zip", as_attachment=True,
+                     download_name=f"fleet-manager-logs-{time.strftime('%Y%m%d-%H%M')}.zip")
