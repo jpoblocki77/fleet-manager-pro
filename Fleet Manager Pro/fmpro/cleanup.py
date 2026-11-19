@@ -18,7 +18,7 @@ GONE_TRUCK = ("sold", "returned")
 # a fired member's own records - deleted with them
 PERSONAL = [("messages", "from_id"), ("messages", "to_id"), ("notifications", "user_id"), ("user_achievements", "user_id"),
             ("event_rsvps", "user_id"), ("hos_logs", "user_id"), ("hos_violations", "user_id"), ("dvirs", "user_id"),
-            ("inspections", "user_id")]
+            ("inspections", "user_id"), ("fluid_samples", "user_id")]
 # company records that must keep a driver: handed to the "Former driver" placeholder
 KEEP_WITH_FORMER = [("jobs", "user_id"), ("job_events", "user_id"), ("ledger", "user_id"), ("ledger", "driver_id")]
 

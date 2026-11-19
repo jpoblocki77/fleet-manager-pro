@@ -1300,6 +1300,76 @@ def main():
     check(_fl.history(fuid) == [], "readings older than an hour drop off the graph")
     _FHUB.ingest(fuid, reader.parse(reader.pack({"sdk_active": True, "game_id": 2, "render_time": 9999})), "test")
     check(_fl.history(fuid) == [], "frames without a truck (menus, loading) aren't recorded")
+
+    # readings are kept in the database: they survive a restart and longer ranges group them into bars
+    _clk.t += 60
+    for _ in range(4 * 60 * 10):                             # ten minutes of driving
+        _clk.t += 0.25
+        fuel_l -= 0.01
+        fl_feed(fuel_l, ad_l)
+    before = len(_fl.history(fuid))
+    _fl.clear()                                              # what an app restart / update forgets
+    check(before >= 39 and len(_fl.history(fuid)) == before, f"the readings survive a restart ({before} in 10 minutes)")
+    check(db.val("SELECT COUNT(*) FROM fluid_samples WHERE user_id=?", (fuid,), 0) >= before,
+          "each reading is a row in fluid_samples")
+    d24 = c.get(f"/api/fluids?user={fuid}&range=24h").get_json()
+    check(d24["range"] == "24h" and d24["window_s"] == 86400 and d24["sample_s"] == 360 and 0 < len(d24["history"]) <= 240,
+          f"the 24-hour view groups the readings into bars ({len(d24['history'])} bars of 6 minutes)")
+    check(c.get(f"/api/fluids?user={fuid}&range=forever").get_json()["range"] == "1h", "an unknown range falls back to the last hour")
+    rp = c.get(f"/fuel?user={fuid}&range=7d").get_data(as_text=True)
+    check(f'value="{fuid}" selected' in rp and 'value="7d" selected' in rp, "a notification link opens the page on that driver and range")
+    db.ex("UPDATE fluid_samples SET t=? WHERE user_id=? AND id=(SELECT MIN(id) FROM fluid_samples WHERE user_id=?)",
+          (_clk.t - 40 * 86400, fuid, fuid))
+    n0 = db.val("SELECT COUNT(*) FROM fluid_samples WHERE user_id=?", (fuid,), 0)
+    _fl.prune()                                              # (on the test's clock)
+    check(db.val("SELECT COUNT(*) FROM fluid_samples WHERE user_id=?", (fuid,), 0) == n0 - 1,
+          f"readings older than {_fl.KEEP_DAYS} days are pruned")
+
+    # low fuel / AdBlue alerts: once per drop below the game's warning level, to the driver and the managers
+    _fl.clear()
+    owner_id = db.val("SELECT id FROM users WHERE role='owner' ORDER BY id LIMIT 1")
+
+    def lows(uid_, what="fuel"):
+        return db.val("SELECT COUNT(*) FROM notifications WHERE user_id=? AND link=? AND text LIKE ?",
+                      (uid_, f"/fuel?user={fuid}", f"Low {what}:%"), 0)
+    db.ex("DELETE FROM notifications WHERE link=?", (f"/fuel?user={fuid}",))
+    db.set_setting("fluid_alerts", "1")
+    _clk.t += 60
+    fl_feed(200.0, 40.0)                                     # 35% fuel, 50% AdBlue: fine
+    check(lows(fuid) == 0, "no alert while the tanks are fine")
+    _clk.t += 20
+    fl_feed(80.0, 40.0)                                      # 14% of 568 L: below the 15% warning
+    check(lows(fuid) == 1 and lows(owner_id) == 1, "low fuel notifies the driver and the Owner")
+    note = db.one("SELECT * FROM notifications WHERE user_id=? AND link=? ORDER BY id DESC LIMIT 1", (fuid, f"/fuel?user={fuid}"))
+    check(note and "14%" in note["text"] and "Kenworth W900" in note["text"] and note["kind"] == "warning",
+          f"the alert says how low and which truck ({note['text'] if note else None})")
+    for _ in range(20):
+        _clk.t += 1
+        fl_feed(79.0, 40.0)
+    check(lows(fuid) == 1, "it alerts once, not on every frame")
+    _clk.t += 20
+    fl_feed(5.0, 10.0)                                       # AdBlue 12.5% too
+    check(lows(fuid, "AdBlue") == 1 and lows(owner_id, "AdBlue") == 1 and lows(fuid) == 1, "low AdBlue has its own alert")
+    _fl.clear()                                              # restart while still low
+    _clk.t += 20
+    fl_feed(5.0, 10.0)
+    check(lows(fuid) == 1 and lows(fuid, "AdBlue") == 1, "a restart while the tank is still low doesn't alert again")
+    _clk.t += 20
+    fl_feed(500.0, 70.0)                                     # refuel + top up: alerts re-arm
+    _clk.t += 20
+    fl_feed(60.0, 40.0)
+    check(lows(fuid) == 2, "after a refuel the next drop alerts again")
+    _clk.t += 20
+    fl_feed(500.0, 70.0)
+    db.set_setting("fluid_alerts", "0")
+    _clk.t += 20
+    fl_feed(60.0, 40.0)
+    check(lows(fuid) == 2, "with the setting off there are no alerts")
+    post("/settings?tab=compliance", {"section": "compliance", "has_fluid_alerts": "1", "fluid_alerts": "1"})
+    check(db.setting("fluid_alerts") == "1", "the alerts switch is on Settings > Compliance")
+    check("Low fuel / AdBlue alerts" in c.get("/settings?tab=compliance").get_data(as_text=True), "(and shown there)")
+    db.ex("DELETE FROM notifications WHERE link=?", (f"/fuel?user={fuid}",))
+    db.ex("DELETE FROM fluid_samples WHERE user_id=?", (fuid,))
     nobody = c.get("/api/fluids?user=987654").get_json()
     check(not nobody["online"] and nobody["history"] == [] and "live" not in nobody, "a driver who isn't driving shows as waiting")
     # the game going away while a page reads the live data must not crash it (1.5.1 /api/live TypeError)

@@ -5,6 +5,8 @@
   const W = 960, H = 200, PAD = 4;
   const imp = FMP.imp();
   const fixed = (n, d = 1) => Number(n || 0).toFixed(d);
+  const ago = (sec) => sec >= 86400 * 2 ? Math.round(sec / 86400) + " days" : sec >= 86400 ? "1 day"
+    : sec >= 7200 ? Math.round(sec / 3600) + " hours" : sec >= 3600 ? "1 hour" : Math.round(sec / 60) + " min";
 
   // colour of one level: the game's own warning level is red, twice that is amber
   function tone(pct, warnPct, kind) {
@@ -75,19 +77,26 @@
     drawChart($("#fl-fuel-chart"), h, "f", "fc", last.fuel_warning_factor, "fuel", d.server_time, d.window_s, d.sample_s);
     drawChart($("#fl-ad-chart"), h, "a", "ac", last.adblue_warning_factor, "adblue", d.server_time, d.window_s, d.sample_s);
     const s = d.summary || {};
+    const span = ago(d.window_s), when = "in the last " + span.replace(/^1 /, "");
+    $("#fl-ax0").textContent = span + " ago";
+    $("#fl-ax1").textContent = ago(d.window_s / 2) + " ago";
+    $("#fl-range-title").textContent = $("#range").selectedOptions[0].textContent;
+    $("#fl-step").textContent = "one bar every " + (d.sample_s < 60 ? Math.round(d.sample_s) + " seconds" : ago(d.sample_s)) + " · updates live";
     const stat = (label, value, sub) => `<div class="card stat"><div class="label">${label}</div><div class="value">${value}</div><div class="sub">${sub}</div></div>`;
-    $("#fl-sum").innerHTML = stat("Fuel used", FMP.liq(s.fuel_used || 0), "in the last hour") +
-      stat("AdBlue used", FMP.liq(s.adblue_used || 0, 1), "in the last hour") +
-      stat("Refuels", s.refuels || 0, "in the last hour") + stat("AdBlue top-ups", s.topups || 0, "in the last hour");
+    $("#fl-sum").innerHTML = stat("Fuel used", FMP.liq(s.fuel_used || 0), when) +
+      stat("AdBlue used", FMP.liq(s.adblue_used || 0, 1), when) +
+      stat("Refuels", s.refuels || 0, when) + stat("AdBlue top-ups", s.topups || 0, when);
   }
 
   let busy = false;
   function tick() {
     if (busy) return;
     busy = true;
-    FMP.get("/api/fluids?user=" + encodeURIComponent($("#who").value)).then(render).catch(() => {}).finally(() => { busy = false; });
+    FMP.get("/api/fluids?user=" + encodeURIComponent($("#who").value) + "&range=" + encodeURIComponent($("#range").value)).then(render).catch(() => {}).finally(() => { busy = false; });
   }
-  $("#who").addEventListener("change", tick);
+  const remember = () => history.replaceState(null, "", "?user=" + encodeURIComponent($("#who").value) + "&range=" + encodeURIComponent($("#range").value));
+  $("#who").addEventListener("change", () => { remember(); tick(); });
+  $("#range").addEventListener("change", () => { remember(); tick(); });
   tick();
   setInterval(tick, 2000);
 })();

@@ -86,6 +86,8 @@
   <h2 style="margin-top:8px">DVIR</h2>
   {{ check('dvir_required', 'Require a pre-trip inspection (DVIR) within 24 game-hours before picking up a load') }}
   <div class="fields"><div class="field"><label>Missing pre-trip fine</label><input name="dvir_fine" type="number" min="0" step="50" value="{{ S.dvir_fine }}"></div></div>
+  <h2 style="margin-top:8px">Fuel &amp; AdBlue</h2>
+  {{ check('fluid_alerts', 'Low fuel / AdBlue alerts', "Notify the driver and every Owner and Manager when a truck's fuel or AdBlue drops to the game's warning level.") }}
   <h2 style="margin-top:8px">Roadside inspections</h2>
   {{ check('inspections_enabled', 'Random roadside (DOT) inspections during loads') }}
   <div class="fields">

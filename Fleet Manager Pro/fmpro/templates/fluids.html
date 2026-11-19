@@ -3,8 +3,9 @@
 {% block title %}Fuel &amp; AdBlue{% endblock %}
 {% block content %}
 <div class="page-head">
-  <div><h1>Fuel &amp; AdBlue</h1><p>Live tank levels and a bar graph of the last {{ window_min }} minutes, straight from the game.</p></div>
+  <div><h1>Fuel &amp; AdBlue</h1><p>Live tank levels and a bar graph of the levels over time, straight from the game. Readings are kept for 30 days.</p></div>
   <div class="actions">
+    <select id="range" style="width:auto" aria-label="Time range">{% for k, label in ranges.items() %}<option value="{{ k }}" {{ 'selected' if k == rng }}>{{ label }}</option>{% endfor %}</select>
     <select id="who" style="width:auto" aria-label="Driver">{% for d in drivers %}<option value="{{ d.id }}" {{ 'selected' if d.id == me }}>{{ d.display_name }}</option>{% endfor %}</select>
   </div>
 </div>
@@ -13,7 +14,7 @@
   <svg viewBox="0 0 120 60" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 40h52V16h22l14 12v12h6"/><circle cx="28" cy="44" r="6"/><circle cx="84" cy="44" r="6"/></svg>
   <h2>Waiting for the game</h2>
   <p class="muted">This driver isn't driving right now. The levels show here as soon as their game sends telemetry.<br>
-  The graph keeps the last hour while Fleet Manager Pro is running.</p>
+  The graph below still shows their earlier readings.</p>
 </div>
 
 <div class="grid g2 fl-top" id="fl-live" style="display:none">
@@ -40,7 +41,7 @@
 </div>
 
 <div class="card" style="margin-top:16px">
-  <div class="card-head"><h2>Last {{ window_min }} minutes</h2><span class="right small muted">one bar every {{ sample_s }} seconds · updates live</span></div>
+  <div class="card-head"><h2 id="fl-range-title">{{ ranges[rng] }}</h2><span class="right small muted" id="fl-step">one bar every {{ sample_s }} seconds · updates live</span></div>
   <div class="fl-legend small muted">
     <span><i class="sw fuel"></i>Fuel</span><span><i class="sw adblue"></i>AdBlue</span>
     <span><i class="sw warn"></i>Getting low</span><span><i class="sw bad"></i>Below the game's warning</span>
@@ -49,7 +50,7 @@
   <div class="fl-chart"><svg id="fl-fuel-chart" viewBox="0 0 960 200" role="img" aria-label="Fuel level bar graph"></svg></div>
   <h3 style="margin-top:14px">AdBlue</h3>
   <div class="fl-chart"><svg id="fl-ad-chart" viewBox="0 0 960 200" role="img" aria-label="AdBlue level bar graph"></svg></div>
-  <div class="between small muted fl-axis"><span>{{ window_min }} min ago</span><span>{{ window_min // 2 }} min ago</span><span>now</span></div>
+  <div class="between small muted fl-axis"><span id="fl-ax0"></span><span id="fl-ax1"></span><span>now</span></div>
   <div class="grid g4" style="margin-top:14px" id="fl-sum"></div>
 </div>
 {% endblock %}

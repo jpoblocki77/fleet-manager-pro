@@ -177,6 +177,11 @@ CREATE TABLE IF NOT EXISTS map_places (
 CREATE TABLE IF NOT EXISTS login_failures (ip TEXT NOT NULL, username TEXT NOT NULL, t REAL NOT NULL);
 CREATE INDEX IF NOT EXISTS ix_login_fail ON login_failures(ip, t);
 
+CREATE TABLE IF NOT EXISTS fluid_samples (
+    id INTEGER PRIMARY KEY, user_id INTEGER, t REAL NOT NULL, game TEXT DEFAULT '',
+    fuel REAL DEFAULT 0, fuel_cap REAL DEFAULT 0, adblue REAL DEFAULT 0, adblue_cap REAL DEFAULT 0);
+CREATE INDEX IF NOT EXISTS ix_fluid_user_t ON fluid_samples(user_id, t);
+
 CREATE TABLE IF NOT EXISTS audit_log (
     id INTEGER PRIMARY KEY, user_id INTEGER, action TEXT NOT NULL, detail TEXT DEFAULT '',
     created_at REAL NOT NULL);
@@ -188,6 +193,7 @@ DEFAULT_SETTINGS = {
     "company_name": "", "company_tag": "", "company_motto": "", "company_color": "#c8102e",
     "currency": "$", "units": "imperial", "default_game": "ats",
     "tablet_access": "0",               # 1 = tablets/phones on this network can connect (HTTPS on port+1)
+    "fluid_alerts": "1",                # 1 = notify the driver and managers when fuel or AdBlue runs low
     "auto_update": "0",                 # 1 = install verified updates by themselves when nobody is driving
     "auto_backup": "1",                 # daily copy of fleet.db in data/backups (newest 14 kept)
     "fuel_price": "1.25",               # per litre, used to cost fuel burnt on a job

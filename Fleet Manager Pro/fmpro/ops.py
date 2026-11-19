@@ -300,7 +300,8 @@ CLEAR_TABLES = [("job_points", "route points"), ("job_events", "job events"), ("
                 ("events", "events"), ("announcements", "announcements"), ("messages", "messages"),
                 ("user_achievements", "achievements"), ("notifications", "notifications"),
                 ("applications", "applications"), ("road_points", "learned road points"),
-                ("map_places", "learned places"), ("login_failures", "failed sign-ins"), ("audit_log", "audit log lines")]
+                ("map_places", "learned places"), ("login_failures", "failed sign-ins"), ("fluid_samples", "fuel & AdBlue readings"),
+                ("audit_log", "audit log lines")]
 
 
 def data_counts():

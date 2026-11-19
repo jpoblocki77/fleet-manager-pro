@@ -1316,7 +1316,7 @@ SETTING_FIELDS = {
     "recruitment_open": ("bool", None), "recruitment_text": ("str", 1000),
     "hos_enabled": ("bool", None), "hos_rules_ats": ("choice", ("us70", "us60")), "hos_rules_ets2": ("choice", ("eu",)),
     "hos_fine": ("num", (0, 1e6)), "dvir_required": ("bool", None), "dvir_fine": ("num", (0, 1e6)),
-    "inspections_enabled": ("bool", None), "inspection_chance_pct": ("num", (0, 100)), "oos_fine": ("num", (0, 1e6)),
+    "fluid_alerts": ("bool", None), "inspections_enabled": ("bool", None), "inspection_chance_pct": ("num", (0, 100)), "oos_fine": ("num", (0, 1e6)),
 }
 
 
