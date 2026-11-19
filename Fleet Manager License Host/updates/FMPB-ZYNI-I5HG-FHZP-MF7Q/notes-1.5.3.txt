@@ -1,0 +1,1 @@
+New: the Fuel & AdBlue page now keeps 30 days of readings, so the graph survives restarts and can show 1 hour, 6 hours, 24 hours or 7 days. New: low fuel and low AdBlue alerts notify the driver and every Owner and Manager (can be turned off in Settings, Compliance tab).
