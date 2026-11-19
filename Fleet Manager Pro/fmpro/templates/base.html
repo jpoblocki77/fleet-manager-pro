@@ -97,6 +97,12 @@
           </form></span>{% endif %}
       </div>
       {% endif %}
+      {% set guide = howto() %}{% if guide %}
+      <details class="howto" data-howto="{{ request.endpoint }}" open>
+        <summary>{{ icon('help') }}<span>{{ HOWTO_TITLE }}</span><span class="howto-hint"><span class="h-open">Hide</span><span class="h-closed">Show</span></span></summary>
+        <ol>{% for step in guide %}<li>{{ step }}</li>{% endfor %}</ol>
+      </details>
+      {% endif %}
       {% block content %}{% endblock %}
     </main>
   </div>

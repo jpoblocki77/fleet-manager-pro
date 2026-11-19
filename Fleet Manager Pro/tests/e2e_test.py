@@ -364,6 +364,18 @@ def main():
         check(r.status_code == 200, f"GET {url} -> {r.status_code}")
     d = c.get("/api/live").get_json()
     check(d["online"] and len(d["values"]) > 200, f"/api/live exposes {len(d['values'])} values")
+    from fmpro import howto
+    tdir_ = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fmpro", "templates")
+    check(all(os.path.exists(os.path.join(tdir_, n + ".html")) for n in howto.GUIDES), "every page guide belongs to a page")
+    import html as html_
+    missing_ = []
+    for u_, n_ in (("/", "dashboard"), ("/fleet", "fleet"), (f"/fleet/truck/{tid}", "truck"),
+                   ("/settings?tab=economy", "settings"), ("/compliance", "compliance"), ("/fuel", "fluids")):
+        page_ = html_.unescape(c.get(u_).get_data(as_text=True))
+        if howto.TITLE not in page_ or howto.GUIDES[n_][0] not in page_:
+            missing_.append(u_)
+    check(not missing_, f"pages open with their own How to use this page panel {missing_ or ''}")
+    check(b"How to use this page" not in c.get("/overlay").data, "the in-game overlay has no instructions panel")
 
     print("Game selector (units)")
     db.set_setting("units", "imperial")
@@ -2169,6 +2181,23 @@ def main():
                                            "build": other_build})
         check(licensing.lease_page_key(d_["lease"], lic2.machine) is None, "another copy's page key doesn't fit this copy")
         licensing._post("/v1/check", lic2._body())
+        # restart: the background licence check can run the moment the licence is loaded, so the build tag must
+        # already be known then (it used to be loaded later, and the copy showed "not activated" until a retry)
+        orig_init = licensing.Licence.__init__
+
+        def init_and_check(self_, path_):
+            orig_init(self_, path_)
+            self_.check()                       # the licence thread winning the race
+
+        licensing.BUILD_TAG = None                 # a fresh start: nothing loaded yet
+        licensing.Licence.__init__ = init_and_check
+        try:
+            create_app(tmp2, start_telemetry=False, check_licence=False)
+        finally:
+            licensing.Licence.__init__ = orig_init
+        lic3 = licensing.LICENCE
+        check(lic3.ok and lic3.lease.get("build") == tag_ and lic3.page_key() is not None,
+              "a licence check right at start-up sends the build tag, so the copy opens unlocked")
         # leak tracing
         check(adm.whose(tag_)["key"] == k_seal, "License Manager identifies whose copy a build tag is")
         check(adm.whose(other_build) == "STOCK" and adm.whose("FMPB-AAAA-AAAA-AAAA-AAAA") is None,

@@ -104,6 +104,11 @@
     }).catch(() => {});
   }
   document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll("details.howto").forEach((d) => {
+      const k = "fmp-howto-" + d.dataset.howto;
+      try { if (localStorage.getItem(k) === "hide") d.open = false; } catch (e) {}
+      d.addEventListener("toggle", () => { try { d.open ? localStorage.removeItem(k) : localStorage.setItem(k, "hide"); } catch (e) {} });
+    });
     pollNotifs(); pollChip();
     setInterval(pollNotifs, 20000); setInterval(pollChip, 2000);
   });

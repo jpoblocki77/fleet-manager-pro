@@ -79,6 +79,9 @@ def create_app(data_dir=None, start_telemetry=True, check_licence=True):
     logs.setup(data_dir)
     tracelog.setup(data_dir)                # logs/debug.log: everything, for troubleshooting
     db.init(os.path.join(data_dir, "fleet.db"))
+    # The build tag must be known before the licence is loaded or checked: a check sent without it gets a lease
+    # with no key for this copy's sealed pages, and the copy shows "not activated" until the next check.
+    emb = licensing.load_build()            # buyer copies: pages compiled in, most of them sealed to the licence
     licensing.LICENCE = licensing.Licence(os.path.join(data_dir, "licence.json"))
     if check_licence:                       # the real program (the tests make many throwaway apps)
         tracelog.system_report(data_dir)
@@ -93,7 +96,8 @@ def create_app(data_dir=None, start_telemetry=True, check_licence=True):
         updater.start()
 
     app = Flask(__name__)
-    emb = licensing.load_build()            # buyer copies: pages compiled in, most of them sealed to the licence
+    from . import howto
+    howto.install(app)                      # the "How to use this page" panel at the top of each page
     if emb is not None:
         app.jinja_loader = _PagesLoader(getattr(emb, "TEMPLATES", {}))
     app.session_interface = _Sessions()
