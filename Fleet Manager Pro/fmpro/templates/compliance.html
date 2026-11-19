@@ -76,7 +76,7 @@
         {% set x1 = lab + b.a * W / 1440 %}{% set x2 = lab + b.b * W / 1440 %}
         {% if ns.px is not none %}<line x1="{{ x1 }}" x2="{{ x1 }}" y1="{{ ns.py }}" y2="{{ y }}" stroke="#e23552" stroke-width="2"/>{% endif %}
         <line x1="{{ x1 }}" x2="{{ x2 }}" y1="{{ y }}" y2="{{ y }}" stroke="{{ '#e23552' if b.status == 'driving' else '#2fb67c' if b.sim else '#4d8fe0' }}" stroke-width="5" stroke-linecap="round"><title>{{ b.note if b.sim else STATUSES[b.status] }} {{ hm(b.a) }}–{{ hm(b.b) }}{{ ' (manual)' if not b.auto and not b.sim }}</title></line>
-        {% if b.sim and x2 - x1 > 34 %}<text x="{{ (x1 + x2) / 2 }}" y="{{ y - 7 }}" fill="#2fb67c" font-size="11" font-weight="700" text-anchor="middle">{{ 'Break (simulated)' if b.b - b.a <= 60 else 'Restart (simulated)' }}</text>{% endif %}
+        {% if b.sim and x2 - x1 > 34 %}<text x="{{ (x1 + x2) / 2 }}" y="{{ y - 7 }}" fill="#2fb67c" font-size="11" font-weight="700" text-anchor="middle">{{ 'Sleeper (simulated)' if b.status == 'sleeper' else 'Break (simulated)' if b.b - b.a <= 60 else 'Restart (simulated)' }}</text>{% endif %}
         {% set ns.px = x2 %}{% set ns.py = y %}
       {% endfor %}
     </svg></div>
@@ -91,10 +91,12 @@
         <button class="btn" name="status" value="off">Off duty</button><button class="btn" name="status" value="sleeper">Sleeper</button><button class="btn" name="status" value="on">On duty</button></form>
       {% else %}<p class="muted small">Only {{ who.display_name }} can change their own status.</p>{% endif %}
       <h2 style="margin-top:18px">Simulate rest</h2>
-      <p class="small muted">Take a rest right now without waiting it out in the game. It goes into your logbook as off-duty time (green on the graph), and your logbook clock moves on by the same amount, so what you drive next comes after it.</p>
+      <p class="small muted">Take a rest right now without waiting it out in the game. It goes into your logbook as off-duty or sleeper-berth time (green on the graph), and your logbook clock moves on by the same amount, so what you drive next comes after it.</p>
       {% if who.id == current_user().id %}
       <form method="post" action="/compliance/simulate" class="row">{{ csrf() }}<input type="hidden" name="game" value="{{ game }}">
         <button class="btn" name="kind" value="break" title="Resets the break clock">Simulate {{ clocks.break_len }}-min break</button>
+        <button class="btn" name="kind" value="sleeper" title="A full {{ clocks.reset_len // 60 }}-hour rest in the sleeper berth: resets the driving and on-duty window clocks"
+                data-confirm="Simulate {{ clocks.reset_len // 60 }} hours in the sleeper berth? Your driving and on-duty window clocks start over.">Simulate {{ clocks.reset_len // 60 }}-hour sleeper berth</button>
         <button class="btn" name="kind" value="restart" title="Resets the driving, on-duty window and cycle clocks"
                 data-confirm="Simulate a {{ clocks.restart_len // 60 }}-hour restart? Driving, window and cycle clocks start over.">Simulate {{ clocks.restart_len // 60 }}-hour restart</button></form>
       {% else %}<p class="muted small">Only {{ who.display_name }} can simulate their own rest.</p>{% endif %}

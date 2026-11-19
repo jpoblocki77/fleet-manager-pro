@@ -971,8 +971,8 @@ def main():
     cl = compliance.clocks(me, None, "ats")
     check(cl["break"]["over"] and cl["drive"]["used"] == 540, "(9 h driven without a break)")
     page = c.get("/compliance?tab=logbook&game=ats").get_data(as_text=True)
-    check("Simulate 30-min break" in page and "Simulate 34-hour restart" in page,
-          "the logbook shows the Simulate break / restart buttons")
+    check("Simulate 30-min break" in page and "Simulate 10-hour sleeper berth" in page and "Simulate 34-hour restart" in page,
+          "the logbook shows the Simulate break / sleeper berth / restart buttons")
     off0 = compliance.log_offset(me, "ats")
     post("/compliance/simulate", {"kind": "break", "game": "ats"})
     cl = compliance.clocks(me, None, "ats")
@@ -986,20 +986,35 @@ def main():
     check(cl["status"] == "off", "after a simulated rest the current status is off duty")
     page = c.get(f"/compliance?tab=logbook&game=ats&day={(sm + 560) // 1440}").get_data(as_text=True)
     check("#2fb67c" in page and "Simulated 30-min break" in page, "the simulated break is drawn on the logbook graph")
+    r = post("/compliance/simulate", {"kind": "sleeper", "game": "ats"}, follow_redirects=True)
+    cl = compliance.clocks(me, None, "ats")
+    check(cl["drive"]["used"] == 0 and cl["window"]["used"] == 0 and cl["break"]["used"] == 0 and cl["cycle"]["used"] >= 545,
+          "a simulated 10 h sleeper berth resets the driving, window and break clocks, but not the cycle")
+    slp = db.one("SELECT * FROM hos_logs WHERE user_id=? AND sim_rest=600 ORDER BY id DESC LIMIT 1", (me,))
+    check(slp and slp["status"] == "sleeper" and slp["start_min"] == sm + 575 and slp["end_min"] == sm + 1175,
+          f"the simulated sleeper berth is a real 10-hour sleeper-berth line after the break ({dict(slp) if slp else None})")
+    check(compliance.log_offset(me, "ats") == off0 + 630 and cl["status"] == "sleeper",
+          "the logbook clock moves on by the 10 hours and the status is sleeper berth")
+    check("Simulated a 10-hour sleeper berth" in r.get_data(as_text=True), "the page confirms the simulated sleeper berth")
+    page = c.get(f"/compliance?tab=logbook&game=ats&day={(sm + 900) // 1440}").get_data(as_text=True)
+    check("Simulated 10-hour sleeper berth" in page and "Sleeper (simulated)" in page,
+          "the sleeper berth is drawn on the sleeper-berth row of the graph")
+    ets_len = compliance.RULESETS[compliance.ruleset_for("ets2")]["reset"]
+    check(ets_len == 11 * 60, "in ETS2 the sleeper berth is the 11-hour EU daily rest")
     post("/compliance/simulate", {"kind": "restart", "game": "ats"})
     cl = compliance.clocks(me, None, "ats")
     check(cl["drive"]["used"] == 0 and cl["window"]["used"] == 0 and cl["cycle"]["used"] == 0,
           "a simulated 34 h restart resets the driving, window and cycle clocks")
     rs = db.one("SELECT * FROM hos_logs WHERE user_id=? AND sim_rest=2040 ORDER BY id DESC LIMIT 1", (me,))
-    check(rs and rs["start_min"] == sm + 575 and rs["end_min"] == sm + 575 + 2040,
-          "the simulated 34 h restart is a real 34-hour off-duty line, after the break")
-    page = c.get(f"/compliance?tab=logbook&game=ats&day={(sm + 575 + 1440) // 1440}").get_data(as_text=True)
+    check(rs and rs["start_min"] == sm + 1175 and rs["end_min"] == sm + 1175 + 2040,
+          "the simulated 34 h restart is a real 34-hour off-duty line, after the sleeper berth")
+    page = c.get(f"/compliance?tab=logbook&game=ats&day={(sm + 1175 + 1440) // 1440}").get_data(as_text=True)
     check("Simulated 34-hour restart" in page and "Restart (simulated)" in page, "the restart is drawn across the next day")
 
     # the live tracker continues on the logbook clock: game minute g is logged as g + simulated rest
     from fmpro.compliance import HosTracker
     tr = HosTracker(me)
-    g0 = sm + 600 - compliance.log_offset(me, "ats") + 2040   # a game minute that lands after the restart
+    g0 = sm + 1200 - compliance.log_offset(me, "ats") + 2040  # a game minute that lands after the restart
     base = {"speed": 20, "engine_enabled": 1, "on_job": 0, "parking_brake": 0, "paused": 0, "game": "ats"}
     for i_ in range(4):
         tr.feed(dict(base, game_time_abs=g0 + i_))

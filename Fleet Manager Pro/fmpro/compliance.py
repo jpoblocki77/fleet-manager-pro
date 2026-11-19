@@ -304,13 +304,14 @@ def set_status(uid, status, game_min, note="", game="ats"):
 
 
 def simulate_rest(uid, kind, game_min, game="ats"):
-    """Take a break (kind 'break') or a cycle restart (kind 'restart', e.g. 34 h) right now without waiting it out
-    in the game: an off-duty line of that length goes into the logbook (it shows on the graph like any rest) and
+    """Take a break (kind 'break'), a full sleeper-berth rest (kind 'sleeper', 10 h US / 11 h EU) or a cycle restart
+    (kind 'restart', e.g. 34 h) right now without waiting it out in the game: an off-duty (sleeper-berth for 'sleeper')
+    line of that length goes into the logbook (it shows on the graph like any rest) and
     the driver's logbook clock moves on by the same amount, so what they drive next comes after the rest.
     game_min is on the logbook clock. Returns the simulated length in minutes."""
     rules = RULESETS[ruleset_for(game)]
-    length = rules["break_len"] if kind == "break" else rules["restart"]
-    label = f"{length}-min break" if kind == "break" else f"{length // 60}-hour restart"
+    length = {"break": rules["break_len"], "sleeper": rules["reset"]}.get(kind, rules["restart"])
+    label = {"break": f"{length}-min break", "sleeper": f"{length // 60}-hour sleeper berth"}.get(kind, f"{length // 60}-hour restart")
     last = db.val("SELECT MAX(COALESCE(end_min, start_min)) FROM hos_logs WHERE user_id=? AND COALESCE(game,'ats')=?",
                   (uid, game))
     if last is not None and last > game_min:
@@ -319,7 +320,7 @@ def simulate_rest(uid, kind, game_min, game="ats"):
                       "AND COALESCE(sim_rest,0)=0 ORDER BY start_min DESC, id DESC LIMIT 1", (uid, game))
     if open_row and (open_row["end_min"] or 0) < game_min:
         db.update("hos_logs", open_row["id"], end_min=game_min)  # the open line ends where the rest starts
-    db.insert("hos_logs", user_id=uid, status="off", start_min=game_min, end_min=game_min + length, auto=0,
+    db.insert("hos_logs", user_id=uid, status="sleeper" if kind == "sleeper" else "off", start_min=game_min, end_min=game_min + length, auto=0,
               note=f"Simulated {label}", sim_rest=length, created_at=time.time(), game=game)
     logbook_changed()
     return length

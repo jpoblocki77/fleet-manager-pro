@@ -128,7 +128,7 @@ def set_status():
 @login_required
 def simulate():
     kind = request.form.get("kind")
-    if kind not in ("break", "restart"):
+    if kind not in ("break", "sleeper", "restart"):
         abort(400)
     uid = user()["id"]
     game = request.form.get("game") if request.form.get("game") in ("ats", "ets2") else _game(uid)
@@ -140,12 +140,14 @@ def simulate():
         flash("No game time yet — drive with telemetry first so the logbook knows the in-game clock.", "error")
     else:
         length = compliance.simulate_rest(uid, kind, gm, game)
-        what = f"{length}-minute break" if kind == "break" else f"{length // 60}-hour restart"
+        what = {"break": f"{length}-minute break", "sleeper": f"{length // 60}-hour sleeper berth"}.get(
+            kind, f"{length // 60}-hour restart")
         db.audit(uid, "simulated rest", f"{what} ({game.upper()})")
-        flash(f"Simulated a {what}: it's in your logbook as off-duty time, and your logbook clock has moved on "
-              f"by {length // 60}h {length % 60:02d}m."
-              + (" Driving, window and cycle clocks are reset." if kind == "restart" else " The break clock is reset."),
-              "success")
+        flash(f"Simulated a {what}: it's in your logbook as {'sleeper-berth' if kind == 'sleeper' else 'off-duty'} "
+              f"time, and your logbook clock has moved on by {length // 60}h {length % 60:02d}m."
+              + {"restart": " Driving, window and cycle clocks are reset.",
+                 "sleeper": " Your driving and on-duty window clocks are reset, and so is the break clock."}.get(
+                  kind, " The break clock is reset."), "success")
     return redirect(url_for("comp.page", tab="logbook", game=request.form.get("game") or None))
 
 
