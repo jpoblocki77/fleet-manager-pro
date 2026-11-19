@@ -1,0 +1,1 @@
+New: every page now has a short How to use this page panel at the top (click Hide to fold it away). Fix: Fleet Manager Pro no longer shows as not activated for a minute after it starts.
