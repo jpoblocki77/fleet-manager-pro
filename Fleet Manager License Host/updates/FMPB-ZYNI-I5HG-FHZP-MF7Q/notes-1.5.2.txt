@@ -1,0 +1,1 @@
+Fix: the Live Cockpit and other live pages no longer log an error when the game closes.
