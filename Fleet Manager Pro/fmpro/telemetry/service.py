@@ -573,20 +573,30 @@ class Hub:
         with self.lock:
             if frame is None:
                 if uid in self.live and self.live[uid]["source"] == source:
-                    self.live[uid]["frame"] = None
+                    # replace the entry, never change it in place: a page may be reading the old one right now
+                    self.live[uid] = dict(self.live[uid], frame=None)
                 return
             self.live[uid] = {"frame": frame, "t": time.time(), "source": source}
         fluids.record(uid, frame)
 
     def get(self, uid):
+        """The driver's latest entry as a private copy (frame is never None in it), or None when not live."""
         e = self.live.get(uid)
-        if not e or not e["frame"] or time.time() - e["t"] > 15:
+        if not e:
+            return None
+        e = dict(e)                                   # one consistent snapshot, whatever the sampler does next
+        if not e["frame"] or time.time() - e["t"] > 15:
             return None
         return e
 
     def all_live(self):
         now = time.time()
-        return {u: e for u, e in list(self.live.items()) if e["frame"] and now - e["t"] < 15}
+        out = {}
+        for u, e in list(self.live.items()):
+            e = dict(e)
+            if e["frame"] and now - e["t"] < 15:
+                out[u] = e
+        return out
 
     def start_local(self):
         if self.sampler:

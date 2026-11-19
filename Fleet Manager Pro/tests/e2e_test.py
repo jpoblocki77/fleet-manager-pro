@@ -1302,6 +1302,29 @@ def main():
     check(_fl.history(fuid) == [], "frames without a truck (menus, loading) aren't recorded")
     nobody = c.get("/api/fluids?user=987654").get_json()
     check(not nobody["online"] and nobody["history"] == [] and "live" not in nobody, "a driver who isn't driving shows as waiting")
+    # the game going away while a page reads the live data must not crash it (1.5.1 /api/live TypeError)
+    _clk.t = __import__("time").time()
+    fl_feed(300.0, 40.0)
+    snap = _FHUB.get(fuid)
+    _FHUB.ingest(fuid, None, "test")                         # sampler: game closed, right after the page's check
+    check(snap and snap["frame"] is not None and snap["frame"]["values"]["fuel"] == 300.0,
+          "a page keeps the frame it already got when the game drops out at that moment")
+    check(_FHUB.get(fuid) is None and fuid not in _FHUB.all_live(), "once the game is gone the driver shows offline")
+    _orig_get = _FHUB.get
+
+    def _racy_get(u):                                        # check passes, then the game drops out before the read
+        e = _orig_get(u)
+        _FHUB.ingest(u, None, "test")
+        return e
+    fl_feed(300.0, 40.0)
+    _FHUB.get = _racy_get
+    try:
+        rr = c.get(f"/api/live?user={fuid}")
+        rf = c.get(f"/api/fluids?user={fuid}")
+    finally:
+        _FHUB.get = _orig_get
+    check(rr.status_code == 200 and rr.get_json()["values"]["fuel"] == 300.0 and rf.status_code == 200,
+          "/api/live and /api/fluids answer normally when the game closes mid-request")
     _FHUB.ingest(fuid, None, "test")
     _FHUB.live.pop(fuid, None)
     _fl.time = _real_time
