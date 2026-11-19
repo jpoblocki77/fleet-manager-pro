@@ -1,0 +1,1 @@
+New: Simulate 10-hour sleeper berth on the ELD logbook (11 hours in ETS2) - resets your driving, on-duty window and break clocks.
