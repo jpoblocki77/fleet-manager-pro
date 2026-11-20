@@ -1,0 +1,1 @@
+New in-game overlay: a see-through panel over ATS/ETS2 with the truck values you choose, plus pop-ups for logbook events and Hours of Service warnings. Open it from the Overlays page; Ctrl+Shift+O hides or shows it in the game (run the game windowed or borderless).
