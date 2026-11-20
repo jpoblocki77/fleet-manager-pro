@@ -1,0 +1,1 @@
+Refuel log on the Fuel & AdBlue page, page tips tailored to your role, and the in-game overlay now stays on top of a borderless full-screen game and the logbook warns you 15 minutes before an Hours of Service limit.
