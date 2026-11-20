@@ -174,6 +174,18 @@ def _h(m):
     return f"{m // 60} h" if m % 60 == 0 else f"{m / 60:.1f} h"
 
 
+WARN_AHEAD = 15   # game-minutes before an HOS limit that the logbook warns the driver (shown on the overlay + bell)
+
+
+def _warn_near_limit(uid, game, key, period, text):
+    """One 'approaching a limit' alert for the in-game overlay (and the notifications bell). The period key is tied
+    to the current rest / break / cycle, so each warning fires once per driving stint and re-arms after a rest."""
+    link = f"/compliance?near={game}:{key}:{period}"
+    if db.val("SELECT 1 FROM notifications WHERE user_id=? AND link=? LIMIT 1", (uid, link)):
+        return
+    db.notify(uid, text, link, "warning")
+
+
 def record_violation(uid, rule, period_key, game_min, detail="", fine=None, job_id=None, game="ats"):
     """Store a violation once per period; charge the fine to the company account. Returns True if new."""
     fine = db.setting_f("hos_fine", 500) if fine is None else fine
@@ -209,6 +221,17 @@ def check_hos(uid, game, now_min, job_id=None):
                          RULE_TEXT["HOS-BREAK"].format(h=_h(r["break_after"]), b=r["break_len"]), job_id=job_id)
     if c["cycle"]["over"]:
         rv(uid, "HOS-CYCLE", f"c{c['cycle_key'] // 1440}", now_min, RULE_TEXT["HOS-CYCLE"].format(h=_h(r["cycle"])), job_id=job_id)
+
+    # 15 minutes before a limit: one heads-up pushed to the overlay and the bell, once per driving stint per limit.
+    near = (
+        ("drive",  f"d{c['reset_key']}",          f"{c['drive']['left']} min of driving time left — find a rest stop."),
+        ("window", f"w{c['reset_key']}",          f"{c['window']['left']} min left in your on-duty window — plan to park."),
+        ("break",  f"b{c['break_key']}",          f"Break due in {c['break']['left']} min — a {r['break_len']}-minute break is coming up."),
+        ("cycle",  f"c{c['cycle_key'] // 1440}",  f"{c['cycle']['left']} min left in your weekly cycle."),
+    )
+    for key, period, text in near:
+        if 0 < c[key]["left"] <= WARN_AHEAD and not c[key]["over"]:
+            _warn_near_limit(uid, game, key, period, text)
 
 
 # ------------------------------------------------------------------------------------------------ duty status tracker

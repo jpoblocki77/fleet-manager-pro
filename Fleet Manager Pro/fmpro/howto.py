@@ -2,6 +2,10 @@
 
 GUIDES maps a page's template name to a short list of steps. base.html shows the guide for whichever page is being
 drawn (see install()); the panel can be folded away and each browser remembers that per page.
+
+Each step is either a plain string (shown to everyone) or a (min_role, text) pair that only appears for members at
+that role or above (roles: trainee, driver, dispatcher, admin = "Manager", owner). That way the panel fits the
+person reading it: a driver isn't told to press buttons only a Manager can see, and Managers get the extra steps.
 """
 from flask import before_render_template, g
 
@@ -20,8 +24,10 @@ GUIDES = {
     "fluids": [
         "Drive with the game running and the tank bars and graph fill in on their own.",
         "Pick a range (1 hour, 6 hours, 24 hours or 7 days) to see how the levels changed; refuels show as jumps up.",
-        "Owners and Managers can pick a driver to see their truck instead of their own.",
-        "When fuel or AdBlue gets low you get a notification. Turn it off in Settings, Compliance tab.",
+        "Every fill-up is listed in the refuel log at the bottom: when it happened, how much went in and the level after.",
+        ("admin", "Pick a driver at the top to see their truck instead of your own."),
+        "When fuel or AdBlue gets low you get a notification.",
+        ("admin", "Turn the low-fluid notification off in Settings, Compliance tab."),
     ],
     "telemetry": [
         "Every value the game sends through scs-telemetry.dll is listed here, grouped by truck, trailers and job.",
@@ -47,7 +53,7 @@ GUIDES = {
     ],
     "job_detail": [
         "This page shows one delivery: the route driven, a timeline of the trip, the costs and the driving score.",
-        "Owners and Managers can Approve & pay or Reject a manual job, clear warning flags, or delete the job.",
+        ("admin", "Approve & pay or Reject a manual job, clear warning flags, or delete the job."),
         "Use your browser's Back button to return to the Logbook.",
     ],
     "job_new": [
@@ -56,11 +62,12 @@ GUIDES = {
         "If manual approval is on, the job waits in the Logbook until a Manager approves it.",
     ],
     "dispatch": [
-        "Contracts are jobs the company wants driven. Press New contract to post one (route, cargo, pay and deadline).",
+        "Contracts are jobs the company wants driven.",
+        ("dispatcher", "Press New contract to post one (route, cargo, pay and deadline)."),
         "Drivers press Claim to take an open contract (Release gives it back).",
         "Pick up the matching load in the game and the contract links up and completes by itself on delivery; Done finishes it by hand.",
         "Send to game puts the contract into your game's freight market so you can pick it up in the truck.",
-        "Assigned drivers get a notification; Cancel or Reopen a contract if plans change.",
+        ("dispatcher", "Assigned drivers get a notification; Cancel or Reopen a contract if plans change."),
     ],
     "planner": [
         "Pick a start city and a destination, then press Check this lane.",
@@ -88,7 +95,7 @@ GUIDES = {
     "leasing": [
         "Lease a truck instead of buying it: pick a plan in Compare lease plans and press Lease on.",
         "Your leases shows what you are paying now; click a lease to buy it out, end it or renew it.",
-        "Owners and Managers can add or edit lease plans with New plan.",
+        ("admin", "Add or edit lease plans with New plan."),
     ],
     "lease": [
         "This page shows one lease: what it costs, what ending it today would cost, and every payment so far.",
@@ -115,8 +122,8 @@ GUIDES = {
     ],
     "drivers": [
         "Everyone in the company. Click a member to see their profile, jobs and records.",
-        "Owners and Managers can press Add member to create a login for a new driver and set their role.",
-        "Divisions groups drivers into teams; former members can be deleted once they have left.",
+        ("admin", "Press Add member to create a login for a new driver and set their role."),
+        ("admin", "Divisions groups drivers into teams; former members can be deleted once they have left."),
     ],
     "driver": [
         "This member's profile: recent jobs, favourite cargo, top destinations, achievements and records.",
@@ -145,8 +152,9 @@ GUIDES = {
         "Organisers mark who attended, then press Save attendance & award XP; Edit, Cancel or Delete the event if plans change.",
     ],
     "announcements": [
-        "Company news for everyone. Owners and Managers write a post and press Post.",
-        "Posts also go to Discord if a webhook is set in Settings, Discord tab.",
+        "Company news for everyone — check here for the latest updates.",
+        ("admin", "Write a post and press Post to share news with the company."),
+        ("admin", "Posts also go to Discord if a webhook is set in Settings, Discord tab."),
     ],
     "messages": [
         "Pick Company chat or a member from the list, type your message and press Send.",
@@ -177,8 +185,21 @@ TITLE = "How to use this page"
 
 
 def guide():
-    """The steps for the page being drawn, or None."""
-    return GUIDES.get(getattr(g, "howto_page", None) or "")
+    """The steps for the page being drawn, tailored to who is signed in, or None. A (min_role, text) step only
+    shows to members at that role or above; plain strings show to everyone."""
+    steps = GUIDES.get(getattr(g, "howto_page", None) or "")
+    if not steps:
+        return None
+    from .auth import can
+    out = []
+    for step in steps:
+        if isinstance(step, tuple):
+            min_role, text = step
+            if can(min_role):
+                out.append(text)
+        else:
+            out.append(step)
+    return out or None
 
 
 def _remember(sender, template, context, **extra):

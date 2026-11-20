@@ -121,6 +121,8 @@ class Overlay:
         self.fails = 0
         self.last_ok = time.time()                        # the overlay closes itself 30 s after the app goes away
         self.hotkey_down = False
+        self.hwnd = None
+        self._topmost_at = 0.0
         self.root.update_idletasks()
         self._click_through()
         threading.Thread(target=self._poll_loop, daemon=True, name="overlay-poll").start()
@@ -132,10 +134,25 @@ class Overlay:
             import ctypes
             u = ctypes.windll.user32
             hwnd = u.GetParent(self.root.winfo_id()) or self.root.winfo_id()
+            self.hwnd = hwnd
             ex = u.GetWindowLongW(hwnd, -20)
             u.SetWindowLongW(hwnd, -20, ex | 0x80000 | 0x20 | 0x80 | 0x08000000 | 0x8)
         except Exception:  # noqa: BLE001 - still works as a normal top-most window
+            self.hwnd = None
             log.exception("overlay: click-through not available")
+
+    def _keep_on_top(self):
+        """Put the window back on top without moving it or taking focus. tkinter sets -topmost once, but a game in
+        borderless full screen repaints over everything, so on a single screen the overlay slips behind it. Calling
+        SetWindowPos(HWND_TOPMOST) about once a second keeps the panel visible over the game."""
+        if not self.hwnd:
+            return
+        try:
+            import ctypes
+            # HWND_TOPMOST=-1; SWP_NOSIZE|SWP_NOMOVE|SWP_NOACTIVATE|SWP_NOOWNERZORDER so z-order is the only change
+            ctypes.windll.user32.SetWindowPos(self.hwnd, -1, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010 | 0x0200)
+        except Exception:  # noqa: BLE001 - the -topmost attribute still applies
+            pass
 
     def font(self, size, bold=False):
         k = (size, bold)
@@ -217,6 +234,9 @@ class Overlay:
         show_panel = self.visible and (online or not cfg.get("only_driving"))
         self.draw(cfg, hud, d.get("rows") or [], online, show_panel)
         self.root.attributes("-alpha", max(0.3, min(1.0, cfg.get("opacity", 90) / 100)))
+        if now - self._topmost_at >= 1.0:                 # stay above a borderless full-screen game
+            self._topmost_at = now
+            self._keep_on_top()
         self.root.after(150, self.tick)
 
     def draw(self, cfg, hud, rows, online, show_panel):

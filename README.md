@@ -30,7 +30,7 @@ change the terms, then rebuild. Only ever send a *For Buyer* zip: `Fleet Manager
 
 ## Making a sale
 
-1. Licence server running on the server PC (192.168.1.29).
+1. Licence server running on the cloud box (`fleetmanager.servehttp.com`).
 2. License Manager → **2) New purchase** → key `FMP-XXXX-XXXX-XXXX-XXXX` (2 PCs).
 3. Run `Build Buyer Copy.bat` with that key and send the buyer the **`For Buyer - FMP-....zip`** it makes, plus the key.
 

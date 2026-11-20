@@ -102,6 +102,23 @@ def summary(samples):
     return out
 
 
+def refuel_log(samples, limit=50):
+    """Each individual refuel / AdBlue top-up in the samples: an upward jump in a tank, the same jumps summary()
+    counts. Newest first, at most `limit`. Amounts are litres; from_pct/to_pct are the tank level either side of
+    the fill, so the page can show "18% -> 96%". The jump is saved the instant it happens (see record()), so the
+    pair of readings around it is tight."""
+    out = []
+    for a, b in zip(samples, samples[1:]):
+        if b["fc"] > 0 and b["f"] - a["f"] > max(1.0, b["fc"] * 0.01):
+            out.append({"t": b["t"], "kind": "fuel", "added": round(b["f"] - a["f"], 1), "cap": b["fc"],
+                        "from_pct": round(a["f"] / b["fc"] * 100), "to_pct": round(b["f"] / b["fc"] * 100)})
+        if b["ac"] > 0 and b["a"] - a["a"] > max(0.5, b["ac"] * 0.01):
+            out.append({"t": b["t"], "kind": "adblue", "added": round(b["a"] - a["a"], 1), "cap": b["ac"],
+                        "from_pct": round(a["a"] / b["ac"] * 100), "to_pct": round(b["a"] / b["ac"] * 100)})
+    out.sort(key=lambda e: e["t"], reverse=True)
+    return out[:limit]
+
+
 # ------------------------------------------------------------------------------------------------ alerts
 def _check_alerts(uid, v, s):
     state = _alert.setdefault(uid, {})
