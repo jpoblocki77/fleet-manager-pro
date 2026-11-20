@@ -279,9 +279,60 @@ def install_now():
     return None
 
 
+def _same_exe_pids(exe):
+    """Other running processes started from this very .exe (the in-game overlay window runs as one). Windows only."""
+    import ctypes
+    from ctypes import wintypes
+    k32, psapi = ctypes.windll.kernel32, ctypes.windll.psapi
+    pids = (wintypes.DWORD * 4096)()
+    got = wintypes.DWORD()
+    if not psapi.EnumProcesses(ctypes.byref(pids), ctypes.sizeof(pids), ctypes.byref(got)):
+        return []
+    want, me, out = os.path.normcase(os.path.abspath(exe)), os.getpid(), []
+    for pid in pids[:got.value // ctypes.sizeof(wintypes.DWORD)]:
+        if not pid or pid == me:
+            continue
+        h = k32.OpenProcess(0x1000, False, pid)              # PROCESS_QUERY_LIMITED_INFORMATION
+        if not h:
+            continue
+        try:
+            buf, n = ctypes.create_unicode_buffer(1024), wintypes.DWORD(1024)
+            if k32.QueryFullProcessImageNameW(h, 0, buf, ctypes.byref(n)) and os.path.normcase(buf.value) == want:
+                out.append(pid)
+        finally:
+            k32.CloseHandle(h)
+    return out
+
+
+def _close_other_copies(flavor):
+    """Close the in-game overlay (and any other process of this same .exe) so the swap can overwrite the program.
+    A running overlay keeps Fleet Manager Pro.exe locked: the copy then fails and the app relaunches on the old
+    version (seen on 1.5.9 -> 1.5.10). The overlay reopens with the app when it's set to autostart."""
+    try:
+        from . import ingame
+        ingame.stop()
+    except Exception:  # noqa: BLE001
+        log.exception("couldn't close the in-game overlay before updating")
+    if os.name != "nt" or flavor != "exe":
+        return
+    try:
+        import ctypes
+        k32 = ctypes.windll.kernel32
+        for pid in _same_exe_pids(os.path.join(_install_root(flavor), EXE_NAME)):
+            h = k32.OpenProcess(0x0001 | 0x00100000, False, pid)   # PROCESS_TERMINATE | SYNCHRONIZE
+            if h:
+                k32.TerminateProcess(h, 0)
+                k32.WaitForSingleObject(h, 5000)
+                k32.CloseHandle(h)
+                log.info("update: closed another copy of the program (pid %s) so it can be replaced", pid)
+    except Exception:  # noqa: BLE001
+        log.exception("couldn't close other copies of the program before updating")
+
+
 def _apply_after(app_root, ver_dir, flavor, delay):
     time.sleep(delay)
     try:
+        _close_other_copies(flavor)
         _launch_swapper(app_root, ver_dir, flavor)
     except Exception:
         log.exception("couldn't start the update helper")
