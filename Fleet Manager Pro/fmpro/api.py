@@ -1,5 +1,6 @@
 """JSON API: live telemetry, remote agents, overlay, notifications, exports."""
 import csv
+import logging
 import io
 import math
 import time
@@ -13,6 +14,8 @@ from .auth import current_units, game_scope, login_required, units_for, user
 from .telemetry import reader
 from .telemetry.layout import FIELDS, GAMES, MMF_SIZE, TRAILER_FIELDS
 from .telemetry.service import HUB, local_user
+
+log = logging.getLogger("fmpro.api")
 
 bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -153,7 +156,52 @@ def overlay():
             g.units_override = units_for(db.val("SELECT game_pref FROM users WHERE id=?", (uid,)) or "both")
     if not uid:
         abort(401)
-    return jsonify(_frame_payload(uid, full=False))
+    out = _frame_payload(uid, full=False)
+    out["hud"] = _overlay_extras(uid, out.get("values"))
+    from . import overlay_fields
+    cfg = overlay_fields.config(uid)
+    v = out.get("values") or {}
+    out["config"] = cfg
+    out["rows"] = overlay_fields.rows(cfg, v, out["hud"], out["units"] == "imperial", out["currency"]) if v else []
+    out["warnings"] = [{"code": c_, "text": t_, "level": l_} for c_, t_, l_ in overlay_fields.hos_warnings(out["hud"], v)] \
+        if v and cfg["hos_warnings"] else []
+    out["alerts"] = _overlay_alerts(uid, request.args.get("since", "")) if cfg["alerts"] else []
+    return jsonify(out)
+
+
+def _overlay_alerts(uid, since):
+    """Logbook (and low fuel) notifications made after `since` - the overlay passes back the server_time it got last
+    time, so each alert pops up once. The first poll (no `since`) only gets alerts from the last 2 minutes."""
+    try:
+        t0 = float(since)
+    except ValueError:
+        t0 = time.time() - 120
+    rows_ = db.q("SELECT id, text, kind, created_at FROM notifications WHERE user_id=? AND created_at > ? "
+                 "AND (link LIKE '/compliance%' OR link LIKE '/fuel%') ORDER BY id DESC LIMIT 5", (uid, t0))
+    return [{"id": r["id"], "text": r["text"], "level": {"error": "bad", "warning": "warn"}.get(r["kind"], "info"),
+             "t": r["created_at"]} for r in reversed(rows_)]
+
+
+def _overlay_extras(uid, v):
+    """What the stream overlay shows besides the raw telemetry: who is driving and their Hours of Service."""
+    u = db.one("SELECT display_name, color FROM users WHERE id=?", (uid,)) or {}
+    hud = {"driver": u.get("display_name") or "", "driver_color": u.get("color") or "",
+           "company": db.setting("company_name", ""), "tag": db.setting("company_tag", ""),
+           "color": db.setting("company_color", "#c8102e"), "hos": None}
+    if not v or db.setting("hos_enabled", "1") != "1":
+        return hud
+    try:
+        from . import compliance
+        game = v.get("game") if v.get("game") in ("ats", "ets2") else "ats"
+        now_min = compliance.log_min(uid, game, v["game_time_abs"]) if v.get("game_time_abs") else None
+        c = compliance.clocks(uid, now_min, game)
+        if c:
+            hud["hos"] = {"status": c["status"], "rules": c["rules_label"], "drive_left": c["drive"]["left"],
+                          "window_left": c["window"]["left"], "break_left": c["break"]["left"],
+                          "cycle_left": c["cycle"]["left"], "available": c["available"], "break_len": c["break_len"]}
+    except Exception:  # noqa: BLE001 - the overlay must keep showing the truck even if the logbook can't be read
+        log.exception("overlay: Hours of Service for driver #%s not available", uid)
+    return hud
 
 
 @bp.route("/agent/frame", methods=["POST"])

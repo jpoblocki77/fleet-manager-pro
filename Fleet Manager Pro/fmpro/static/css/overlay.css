@@ -1,0 +1,140 @@
+/* Fleet Manager Pro — stream overlay. Transparent by default so OBS shows the game behind it; ?solid adds a background. */
+:root {
+  --ov-accent: #c8102e;
+  --ov-glass: rgba(7, 19, 39, .84);
+  --ov-glass-2: rgba(17, 42, 79, .9);
+  --ov-line: rgba(143, 168, 204, .22);
+  --ov-text: #f2f6fc;
+  --ov-muted: #9fb3d1;
+  --ov-ok: #2fb67c;
+  --ov-warn: #f0a92e;
+  --ov-bad: #ff4d6a;
+  --ov-blue: #4d8fe0;
+  --ov-scale: 1;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: transparent; }
+body.ov { font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif; color: var(--ov-text); overflow: hidden; }
+body.ov.solid { background: #050e1c; }
+[hidden] { display: none !important; }
+
+.rig { display: flex; gap: 10px; align-items: stretch; padding: 12px; zoom: var(--ov-scale); width: max-content; }
+.ov-stack .rig { flex-direction: column; width: 300px; }
+.ov-compact .rig { gap: 8px; }
+
+/* a pod: one glass panel with the company colour along its top edge */
+.pod { position: relative; background: linear-gradient(180deg, var(--ov-glass-2), var(--ov-glass)); border: 1px solid var(--ov-line);
+  border-radius: 14px; padding: 10px 14px 11px; min-width: 120px; box-shadow: 0 8px 24px rgba(0, 0, 0, .35); overflow: hidden; }
+.pod::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--ov-accent); opacity: .95; }
+.lbl { display: flex; justify-content: space-between; gap: 10px; font-size: 10.5px; font-weight: 700; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ov-muted); }
+.sub { font-size: 12px; color: var(--ov-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+b, .big, .gear, .count { font-variant-numeric: tabular-nums; }
+.warn { color: var(--ov-warn) !important; }
+
+/* company & driver */
+.pod-brand { display: flex; align-items: center; gap: 12px; min-width: 180px; }
+.badge-tag { display: grid; place-items: center; min-width: 46px; height: 46px; padding: 0 6px; border-radius: 12px; background: var(--ov-accent);
+  font-weight: 900; font-size: 15px; letter-spacing: .04em; color: #fff; box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .25); }
+.who { display: flex; flex-direction: column; min-width: 0; }
+.who b { font-size: 15px; white-space: nowrap; }
+.who span { font-size: 12.5px; color: var(--ov-muted); white-space: nowrap; }
+
+/* speed dial */
+.pod-speed { display: grid; justify-items: center; min-width: 150px; padding-bottom: 8px; }
+.dial { width: 128px; height: 74px; margin-top: -2px; }
+.dial path { fill: none; stroke-width: 9; stroke-linecap: round; }
+.dial-track { stroke: rgba(255, 255, 255, .08); }
+.dial-fill { stroke: var(--ov-accent); transition: stroke-dasharray .45s ease-out; }
+.dial .dial-limit { fill: #fff; stroke: #0a1a33; stroke-width: 2.5; }
+.speed-read { margin-top: -40px; display: flex; align-items: baseline; gap: 4px; }
+.speed-read .big { font-size: 34px; font-weight: 800; line-height: 1; }
+.speed-read .unit { font-size: 11px; color: var(--ov-muted); font-weight: 700; text-transform: uppercase; }
+.speed-tags { display: flex; gap: 6px; margin-top: 4px; min-height: 22px; align-items: center; }
+.sign { display: grid; place-items: center; min-width: 24px; height: 22px; padding: 0 4px; border-radius: 5px; background: #fff; color: #111;
+  font-weight: 900; font-size: 12px; border: 2px solid #111; }
+.chip { font-size: 11px; font-weight: 700; padding: 3px 7px; border-radius: 999px; background: rgba(77, 143, 224, .22); color: #bcd6f7; }
+body.speeding .dial-fill { stroke: var(--ov-bad); }
+body.speeding .speed-read .big { color: var(--ov-bad); }
+
+/* gear & rpm */
+.pod-gear { min-width: 100px; text-align: center; }
+.gear { font-size: 34px; font-weight: 800; line-height: 1.15; }
+.rpm { height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .08); margin: 4px 0 5px; overflow: hidden; }
+.rpm i { display: block; height: 100%; width: 0; background: var(--ov-ok); transition: width .3s ease-out, background .3s; }
+.rpm i.hot { background: var(--ov-bad); }
+
+/* job & trip progress */
+.pod-trip { min-width: 300px; max-width: 380px; }
+.pay { color: var(--ov-ok); letter-spacing: .04em; }
+.cargo { font-size: 16.5px; font-weight: 700; margin: 2px 0 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.route { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; }
+.city { max-width: 110px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rail { position: relative; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .1); }
+.rail i { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: 3px; background: linear-gradient(90deg, var(--ov-accent), #fff); transition: width .6s ease-out; }
+.rail .truck { position: absolute; top: 50%; left: 0; width: 13px; height: 13px; margin: -6.5px 0 0 -6.5px; border-radius: 50%;
+  background: #fff; border: 3px solid var(--ov-accent); transition: left .6s ease-out; }
+.pod-trip .sub { margin-top: 7px; }
+
+/* deadline & clock */
+.pod-deadline, .pod-clock { min-width: 118px; }
+.count { font-size: 27px; font-weight: 800; line-height: 1.25; }
+.pod-deadline.tight .count { color: var(--ov-warn); }
+.pod-deadline.late .count, .pod-deadline.late .sub { color: var(--ov-bad); }
+.pod-deadline.late::before { background: var(--ov-bad); }
+
+/* fuel & AdBlue */
+.pod-fuel { min-width: 180px; display: grid; gap: 5px; align-content: center; }
+.tank { display: grid; grid-template-columns: 48px 1fr 38px; align-items: center; gap: 8px; }
+.tank b { font-size: 13px; text-align: right; }
+.meter { height: 8px; border-radius: 4px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+.meter i { display: block; height: 100%; width: 0; background: var(--ov-ok); transition: width .6s ease-out; }
+.meter.blue i { background: var(--ov-blue); }
+.meter i.low { background: var(--ov-bad); animation: ov-pulse 1.2s ease-in-out infinite; }
+@keyframes ov-pulse { 50% { opacity: .45; } }
+
+/* hours of service */
+.pod-hos { min-width: 230px; }
+.duty { color: var(--ov-text); letter-spacing: .06em; }
+.clocks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 6px; }
+.clocks div { display: grid; }
+.clocks b { font-size: 19px; font-weight: 800; }
+
+/* damage */
+.pod-damage { min-width: 132px; }
+.dmg { display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px; margin-top: 3px; }
+.dmg span { color: var(--ov-muted); }
+
+/* the driver's chosen fields */
+.pod-fields { min-width: 220px; }
+.rows { display: grid; gap: 2px; margin-top: 4px; }
+.row-f { display: flex; justify-content: space-between; gap: 16px; font-size: 13px; }
+.row-f span { color: var(--ov-muted); }
+.row-f b { white-space: nowrap; }
+.st-warn { color: var(--ov-warn); }
+.st-bad { color: var(--ov-bad); }
+
+/* logbook alert pop-ups */
+.toasts { display: grid; gap: 8px; padding: 0 12px 12px; width: max-content; max-width: 460px;
+  zoom: var(--ov-scale); }
+.toast { background: linear-gradient(180deg, var(--ov-glass-2), var(--ov-glass)); border: 1px solid var(--ov-line);
+  border-left: 4px solid var(--ov-blue); border-radius: 10px; padding: 9px 14px; font-size: 13.5px; font-weight: 600;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .35); animation: ov-in .35s ease-out; transition: opacity .4s, transform .4s; }
+.toast.lv-warn { border-left-color: var(--ov-warn); }
+.toast.lv-bad { border-left-color: var(--ov-bad); }
+.toast.out { opacity: 0; transform: translateX(-12px); }
+@keyframes ov-in { from { opacity: 0; transform: translateY(-6px); } }
+
+/* waiting for the game */
+.pod-offline { min-width: 260px; }
+
+/* column layout: pods fill the width */
+.ov-stack .pod { min-width: 0; max-width: none; }
+
+/* compact: smaller pods */
+.ov-compact .pod { padding: 8px 12px 9px; }
+.ov-compact .pod-trip { min-width: 250px; }
+.ov-compact .count { font-size: 22px; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }

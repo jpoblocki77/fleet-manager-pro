@@ -71,6 +71,35 @@ def record_build(buyer, tag, kind, folder):
         w.writerow([datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), buyer, tag, kind, folder])
 
 
+def tk_library_args(work):
+    """Nuitka options that bundle Tcl/Tk for the in-game overlay window. Tcl 9 (Python 3.15+) keeps its script
+    library inside its DLL, where Nuitka can't find it, so copy both libraries out to folders and point Nuitka there."""
+    import base64
+    import tkinter
+    r = tkinter.Tk()
+    r.withdraw()
+    libs = {"tcl": r.eval("info library"), "tk": r.eval("set tk_library")}
+    if not any(v.startswith("//zipfs:") for v in libs.values()):
+        return []                                                     # ordinary folders: Nuitka finds them itself
+
+    def copy(src, dst):
+        for f in r.eval(f"glob -nocomplain -directory {{{src}}} *").split():
+            target = os.path.join(dst, f.rsplit("/", 1)[-1])
+            if r.eval(f"file isdirectory {{{f}}}") == "1":
+                copy(f, target)
+            else:
+                os.makedirs(dst, exist_ok=True)
+                data = r.eval(f"set h [open {{{f}}} rb]; set d [read $h]; close $h; binary encode base64 $d")
+                with open(target, "wb") as fh:
+                    fh.write(base64.b64decode(data))
+    args = []
+    for name, src in libs.items():
+        dst = os.path.join(work, f"{name}_library")
+        copy(src, dst)
+        args.append(f"--{name}-library-dir={dst}")
+    return args
+
+
 def main():
     global OUT
     buyer = buyer_from_args()
@@ -100,6 +129,7 @@ def main():
     cmd = [sys.executable, "-m", "nuitka", "--mode=standalone", "--python-flag=no_docstrings", "--msvc=latest", "--assume-yes-for-downloads",
            "--remove-output", "--output-dir=" + os.path.join(work, "dist"), f"--output-filename={NAME}.exe",
            "--windows-console-mode=force", "--include-package=fmpro", "--include-package=waitress",
+           "--enable-plugin=tk-inter", *tk_library_args(work),           # the in-game overlay window (fmpro/ingame.py)
            "--include-package=cryptography.hazmat.primitives.ciphers",
            "--include-data-dir=" + os.path.join(stage, "fmpro", "static") + "=fmpro/static",
            "--include-data-files=" + os.path.join(stage, "fmpro", "cargo_list.json") + "=fmpro/cargo_list.json",

@@ -359,7 +359,8 @@ def main():
                 "/api/overlay", "/api/export/jobs.csv", "/api/export/ledger.csv", "/jobs?status=delivered&q=a",
                 "/compliance", "/compliance?tab=dvir", "/compliance?tab=inspections", "/compliance?tab=violations",
                 f"/compliance?tab=logbook&driver={hid}", f"/compliance?tab=logbook&driver={hid}&day=10",
-                "/api/hos", f"/api/hos?user={hid}", "/settings?tab=compliance"]:
+                "/api/hos", f"/api/hos?user={hid}", "/settings?tab=compliance", "/overlay/setup",
+                "/overlay?layout=stack", "/overlay?layout=compact&solid&scale=1.5"]:
         r = c.get(url)
         check(r.status_code == 200, f"GET {url} -> {r.status_code}")
     d = c.get("/api/live").get_json()
@@ -375,7 +376,40 @@ def main():
         if howto.TITLE not in page_ or howto.GUIDES[n_][0] not in page_:
             missing_.append(u_)
     check(not missing_, f"pages open with their own How to use this page panel {missing_ or ''}")
-    check(b"How to use this page" not in c.get("/overlay").data, "the in-game overlay has no instructions panel")
+    check(b"How to use this page" not in c.get("/overlay").data, "the stream overlay page has no instructions panel")
+
+    print("In-game overlay")
+    from fmpro import ingame, overlay_fields
+    check(overlay_fields.clean({"fields": ["speed_kmh", "nope", "speed_kmh"], "opacity": 5, "corner": "zz", "scale": "x",
+                                "hotkey": "alt+f4"}) == dict(overlay_fields.DEFAULTS, fields=["speed_kmh"], opacity=30),
+          "overlay settings drop unknown fields, duplicates and out-of-range values")
+    r = post("/overlay/ingame", {"action": "save", "field": ["fuel_pct", "speed_kmh", "hos.available", "route"],
+                                 "corner": "bl", "hotkey": "f10", "opacity": "75", "scale": "120", "alerts": "1"})
+    cfg_ = overlay_fields.config(uid)
+    check(r.status_code == 302 and cfg_["fields"] == ["fuel_pct", "speed_kmh", "hos.available", "route"]
+          and cfg_["corner"] == "bl" and cfg_["hotkey"] == "f10" and cfg_["alerts"] and not cfg_["hos_warnings"],
+          "the driver picks which telemetry values the in-game overlay shows, and where")
+    d = c.get("/api/overlay").get_json()
+    check([row[0] for row in d["rows"]] == ["Fuel", "Speed", "Drive time left", "Route"] and all(row[1] for row in d["rows"]),
+          "the overlay feed sends exactly the chosen values, ready to draw")
+    check(d["warnings"] == [], "Hours of Service warnings are off when the driver turns them off")
+    t0_ = d["server_time"]
+    db.notify(uid, "Compliance violation 11-hour: test", "/compliance?tab=violations", "error")
+    db.notify(uid, "New truck detected: test", "/fleet/truck/1")
+    a_ = c.get(f"/api/overlay?since={t0_ - 0.001}").get_json()["alerts"]
+    check([x["text"] for x in a_] == ["Compliance violation 11-hour: test"] and a_[0]["level"] == "bad",
+          "logbook events are sent to the overlay (other notifications are not)")
+    check(c.get(f"/api/overlay?since={_time.time() + 1}").get_json()["alerts"] == [], "each logbook alert is sent once")
+    hud_t = {"hos": {"available": 12, "break_left": 0, "status": "driving", "cycle_left": 3000, "break_len": 30}}
+    codes_ = [w[0] for w in overlay_fields.hos_warnings(hud_t, {"next_rest_stop": 20})]
+    check(codes_ == ["drive-15", "break-0", "rest-30"], f"Hours of Service warnings: drive time, break and rest stop {codes_}")
+    check(overlay_fields.hos_warnings({"hos": {"available": 0, "break_left": 100, "status": "off", "cycle_left": 0}}, {})[0][0]
+          == "drive-0", "out of drive time is a red warning")
+    check(not ingame.running() and b"didn" not in post("/overlay/ingame", {"action": "start"}).data
+          and not ingame.running(), "the overlay window isn't started where the app has no local port (tests, LAN mode)")
+    page_ = c.get("/overlay?show=fields,alerts").get_data(as_text=True)
+    check('data-part="fields"' in page_ and 'id="ov-toasts"' in page_, "the stream overlay can show the chosen values and alerts")
+    overlay_fields.save(uid, {})
 
     print("Game selector (units)")
     db.set_setting("units", "imperial")
@@ -1669,6 +1703,25 @@ def main():
     check(r.status_code == 401, "bad agent token refused")
     check(c.get(f"/api/overlay?key={tok}").status_code == 200, "overlay works with token")
     check(c.get("/api/live").status_code == 401, "API needs login")
+    # stream overlay: works from its link with no login, shows only the chosen panels, and carries company + HOS
+    ov_ = c.get(f"/api/overlay?key={tok}").get_json()
+    hud_ = ov_.get("hud") or {}
+    check(ov_["online"] and hud_.get("company") == db.setting("company_name") and hud_.get("driver")
+          and set(hud_) >= {"tag", "color", "hos"}, "the overlay feed names the company and the driver")
+    check(hud_.get("hos") is None or {"drive_left", "break_left", "status"} <= set(hud_["hos"]),
+          "the overlay feed carries the driver's Hours of Service clocks")
+    r = c.get(f"/overlay?key={tok}&layout=stack&show=speed,hos,bogus&scale=9")
+    page_ = r.get_data(as_text=True)
+    check(r.status_code == 200 and 'data-part="speed"' in page_ and 'data-part="hos"' in page_
+          and 'data-part="trip"' not in page_ and "ov-stack" in page_ and "--ov-scale: 2.0" in page_,
+          "the overlay link picks the layout, panels and size (and ignores bad values)")
+    page_ = c.get(f"/overlay?key={tok}&layout=compact").get_data(as_text=True)
+    check('data-part="deadline"' in page_ and 'data-part="fuel"' not in page_, "compact shows speed, trip and deadline")
+    page_ = c.get(f"/overlay?key={tok}&layout=nonsense").get_data(as_text=True)
+    check("ov-bar" in page_ and 'data-part="damage"' in page_, "an unknown layout falls back to the full bar")
+    check(c.get("/overlay?key=not-a-real-key").status_code == 302 and c.get("/api/overlay?key=nope").status_code == 401,
+          "a wrong overlay key gets nothing")
+    check(c.get("/overlay/setup").status_code == 302, "overlay setup needs a login")
 
     print("Trailer types, demo clean-up, repair cost, photos")
     c.get("/login")

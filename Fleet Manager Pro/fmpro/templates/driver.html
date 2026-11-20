@@ -40,7 +40,7 @@
     <div class="card accent"><h2>Remote telemetry</h2>
       <p class="small muted">To log jobs from {{ 'your' if is_self else 'their' }} own PC, run this there in the Fleet Manager Pro folder (copied to that PC; no purchase key needed):</p>
       <pre class="mono small" style="white-space:pre-wrap;word-break:break-all;background:var(--panel-2);padding:8px;border-radius:8px">{% if lan_pin %}{{ AGENT_CMD }} --server https://THIS-PC-IP:8760 --token {{ p.agent_token }} --pin {{ lan_pin }}{% else %}{{ AGENT_CMD }} --server http://THIS-PC-IP:8760 --token {{ p.agent_token }}{% endif %}</pre>{% if not lan_pin %}<p class="small muted">Start this PC in LAN mode once to get the encrypted https address and its fingerprint.</p>{% endif %}
-      <p class="small muted">Overlay for OBS: <code>/overlay?key={{ p.agent_token }}&amp;solid</code></p>
+      <p class="small muted">Stream overlay for OBS: {% if is_self %}<a href="/overlay/setup">set it up and copy your link</a>{% else %}<code>/overlay?key={{ p.agent_token }}</code>{% endif %}</p>
       <form method="post" action="/drivers/{{ p.id }}/token">{{ csrf() }}<button class="btn sm" data-confirm="Generate a new token? The old one stops working.">New token</button></form></div>
     {% endif %}
   </div>

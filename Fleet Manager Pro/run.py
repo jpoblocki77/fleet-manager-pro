@@ -5,6 +5,7 @@
     run.py --lan --insecure-http  LAN without encryption (only on a network you fully trust)
     run.py --port 9000            choose a port
     run.py --no-browser           don't open the browser
+    run.py overlay --port 8760    the in-game overlay window (Fleet Manager Pro starts this itself)
     run.py agent --server https://HOST:8760 --token TOKEN --pin FINGERPRINT
                                   stream this PC's game telemetry to another Fleet Manager Pro
                                   (token and fingerprint are shown on your profile page there)

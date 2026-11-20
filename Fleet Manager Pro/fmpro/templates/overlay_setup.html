@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, csrf %}
+{% block title %}Overlays{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Overlays</h1><p>Your live truck data on top of the game while you drive, and a see-through panel for OBS, a second screen or a tablet.</p></div>
+</div>
+
+<form method="post" action="/overlay/ingame" class="card ingame-card" id="ingame" style="margin-bottom:20px">{{ csrf() }}
+  <div class="card-head"><h2>In-game overlay</h2>
+    <span class="right">{% if ingame_running %}<span class="badge active">on</span>{% else %}<span class="badge">off</span>{% endif %}</span></div>
+  <p class="muted" style="margin-top:0">A small panel that floats over ATS or ETS2, with the values you pick below and pop-ups for logbook
+    events: breaks due, drive time running out, duty changes, violations, roadside inspections and DVIR defects.
+    Clicks go straight through it to the game. Press <b>{{ hotkeys[cfg.hotkey] }}</b> in the game to hide or show it.</p>
+  {% if can_run %}
+  <div class="row" style="gap:8px;margin-bottom:6px">
+    {% if ingame_running %}
+    <button class="btn" name="action" value="stop" formnovalidate>Close the overlay</button>
+    {% else %}
+    <button class="btn primary" name="action" value="start" formnovalidate>{{ icon('live') }}Open the overlay</button>
+    {% endif %}
+  </div>
+  {% if not is_local %}<p class="hint">The overlay on this PC shows {{ local_name }}'s truck (the driver set in Settings, Telemetry tab), using {{ local_name }}'s field choices.</p>{% endif %}
+  {% else %}
+  <p class="hint">The overlay window opens on the PC running Fleet Manager Pro. Your choices here are used by your browser overlay and on your own PC.</p>
+  {% endif %}
+  <p class="hint">Run the game in <b>windowed</b> or <b>borderless</b> mode. Exclusive full screen hides every other window, this one included.</p>
+
+  <div class="ingame-grid">
+    <div>
+      <h3>Show these values</h3>
+      <div class="field-groups">
+      {% for group, items in field_groups.items() %}
+        <fieldset><legend>{{ group }}</legend>
+        {% for k, label in items %}<label class="check"><input type="checkbox" name="field" value="{{ k }}" {{ 'checked' if k in cfg.fields }}> {{ label }}</label>{% endfor %}
+        </fieldset>
+      {% endfor %}
+      </div>
+    </div>
+    <div>
+      <h3>Alerts</h3>
+      <label class="check"><input type="checkbox" name="alerts" value="1" {{ 'checked' if cfg.alerts }}> Logbook events (violations, inspections, DVIR defects, low fuel)</label>
+      <label class="check"><input type="checkbox" name="hos_warnings" value="1" {{ 'checked' if cfg.hos_warnings }}> Hours of Service warnings (break due, drive time running out, rest stops)</label>
+      <h3 style="margin-top:14px">Where and how</h3>
+      <label>Position<select name="corner">{% for k, l in corners.items() %}<option value="{{ k }}" {{ 'selected' if k == cfg.corner }}>{{ l }}</option>{% endfor %}</select></label>
+      <label>Hide / show key<select name="hotkey">{% for k, l in hotkeys.items() %}<option value="{{ k }}" {{ 'selected' if k == cfg.hotkey }}>{{ l }}</option>{% endfor %}</select></label>
+      <label>Opacity <b class="rv" data-for="opacity">{{ cfg.opacity }}%</b><input type="range" name="opacity" min="30" max="100" step="5" value="{{ cfg.opacity }}"></label>
+      <label>Size <b class="rv" data-for="scale">{{ cfg.scale }}%</b><input type="range" name="scale" min="60" max="200" step="10" value="{{ cfg.scale }}"></label>
+      <label class="check"><input type="checkbox" name="only_driving" value="1" {{ 'checked' if cfg.only_driving }}> Only show the panel while the game is running</label>
+      <label class="check"><input type="checkbox" name="autostart" value="1" {{ 'checked' if cfg.autostart }}> Open the overlay when Fleet Manager Pro starts</label>
+      <div class="row" style="margin-top:12px"><button class="btn primary" name="action" value="save">Save</button></div>
+    </div>
+  </div>
+</form>
+
+<h2 style="margin:6px 0 12px">Stream overlay (OBS, second screen, tablet)</h2>
+<div class="row" style="margin-bottom:12px"><a class="btn" id="ov-open" href="/overlay" target="_blank" rel="noopener">{{ icon('live') }}Open in a new tab</a></div>
+<div class="grid ov-setup">
+  <div class="card">
+    <div class="card-head"><h2>Layout</h2></div>
+    {% for k, label in layouts.items() %}
+    <label class="check"><input type="radio" name="layout" value="{{ k }}" {{ 'checked' if k == 'bar' }}> {{ label }}</label>
+    {% endfor %}
+
+    <div class="card-head" style="margin-top:14px"><h2>Show</h2></div>
+    {% for k, label in parts.items() %}
+    <label class="check"><input type="checkbox" name="part" value="{{ k }}" {{ 'checked' if k in default }}> {{ label }}</label>
+    {% endfor %}
+
+    <div class="card-head" style="margin-top:14px"><h2>Look</h2></div>
+    <label for="ov-scale">Size <b id="ov-scale-v">100%</b></label>
+    <input type="range" id="ov-scale" min="50" max="200" step="10" value="100">
+    <label class="check"><input type="checkbox" id="ov-solid"> Solid background (for a second screen; leave off for OBS)</label>
+    <p class="hint">The panels use your company colour from Settings, Company tab.</p>
+  </div>
+
+  <div class="ov-right">
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-head"><h2>Preview</h2><span class="right small muted">live from your truck</span></div>
+      <div class="ov-preview"><iframe id="ov-frame" src="/overlay" title="Overlay preview" loading="lazy"></iframe></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Your overlay link</h2></div>
+      <div class="row" style="gap:8px">
+        <input id="ov-url" readonly value="" aria-label="Overlay link" style="flex:1;font-family:ui-monospace,monospace;font-size:12.5px">
+        <button type="button" class="btn primary" id="ov-copy">Copy</button>
+      </div>
+      <p class="hint">This link signs in by itself with your personal key, so OBS doesn't need your password. Keep it private:
+        anyone with it can see your live truck data. If it leaks, make a new key on <a href="/profile">your profile</a> (New token).</p>
+      <h3 style="margin:14px 0 6px">Add it to OBS</h3>
+      <ol class="small" style="margin:0;padding-left:20px;line-height:1.7">
+        <li>In OBS, under <b>Sources</b>, press <b>+</b> and choose <b>Browser</b>.</li>
+        <li>Paste the link into <b>URL</b>. Set <b>Width</b> <span id="ov-w">1920</span> and <b>Height</b> <span id="ov-h">220</span>.</li>
+        <li>Press OK, then drag the overlay where you want it on your scene.</li>
+      </ol>
+      <p class="hint">OBS on another PC: use this PC's network address instead of 127.0.0.1 (Connect a Tablet shows it).</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const base = {{ (request.host_url.rstrip('/') ~ '/overlay')|tojson }};
+  const key = {{ token|tojson }};
+  const $ = (s) => document.querySelector(s), $$ = (s) => Array.from(document.querySelectorAll(s));
+  const SIZES = { bar: [1920, 220], stack: [340, 1000], compact: [1100, 180] };
+  const PRESETS = { compact: ["speed", "trip", "deadline", "alerts"], full: {{ default|list|tojson }} };
+  let timer = null, lastLayout = "bar";
+
+  function preset(names) { $$('input[name="part"]').forEach((i) => { i.checked = names.includes(i.value); }); }
+
+  function measured() {                              // the overlay's real size, read from the preview (same site)
+    try {
+      const rig = $("#ov-frame").contentDocument.getElementById("rig");
+      const r = rig && rig.getBoundingClientRect();
+      if (r && r.width > 40 && r.height > 40) return [Math.ceil(r.right + 12), Math.ceil(r.bottom + 12)];
+    } catch (e) {}
+    return null;
+  }
+
+  function fit() {                                   // shrink the preview so the whole overlay fits the box
+    const box = $(".ov-preview"), f = $("#ov-frame"), layout = ($('input[name="layout"]:checked') || {}).value || "bar";
+    const s = Number($("#ov-scale").value) / 100, [w0, h0] = SIZES[layout];
+    const [w, h] = measured() || [w0 * s, h0 * s];
+    const k = Math.min(1, (box.clientWidth - 2) / w, 620 / h);
+    f.style.width = Math.max(w, w0 * s) + "px"; f.style.height = Math.max(h, h0 * s) + "px"; f.style.transform = `scale(${k})`;
+    box.style.height = Math.ceil(h * k) + "px";
+    $("#ov-w").textContent = w; $("#ov-h").textContent = h;
+  }
+
+  function query(withKey) {
+    const layout = ($('input[name="layout"]:checked') || {}).value || "bar";
+    const parts = $$('input[name="part"]:checked').map((i) => i.value);
+    const q = new URLSearchParams();
+    if (withKey && key) q.set("key", key);
+    q.set("layout", layout);
+    if (parts.length) q.set("show", parts.join(","));
+    const scale = Number($("#ov-scale").value) / 100;
+    if (scale !== 1) q.set("scale", scale.toFixed(1));
+    if ($("#ov-solid").checked) q.append("solid", "");
+    return { layout, scale, qs: q.toString().replace(/solid=(&|$)/, "solid$1") };
+  }
+
+  function update() {
+    const pub = query(true), own = query(false);
+    $("#ov-url").value = base + "?" + pub.qs;
+    $("#ov-open").href = "/overlay?" + own.qs;
+    $("#ov-scale-v").textContent = Math.round(pub.scale * 100) + "%";
+    fit();
+    clearTimeout(timer);
+    timer = setTimeout(() => { $("#ov-frame").src = "/overlay?" + own.qs; }, 250);
+  }
+
+  $$('input[name="layout"]').forEach((i) => i.addEventListener("change", () => {
+    if (i.value === "compact") preset(PRESETS.compact);          // compact starts with its own three panels
+    else if (lastLayout === "compact") preset(PRESETS.full);
+    lastLayout = i.value;
+  }));
+  $$(".ov-setup input").forEach((i) => i.addEventListener(i.type === "range" ? "input" : "change", update));
+  $$(".ingame-card input[type=range]").forEach((i) => i.addEventListener("input", () => {
+    $(`.rv[data-for="${i.name}"]`).textContent = i.value + "%";
+  }));
+  window.addEventListener("resize", fit);
+  $("#ov-frame").addEventListener("load", () => { fit(); setTimeout(fit, 1200); });
+  setInterval(fit, 2000);                            // panels grow or shrink as the job changes
+  $("#ov-copy").addEventListener("click", () => {
+    const i = $("#ov-url"); i.select();
+    (navigator.clipboard ? navigator.clipboard.writeText(i.value) : Promise.reject()).catch(() => document.execCommand("copy"));
+    $("#ov-copy").textContent = "Copied"; setTimeout(() => { $("#ov-copy").textContent = "Copy"; }, 1500);
+  });
+  update();
+})();
+</script>
+{% endblock %}

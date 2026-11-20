@@ -227,7 +227,78 @@ def overlay():
         from flask import g
         from .auth import units_for
         g.units_override = units_for(db.val("SELECT game_pref FROM users WHERE agent_token=?", (token,)) or "both")
-    return render_template("overlay.html", solid="solid" in request.args, key=token)
+    return render_template("overlay.html", solid="solid" in request.args, key=token, **overlay_options(request.args))
+
+
+OVERLAY_PARTS = {"brand": "Company & driver", "speed": "Speed & limit", "gear": "Gear & RPM", "trip": "Job & trip progress",
+                 "deadline": "Deadline countdown", "fuel": "Fuel & AdBlue", "hos": "Hours of Service",
+                 "damage": "Damage", "clock": "Game clock", "fields": "My chosen fields (from In-game overlay)",
+                 "alerts": "Logbook alerts (pop-ups)"}
+OVERLAY_LAYOUTS = {"bar": "Wide bar (bottom or top of the screen)", "stack": "Column (side of the screen)",
+                   "compact": "Compact (speed, trip and deadline only)"}
+OVERLAY_DEFAULT = ("brand", "speed", "gear", "trip", "deadline", "fuel", "hos", "damage", "alerts")
+
+
+def overlay_options(args):
+    """The overlay's look from its address: ?layout=bar|stack|compact&show=speed,trip,...&scale=1.2&solid"""
+    layout = args.get("layout", "bar") if args.get("layout") in OVERLAY_LAYOUTS else "bar"
+    show = [p for p in (args.get("show") or "").split(",") if p in OVERLAY_PARTS]
+    if not show:
+        show = ["speed", "trip", "deadline", "alerts"] if layout == "compact" else list(OVERLAY_DEFAULT)
+    try:
+        scale = min(2.0, max(0.5, float(args.get("scale", 1))))
+    except ValueError:
+        scale = 1.0
+    return {"layout": layout, "show": show, "scale": scale}
+
+
+@bp.route("/overlay/setup")
+@login_required
+def overlay_setup():
+    from . import ingame, overlay_fields
+    from .telemetry.service import local_user
+    me = user()
+    token = db.val("SELECT agent_token FROM users WHERE id=?", (me["id"],)) or ""
+    local = local_user()
+    groups = {}
+    for k, (label, group, _kind) in overlay_fields.FIELDS.items():
+        groups.setdefault(group, []).append((k, label))
+    return render_template("overlay_setup.html", parts=OVERLAY_PARTS, layouts=OVERLAY_LAYOUTS,
+                           default=OVERLAY_DEFAULT, token=token, cfg=overlay_fields.config(me["id"]),
+                           field_groups=groups, corners=overlay_fields.CORNERS, hotkeys=overlay_fields.HOTKEYS,
+                           ingame_running=ingame.running(), is_local=(local == me["id"]),
+                           local_name=db.val("SELECT display_name FROM users WHERE id=?", (local,)) or "",
+                           can_run=(local == me["id"] or can("admin")))
+
+
+@bp.route("/overlay/ingame", methods=["POST"])
+@login_required
+def overlay_ingame():
+    """Save my in-game overlay settings, or open / close the overlay window on this PC."""
+    from flask import current_app
+    from . import ingame, overlay_fields
+    from .telemetry.service import local_user
+    me, action = user(), request.form.get("action", "save")
+    if action == "save":
+        f = request.form
+        overlay_fields.save(me["id"], {
+            "fields": f.getlist("field"), "corner": f.get("corner"), "hotkey": f.get("hotkey"),
+            "opacity": f.get("opacity"), "scale": f.get("scale"), "alerts": f.get("alerts") == "1",
+            "hos_warnings": f.get("hos_warnings") == "1", "only_driving": f.get("only_driving") == "1",
+            "autostart": f.get("autostart") == "1"})
+        flash("In-game overlay settings saved. An open overlay picks them up within a second.", "success")
+        return redirect(url_for("pages.overlay_setup") + "#ingame")
+    local = local_user()
+    if not (local == me["id"] or can("admin")):
+        abort(403)
+    if action == "start":
+        key = db.val("SELECT agent_token FROM users WHERE id=?", (local,))
+        why = ingame.start(current_app.config.get("PORT"), key)
+        flash(why or "In-game overlay opened. Press its hotkey in the game to hide or show it.", "error" if why else "success")
+    elif action == "stop":
+        ingame.stop()
+        flash("In-game overlay closed.", "success")
+    return redirect(url_for("pages.overlay_setup") + "#ingame")
 
 
 # ------------------------------------------------------------------ jobs / logbook

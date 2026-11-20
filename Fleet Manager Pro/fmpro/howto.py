@@ -28,6 +28,12 @@ GUIDES = {
         "Values that change flash red, so you can see what reacts when you press something in the truck.",
         "Pause freezes the list; Download snapshot saves everything as a JSON file for troubleshooting.",
     ],
+    "overlay_setup": [
+        "In-game overlay: tick the values you want, choose alerts and where it sits, press Save, then Open the overlay.",
+        "In the game, press the hide/show key (Ctrl + Shift + O unless you changed it). Clicks go straight through it.",
+        "Run the game in windowed or borderless mode; exclusive full screen hides every other window.",
+        "Stream overlay: pick a layout and panels, then Copy the link into an OBS Browser source. Keep that link private.",
+    ],
     "map": [
         "Scroll to zoom and drag to pan. The lines are roads your company has driven; dots are drivers on the road right now.",
         "Whole map shows everything; Fit drivers zooms to the trucks that are driving.",

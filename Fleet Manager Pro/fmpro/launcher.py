@@ -17,7 +17,7 @@ def _free_port():
 
 def main():
     ap = argparse.ArgumentParser(description="Fleet Manager Pro")
-    ap.add_argument("mode", nargs="?", default="serve", choices=["serve", "agent"])
+    ap.add_argument("mode", nargs="?", default="serve", choices=["serve", "agent", "overlay"])
     ap.add_argument("--lan", action="store_true")
     ap.add_argument("--insecure-http", action="store_true", help="with --lan: no HTTPS")
     ap.add_argument("--port", type=int, default=8760)
@@ -33,6 +33,11 @@ def main():
         from fmpro import licensing
         licensing.load_build()
         print(licensing.BUILD_TAG or "No build tag (developer or seller copy).")
+        return
+
+    if a.mode == "overlay":                     # the in-game overlay window (started by the app itself)
+        from fmpro import ingame
+        ingame.main(a.port)
         return
 
     if a.mode == "agent":
@@ -66,6 +71,8 @@ def main():
         app.config["PORT"] = a.port
         from fmpro import tablet
         tablet.autostart(app)
+        from fmpro import ingame
+        ingame.autostart(app)
         if app.config.get("LAN"):
             print(f"  Tablets: on (https, port {app.config['LAN']['port']}) - open Connect a Tablet for the QR code")
         print("  Press Ctrl+C to stop.\n")

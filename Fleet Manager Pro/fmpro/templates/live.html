@@ -5,7 +5,7 @@
   <div><h1>Live Cockpit</h1><p>Real-time data from scs-telemetry.dll — updates 4× a second.</p></div>
   <div class="actions">
     <select id="who" style="width:auto">{% for d in drivers %}<option value="{{ d.id }}" {{ 'selected' if d.id == me }}>{{ d.display_name }}</option>{% endfor %}</select>
-    <a class="btn" href="/overlay" target="_blank">Open overlay</a>
+    <a class="btn" href="/overlay/setup">Stream overlay</a>
     <a class="btn" href="/telemetry">All data points</a>
   </div>
 </div>

@@ -109,6 +109,7 @@
       try { if (localStorage.getItem(k) === "hide") d.open = false; } catch (e) {}
       d.addEventListener("toggle", () => { try { d.open ? localStorage.removeItem(k) : localStorage.setItem(k, "hide"); } catch (e) {} });
     });
+    if (document.body.classList.contains("ov")) return;     // the stream overlay has no top bar or bell
     pollNotifs(); pollChip();
     setInterval(pollNotifs, 20000); setInterval(pollChip, 2000);
   });

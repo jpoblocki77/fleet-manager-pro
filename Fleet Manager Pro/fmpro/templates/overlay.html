@@ -1,34 +1,109 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Overlay · Fleet Manager Pro</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v={{ VERSION }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/overlay.css') }}?v={{ VERSION }}">
 </head>
-<body class="overlay {{ 'solid' if solid }}" data-units="{{ current_units() }}" data-currency="{{ S.currency }}">
-<div class="hud" id="hud">
-  <div class="box"><div class="l">Speed</div><div class="v" id="o-speed">—</div><div class="s" id="o-limit"></div></div>
-  <div class="box"><div class="l">Gear · RPM</div><div class="v" id="o-gear">—</div><div class="s" id="o-rpm"></div></div>
-  <div class="box"><div class="l">Fuel</div><div class="v" id="o-fuel">—</div><div class="s" id="o-range"></div></div>
-  <div class="box" style="min-width:240px"><div class="l">Job</div><div class="v" style="font-size:18px" id="o-job">—</div><div class="s" id="o-route"></div></div>
-  <div class="box"><div class="l">Remaining</div><div class="v" id="o-dist">—</div><div class="s" id="o-eta"></div></div>
-  <div class="box"><div class="l">Damage</div><div class="v" id="o-dmg">—</div><div class="s" id="o-cargo"></div></div>
+<body class="ov {{ 'solid' if solid }} ov-{{ layout }}" data-units="{{ current_units() }}" data-currency="{{ S.currency }}"
+      data-key="{{ key }}" data-show="{{ show|join(',') }}" style="--ov-scale: {{ scale }}">
+<div class="rig" id="rig">
+  {% if 'brand' in show %}
+  <section class="pod pod-brand" data-part="brand">
+    <div class="badge-tag" id="ov-tag">{{ S.company_tag or 'FMP' }}</div>
+    <div class="who"><b id="ov-company">{{ S.company_name or 'Fleet Manager Pro' }}</b><span id="ov-driver">&nbsp;</span></div>
+  </section>
+  {% endif %}
+
+  {% if 'speed' in show %}
+  <section class="pod pod-speed" data-part="speed">
+    <svg class="dial" viewBox="0 0 120 70" aria-hidden="true">
+      <path class="dial-track" d="M10 62 A50 50 0 0 1 110 62"/>
+      <path class="dial-fill" id="ov-dial" d="M10 62 A50 50 0 0 1 110 62" pathLength="100" stroke-dasharray="0 100"/>
+      <circle class="dial-limit" id="ov-dial-limit" cx="10" cy="62" r="5" hidden/>
+    </svg>
+    <div class="speed-read"><span class="big" id="ov-speed">0</span><span class="unit" id="ov-speed-u">mph</span></div>
+    <div class="speed-tags"><span class="sign" id="ov-limit" hidden></span><span class="chip" id="ov-cruise" hidden></span></div>
+  </section>
+  {% endif %}
+
+  {% if 'gear' in show %}
+  <section class="pod pod-gear" data-part="gear">
+    <div class="lbl">Gear</div>
+    <div class="gear" id="ov-gear">N</div>
+    <div class="rpm"><i id="ov-rpm-bar"></i></div>
+    <div class="sub" id="ov-rpm">0 rpm</div>
+  </section>
+  {% endif %}
+
+  {% if 'trip' in show %}
+  <section class="pod pod-trip" data-part="trip">
+    <div class="lbl"><span id="ov-trip-lbl">Free roam</span><span class="pay" id="ov-pay"></span></div>
+    <div class="cargo" id="ov-cargo">No job</div>
+    <div class="route">
+      <span class="city" id="ov-from"></span>
+      <div class="rail"><i id="ov-rail"></i><b class="truck" id="ov-truck"></b></div>
+      <span class="city" id="ov-to"></span>
+    </div>
+    <div class="sub" id="ov-left">&nbsp;</div>
+  </section>
+  {% endif %}
+
+  {% if 'deadline' in show %}
+  <section class="pod pod-deadline" data-part="deadline">
+    <div class="lbl">Deadline</div>
+    <div class="count" id="ov-deadline">—</div>
+    <div class="sub" id="ov-eta">&nbsp;</div>
+  </section>
+  {% endif %}
+
+  {% if 'fuel' in show %}
+  <section class="pod pod-fuel" data-part="fuel">
+    <div class="tank"><span class="lbl">Fuel</span><div class="meter"><i id="ov-fuel-bar"></i></div><b id="ov-fuel">—</b></div>
+    <div class="tank"><span class="lbl">AdBlue</span><div class="meter blue"><i id="ov-adblue-bar"></i></div><b id="ov-adblue">—</b></div>
+    <div class="sub" id="ov-range">&nbsp;</div>
+  </section>
+  {% endif %}
+
+  {% if 'hos' in show %}
+  <section class="pod pod-hos" data-part="hos">
+    <div class="lbl"><span>Hours of Service</span><span class="duty" id="ov-duty"></span></div>
+    <div class="clocks">
+      <div><span class="sub">Drive</span><b id="ov-hos-drive">—</b></div>
+      <div><span class="sub">Break in</span><b id="ov-hos-break">—</b></div>
+      <div><span class="sub">Rest stop</span><b id="ov-rest">—</b></div>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if 'damage' in show %}
+  <section class="pod pod-damage" data-part="damage">
+    <div class="lbl">Damage</div>
+    <div class="dmg"><span>Truck</span><b id="ov-dmg-truck">0%</b></div>
+    <div class="dmg"><span>Trailer</span><b id="ov-dmg-trailer">0%</b></div>
+    <div class="dmg"><span>Cargo</span><b id="ov-dmg-cargo">0%</b></div>
+  </section>
+  {% endif %}
+
+  {% if 'clock' in show %}
+  <section class="pod pod-clock" data-part="clock">
+    <div class="lbl">Game time</div>
+    <div class="count" id="ov-clock">—</div>
+  </section>
+  {% endif %}
+
+  {% if 'fields' in show %}
+  <section class="pod pod-fields" data-part="fields">
+    <div class="lbl">Live</div>
+    <div class="rows" id="ov-rows"></div>
+  </section>
+  {% endif %}
+
+  <section class="pod pod-offline" id="ov-offline" hidden>
+    <div class="lbl">Fleet Manager Pro</div>
+    <div class="cargo">Waiting for the game</div>
+    <div class="sub" id="ov-status">&nbsp;</div>
+  </section>
 </div>
+{% if 'alerts' in show %}<div class="toasts" id="ov-toasts" aria-live="polite"></div>{% endif %}
 <script src="{{ url_for('static', filename='js/app.js') }}?v={{ VERSION }}"></script>
-<script>
-const key = {{ key|tojson }};
-const set = (id, t) => document.getElementById(id).textContent = t;
-function tick() {
-  fetch("/api/overlay" + (key ? "?key=" + encodeURIComponent(key) : ""), { credentials: "same-origin" }).then(r => r.json()).then(d => {
-    if (!d.online) { set("o-speed", "—"); set("o-job", "Offline"); set("o-route", d.status || ""); return; }
-    const v = d.values, imp = FMP.imp();
-    set("o-speed", Math.round(Math.abs(FMP.speed(v.speed_kmh))) + " " + FMP.speedU());
-    set("o-limit", v.speed_limit > 0 ? "Limit " + Math.round(imp ? v.speed_limit_mph : v.speed_limit_kmh) + (v.cruise_control ? " · CC " + Math.round(imp ? v.cruise_mph : v.cruise_kmh) : "") : "");
-    set("o-gear", v.gear_label); set("o-rpm", Math.round(v.engine_rpm) + " rpm");
-    set("o-fuel", Math.round(v.fuel_pct) + "%"); set("o-range", FMP.dist(v.fuel_range) + " range");
-    set("o-job", v.on_job ? v.cargo : "Free roam"); set("o-route", v.on_job ? v.source_city + " → " + v.destination_city : v.game_clock);
-    set("o-dist", v.on_job ? FMP.dist(v.navigation_km, 0) : "—"); set("o-eta", v.on_job ? FMP.mins(v.navigation_time / 60) + " drive" : "");
-    set("o-dmg", v.truck_damage_pct.toFixed(1) + "%"); set("o-cargo", "Cargo " + (v.cargo_damage * 100).toFixed(1) + "%");
-  }).catch(() => {});
-}
-tick(); setInterval(tick, 500);
-</script>
+<script src="{{ url_for('static', filename='js/overlay.js') }}?v={{ VERSION }}"></script>
 </body></html>
