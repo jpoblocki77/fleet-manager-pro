@@ -59,9 +59,9 @@ def build():
             [2.6 * inch, 3.6 * inch, 0.7 * inch]))
 
     A(Paragraph("2. Making a sale", H1))
-    A(steps(["Make sure the licence server is running on the server PC (192.168.1.29): the blue <b>LICENCE SERVER</b> window.",
+    A(steps(["Make sure the licence server is running on the cloud box (AnyDesk / Remote Utilities in): the blue <b>LICENCE SERVER</b> window.",
              "If you changed anything since the last build, rebuild the buyer copy (section 4).",
-             "On the server PC open <b>License Manager.bat</b> and choose <b>2) New purchase</b>. Type the buyer's name "
+             "On the cloud box open <b>License Manager.bat</b> and choose <b>2) New purchase</b>. Type the buyer's name "
              "(email optional). Copy the key it shows: <b>FMP-XXXX-XXXX-XXXX-XXXX</b>. It works on 2 PCs.",
              "On this PC double-click <b>Development\\Build Buyer Copy.bat</b>. Paste the buyer's key and confirm. "
              "A few minutes later it opens Build Output.",
@@ -110,7 +110,7 @@ def build():
              ["Found a copy online", "Run it with <b>--build-tag</b> (see the menu) and use <b>10) Identify a copy</b> to see "
                                      "whose it was."]], W))
     A(Paragraph("Copies keep working for up to 7 days when they can't reach the server, so a short outage doesn't lock anyone out. "
-                "License Manager only works on the server PC or your home network.", SMALL))
+                "License Manager only works on the cloud box itself (admin is local-only).", SMALL))
 
     A(Paragraph("4. After you change the program", H1))
     A(Paragraph("Work in the development copy, then:", P))
@@ -118,7 +118,7 @@ def build():
     A(Paragraph("All three must end with <b>ALL PASSED</b>. Then bump <b>Fleet Manager Pro\\VERSION</b> and, in the Development "
                 "folder, double-click <b>Build and Publish Update (All Buyers).bat</b>. It rebuilds every active buyer's copy "
                 "(the buyer list comes from the licence server) and publishes each one as an update; copy the new files in "
-                "License Host\\updates to the server PC and every buyer sees <b>Update available</b>.", P))
+                "License Host\\updates to the cloud box and every buyer sees <b>Update available</b>.", P))
     A(Paragraph("The build compiles the program to native machine code with <b>Nuitka</b>, so buyers get no Python source or "
                 "bytecode. The build PC needs, once: <b>python -m pip install nuitka</b> and Visual Studio (or its Build Tools) with "
                 "<i>Desktop development with C++</i>. Each buyer's copy takes about 2-3 minutes.", SMALL))
@@ -127,12 +127,12 @@ def build():
 
     A(Paragraph("5. The licence server", H1))
     A(table([["", ""],
-             ["Server PC", "192.168.1.29, folder with License Server.bat (keep its window open)"],
+             ["Server", "cloud box (AnyDesk / Remote Utilities in), folder with License Server.bat (keep its window open)"],
              ["Public address", "https://fleetmanager.servehttp.com:8750 (No-IP name; keep the No-IP DUC running)"],
-             ["Router", "forward TCP 8750 only, to 192.168.1.29"],
-             ["Firewall", "inbound TCP 8750 allowed on the server PC"],
+             ["Admin", "License Manager runs on the cloud box itself (admin is local-only)"],
+             ["Firewall", "inbound TCP 8750 open on the cloud box"],
              ["Also hosts", "every company's online recruitment Apply page"]], W, head=False))
-    A(Paragraph("<b>Updating the server PC:</b> copy license_server.py, license_tool.py, reset_licences.py, the .bat files and the "
+    A(Paragraph("<b>Updating the server:</b> copy license_server.py, license_tool.py, reset_licences.py, the .bat files and the "
                 "README over the old ones, then close and reopen License Server.bat. <b>Never</b> copy licenses.db, host_key.json, "
                 "server_config.json or the .pem files over the server's own.", P))
     A(Paragraph("<b>Reset Licences.bat</b> wipes every purchase (it backs up licenses.db first and makes you type RESET). Only use it to "

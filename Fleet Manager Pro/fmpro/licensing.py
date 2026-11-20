@@ -31,10 +31,10 @@ log = logging.getLogger("fmpro.licence")
 PRODUCT = "Fleet Manager Pro"
 PUBLIC_KEY_HEX = "49b187237dea8f82b9dc28d042b9c2b76f000380b22080241a30821fbaf83896"
 SERVER_URL = "https://fleetmanager.servehttp.com:8750"
-# Inside the seller's own home network the public address often can't be reached (routers rarely loop back),
-# so the seller's copies also try the server's home-network address. Same server, same pinned certificate.
-# Buyer copies are built without it (Build Pro Buyer Copy.py empties it).
-LAN_FALLBACK = "https://192.168.1.29:8750"
+# The licence server is a cloud box reached at SERVER_URL from anywhere, so there is no separate home-network
+# address to fall back to. Kept as an empty string (licensing.py still parses; Build Pro Buyer Copy.py empties it
+# for buyer copies anyway) so the "also try the LAN address" step is simply skipped.
+LAN_FALLBACK = ""
 TLS_PIN = "0c2a8aa6893098773aa0b75dd4074e8fae38ef28be9dd35426094fc7054c480d"
 CHECK_EVERY = dt.timedelta(hours=6)
 CLOCK_SLACK = dt.timedelta(hours=2)

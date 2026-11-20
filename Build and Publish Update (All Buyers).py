@@ -123,7 +123,7 @@ def main():
             keys, source = buyers_from_server(), "licence server"
         except Exception as e:
             sys.exit(f"Couldn't get the buyer list from the licence server: {e}\n"
-                     "Is License Server running on 192.168.1.29? (Or pass --keys / --from-csv.)")
+                     "Is License Server running on this PC? (Or pass --keys / --from-csv.)")
     bad = [k for k in keys if not KEY_RX.match(k)]
     if bad:
         sys.exit(f"Not purchase keys: {bad}")

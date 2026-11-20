@@ -525,8 +525,9 @@ ol.steps ul { margin: 6px 0 0; padding-left: 18px; } ol.steps ul li { margin: 4p
 .fl-bar { transition: height .3s; } .fl-bar.fuel { fill: #2fb67c; } .fl-bar.adblue { fill: #4d8fe0; }
 .fl-bar.warn { fill: #f0a92e; } .fl-bar.bad { fill: var(--crimson-400); }
 .fl-legend { display: flex; flex-wrap: wrap; gap: 14px; }
-.fl-legend .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.fl-legend .sw, #fl-log .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
 .sw.fuel { background: #2fb67c; } .sw.adblue { background: #4d8fe0; } .sw.warn { background: #f0a92e; } .sw.bad { background: var(--crimson-400); }
+#fl-log .sw { width: 10px; height: 10px; }
 .fl-axis { margin-top: 4px; }
 @media (max-width: 640px) {
   .fl-tank { width: 76px; height: 170px; } .fl-pct { font-size: 20px; } .fl-tank-row { gap: 14px; }

@@ -51,23 +51,22 @@ This server licenses **Fleet Manager Pro only**: it issues `FMP-` keys and refus
 Leases are signed with your private key and Fleet Manager Pro only trusts your public key, so a fake server can't
 unlock it.
 
-## Your setup (home server)
+## Your setup (cloud server)
 
 | | |
 |---|---|
-| Server PC | `192.168.1.29`, runs **License Server.bat** |
-| Internet address | `fleetmanager.servehttp.com` (free No-IP name; keep the No-IP DUC running on the server PC) |
-| Router | forwards **TCP 8750 only** to 192.168.1.29 (Spectrum: My Spectrum app → Advanced Settings → Port Forwarding) |
+| Server | cloud box, reached over **AnyDesk / Remote Utilities**; runs **License Server.bat** (keep its window open) |
+| Internet address | `fleetmanager.servehttp.com` (free No-IP name pointing at the cloud box) |
+| Port | inbound **TCP 8750** open on the cloud box's firewall |
 | Buyer copies check | `https://fleetmanager.servehttp.com:8750`, pinned to `tls_cert.pem` |
-| Your own copies also try | `https://192.168.1.29:8750` (routers rarely loop the public address back inside your network) |
-| Windows Firewall (server PC) | inbound TCP 8750 allowed (rule "Fleet Manager licence server") |
+| Admin (License Manager) | runs **on the cloud box itself** — `admin_url` is `http://127.0.0.1:8750` |
 
-**Updating the server PC:** copy `license_server.py`, `license_tool.py`, `reset_licences.py`, the `.bat` files and this
-README over the old ones on 192.168.1.29, then close and reopen License Server.bat. Never copy `licenses.db`,
+**Updating the server:** copy `license_server.py`, `license_tool.py`, `reset_licences.py`, the `.bat` files and this
+README over the old ones on the cloud box, then close and reopen License Server.bat. Never copy `licenses.db`,
 `host_key.json`, `server_config.json` or the `.pem` files over the server's own - those hold its keys and purchases.
 
-**Admin is local only:** License Manager's functions only work from the server PC itself or your home network, never
-straight from the internet. Run License Manager on the server PC.
+**Admin is local only:** License Manager's functions only work from the server itself, never straight from the
+internet. AnyDesk / Remote Utilities into the cloud box and run License Manager there.
 
 To move to a cloud server later: **Guides\Kamatera Hosting Guide.pdf** and `deploy\`.
 

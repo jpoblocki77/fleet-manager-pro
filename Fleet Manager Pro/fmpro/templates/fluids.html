@@ -53,6 +53,11 @@
   <div class="between small muted fl-axis"><span id="fl-ax0"></span><span id="fl-ax1"></span><span>now</span></div>
   <div class="grid g4" style="margin-top:14px" id="fl-sum"></div>
 </div>
+
+<div class="card" style="margin-top:16px">
+  <div class="card-head"><h2>{{ icon('fuel') }} Refuel log</h2><span class="right small muted" id="fl-log-when"></span></div>
+  <div id="fl-log" class="table-wrap"></div>
+</div>
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/fluids.js') }}?v={{ VERSION }}"></script>

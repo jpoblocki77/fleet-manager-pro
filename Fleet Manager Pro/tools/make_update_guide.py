@@ -204,7 +204,7 @@ def build():
              "(for example <b>1.3</b> to <b>1.4</b>). The server only offers a version <i>higher</i> than what a "
              "buyer is running, so this is what makes an update “new”.",
              "<b>Make sure the licence server is running</b> (<font face='Courier'>license_server.py</font> on the "
-             "licence-server PC, 192.168.1.29).",
+             "cloud box, reached over AnyDesk / Remote Utilities).",
              "<b>Double-click</b> <font face='Courier'>Build and Publish Update (All Buyers).bat</font> in the "
              "Development folder and type optional release notes."]))
     a(Paragraph("It rebuilds every buyer's sealed copy and publishes each one to your server. Each buyer then sees "
@@ -239,16 +239,15 @@ def build():
                 "to do.", P))
     a(Paragraph("Building on a different PC from the server?", H2))
     a(Paragraph("The publish tools write to the <font face='Courier'>updates</font> folder <b>on whatever PC you "
-                "run them on</b>. So if you build on one PC and the server runs on another (for example the server "
-                "on 192.168.1.29), the new zips will not reach the server on their own. Do one of these:", P))
-    a(bullets(["<b>Copy it across.</b> After publishing, copy the whole "
-               "<font face='Courier'>Fleet Manager License Host\\updates</font> folder onto the server PC, into its "
-               "own <font face='Courier'>Fleet Manager License Host</font> folder (next to "
+                "run them on</b>. So if you build on this PC and the server runs on the cloud box, the new zips will "
+                "not reach the server on their own. Do one of these:", P))
+    a(bullets(["<b>Copy it across.</b> After publishing, zip the whole "
+               "<font face='Courier'>Fleet Manager License Host\\updates</font> folder and transfer it to the cloud "
+               "box (AnyDesk / Remote Utilities file transfer), into its own "
+               "<font face='Courier'>Fleet Manager License Host</font> folder (next to "
                "<font face='Courier'>license_server.py</font>). Choose “replace the files in the destination” when "
-               "Windows asks.",
-               "<b>Run the publishing on the server PC</b> instead, if it has the project folder and Python.",
-               "<b>Share one folder.</b> Point both PCs at a single shared "
-               "<font face='Courier'>updates</font> folder (a mapped network drive or a UNC path)."]))
+               "asked.",
+               "<b>Run the publishing on the cloud box</b> instead, if it has the project folder and Python."]))
     a(Paragraph("<b>Check this first:</b> a buyer can only download an update when the server is running <i>and</i> "
                 "<font face='Courier'>fleetmanager.servehttp.com:8750</font> still points to the server PC's current "
                 "address. If you have changed networks or PCs, confirm that before you publish.", NOTE))

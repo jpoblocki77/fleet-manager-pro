@@ -86,6 +86,23 @@
     $("#fl-sum").innerHTML = stat("Fuel used", FMP.liq(s.fuel_used || 0), when) +
       stat("AdBlue used", FMP.liq(s.adblue_used || 0, 1), when) +
       stat("Refuels", s.refuels || 0, when) + stat("AdBlue top-ups", s.topups || 0, when);
+    renderLog(d.refuel_log || [], when);
+  }
+
+  const logWhen = (t) => new Date(t * 1000).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  function renderLog(log, when) {
+    $("#fl-log-when").textContent = log.length ? log.length + (log.length === 1 ? " fill " : " fills ") + when : "";
+    if (!log.length) {
+      $("#fl-log").innerHTML = `<p class="muted" style="margin:6px 2px">No refuels or AdBlue top-ups ${esc(when)}. Fill up in the game and each one is listed here.</p>`;
+      return;
+    }
+    const rows = log.map((e) => {
+      const isFuel = e.kind === "fuel";
+      return `<tr><td>${esc(logWhen(e.t))}</td><td><i class="sw ${isFuel ? "fuel" : "adblue"}"></i>${isFuel ? "Fuel" : "AdBlue"}</td>` +
+        `<td class="num">+${esc(FMP.liq(e.added, isFuel ? 0 : 1))}</td><td class="num muted">${e.from_pct}% → ${e.to_pct}%</td></tr>`;
+    }).join("");
+    $("#fl-log").innerHTML = `<table class="small"><thead><tr><th>When</th><th>Fluid</th><th class="num">Added</th>` +
+      `<th class="num">Level after</th></tr></thead><tbody>${rows}</tbody></table>`;
   }
 
   let busy = false;

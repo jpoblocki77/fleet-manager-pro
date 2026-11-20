@@ -12,9 +12,9 @@ buyer's copy at the new version and drop it in their folder here.
 
 ## One-time: nothing
 
-The updates live in `updates\` next to `license_server.py` on this PC (192.168.1.29). The folder is created for
-you the first time you publish. The server already reaches buyers as `fleetmanager.servehttp.com:8750`, so there
-is **no new port to open**.
+The updates live in `updates\` next to `license_server.py` on the cloud box (reached over AnyDesk / Remote
+Utilities). The folder is created for you the first time you publish. The server already reaches buyers as
+`fleetmanager.servehttp.com:8750`, so there is **no new port to open**.
 
 ## The easy way: one command for every buyer
 

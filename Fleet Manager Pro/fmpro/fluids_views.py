@@ -48,7 +48,8 @@ def data():
     hist = fluids.history(uid, seconds)
     shown, step = fluids.bars(hist, seconds, now)
     out = {"user_id": uid, "online": bool(e), "units": current_units(), "server_time": now, "range": rng,
-           "window_s": seconds, "sample_s": step, "history": shown, "summary": fluids.summary(hist)}
+           "window_s": seconds, "sample_s": step, "history": shown, "summary": fluids.summary(hist),
+           "refuel_log": fluids.refuel_log(hist)}
     if e:
         v = e["frame"]["values"]
         out["live"] = {k: v.get(k) for k in _LIVE_KEYS}
