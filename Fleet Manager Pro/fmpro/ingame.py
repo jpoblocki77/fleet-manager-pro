@@ -86,7 +86,7 @@ def autostart(app):
 
 
 # ------------------------------------------------------------------------------------------------ the window
-KEYS = {"ctrl": 0x11, "shift": 0x10, "alt": 0x12, "o": 0x4F, "f": 0x46, "f10": 0x79, "f11": 0x7A, "f12": 0x7B}
+KEYS = {"ctrl": 0x11, "shift": 0x10, "alt": 0x12, "o": 0x4F, "f": 0x46, "i": 0x49, "f10": 0x79, "f11": 0x7A, "f12": 0x7B}
 COLORS = {"": "#f2f6fc", "warn": "#f0a92e", "bad": "#ff4d6a", "info": "#7fb2f0"}
 TRANSPARENT = "#010203"                                  # painted pixels of this colour become see-through
 
@@ -186,7 +186,7 @@ class Overlay:
     def _hotkey(self):
         try:
             import ctypes
-            combo = (self.cfg or {}).get("hotkey", "ctrl+shift+o").split("+")
+            combo = (self.cfg or {}).get("hotkey", "ctrl+i").split("+")
             down = all(ctypes.windll.user32.GetAsyncKeyState(KEYS[k]) & 0x8000 for k in combo if k in KEYS)
         except Exception:  # noqa: BLE001
             down = False

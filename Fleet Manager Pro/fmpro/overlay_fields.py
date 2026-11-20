@@ -54,9 +54,9 @@ DEFAULT_FIELDS = ["speed_kmh", "speed_limit_kmh", "gear_label", "route", "naviga
                   "fuel_pct", "hos.status", "hos.available", "hos.break_left"]
 CORNERS = {"tl": "Top left", "tc": "Top middle", "tr": "Top right", "ml": "Middle left", "mr": "Middle right",
            "bl": "Bottom left", "bc": "Bottom middle", "br": "Bottom right"}
-HOTKEYS = {"ctrl+shift+o": "Ctrl + Shift + O", "ctrl+shift+f": "Ctrl + Shift + F", "ctrl+alt+o": "Ctrl + Alt + O",
+HOTKEYS = {"ctrl+i": "Ctrl + I", "ctrl+shift+f": "Ctrl + Shift + F", "ctrl+alt+o": "Ctrl + Alt + O",
            "f10": "F10", "f11": "F11", "ctrl+f12": "Ctrl + F12"}
-DEFAULTS = {"fields": DEFAULT_FIELDS, "corner": "tr", "opacity": 90, "scale": 100, "hotkey": "ctrl+shift+o",
+DEFAULTS = {"fields": DEFAULT_FIELDS, "corner": "tr", "opacity": 90, "scale": 100, "hotkey": "ctrl+i",
             "alerts": True, "hos_warnings": True, "only_driving": True, "autostart": False}
 
 

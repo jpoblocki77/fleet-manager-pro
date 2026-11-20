@@ -36,7 +36,7 @@ GUIDES = {
     ],
     "overlay_setup": [
         "In-game overlay: tick the values you want, choose alerts and where it sits, press Save, then Open the overlay.",
-        "In the game, press the hide/show key (Ctrl + Shift + O unless you changed it). Clicks go straight through it.",
+        "In the game, press the hide/show key (Ctrl + I unless you changed it). Clicks go straight through it.",
         "Run the game in windowed or borderless mode; exclusive full screen hides every other window.",
         "Stream overlay: pick a layout and panels, then Copy the link into an OBS Browser source. Keep that link private.",
     ],
