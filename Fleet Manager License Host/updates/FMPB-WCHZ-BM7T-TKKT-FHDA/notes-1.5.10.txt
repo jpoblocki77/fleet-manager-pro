@@ -1,0 +1,1 @@
+The in-game overlay's hide/show key is now Ctrl+I (if you picked a different key it stays as you set it).
