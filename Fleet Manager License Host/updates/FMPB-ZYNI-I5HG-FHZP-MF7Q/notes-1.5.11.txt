@@ -1,0 +1,1 @@
+Fixes updates that wouldn't install while the in-game overlay was open. If this update seems stuck, close the overlay (or Fleet Manager Pro) and start it again.
