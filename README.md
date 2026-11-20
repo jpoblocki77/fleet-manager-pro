@@ -1,7 +1,7 @@
 # Fleet Manager Pro - Development (seller folder)
 
 Everything for Fleet Manager Pro in one place: the development copy, the licence server, the build scripts and every
-guide. This folder is `D:\Fleet Manager Pro\Fleet Manager Pro RC 1.5.5\Development`. **Never share this folder.** Full instructions: **Guides\Fleet Manager Pro - Seller Guide.pdf**.
+guide. This folder is `D:\Fleet Manager Pro\Fleet Manager Pro RC 1.5.7\Development`. **Never share this folder.** Full instructions: **Guides\Fleet Manager Pro - Seller Guide.pdf**.
 
 | Here | What it is | Share it? |
 |---|---|---|
@@ -48,7 +48,7 @@ After a game update or new DLC run `python tools\build_cargo.py`.
 
 ## The packaged release on D:
 
-`D:\Fleet Manager Pro\Fleet Manager Pro RC 1.5.5\` holds this Development folder, `Build Output\` (fresh buyer
+`D:\Fleet Manager Pro\Fleet Manager Pro RC 1.5.7\` holds this Development folder, `Build Output\` (fresh buyer
 copies), the guides, database backups and a private backup of the licence host. Its `READ ME FIRST.txt`
 explains each folder. The source code is here and in the private GitHub repo.
 

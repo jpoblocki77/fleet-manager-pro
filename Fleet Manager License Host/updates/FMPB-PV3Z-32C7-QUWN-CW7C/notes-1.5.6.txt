@@ -1,0 +1,1 @@
+1.5.6: new refuel log on the Fuel & AdBlue page; page tips now tailored to your role; the in-game overlay stays on top of the game on a single screen; and the logbook warns you 15 minutes before an Hours of Service limit.
