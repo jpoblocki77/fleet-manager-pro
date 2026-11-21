@@ -43,12 +43,18 @@ def running():
         return bool(p and p.poll() is None)
 
 
+def local_port(app):
+    """The plain-http port this PC's own copy answers on at 127.0.0.1: the normal port, or in LAN mode the
+    private back-end port behind the HTTPS front door (LAN mode used to leave the overlay with no port at all)."""
+    return app.config.get("OVERLAY_PORT") or app.config.get("PORT")
+
+
 def start(port, key):
     """Open the overlay window (does nothing if it is already open). Returns None or a reason it can't."""
     if os.name != "nt":
         return "The in-game overlay works on Windows only."
     if not port or not key:
-        return "Start Fleet Manager Pro normally (not in LAN mode) to use the in-game overlay."
+        return "The in-game overlay can't find Fleet Manager Pro on this PC. Restart Fleet Manager Pro and try again."
     with _lock:
         if _proc[0] and _proc[0].poll() is None:
             return None
@@ -80,7 +86,7 @@ def autostart(app):
             uid = local_user()
             if uid and overlay_fields.config(uid)["autostart"]:
                 key = db.val("SELECT agent_token FROM users WHERE id=?", (uid,))
-                start(app.config.get("PORT"), key)
+                start(local_port(app), key)
     except Exception:  # noqa: BLE001 - the overlay is optional; never stop the app starting
         log.exception("in-game overlay autostart failed")
 

@@ -88,7 +88,10 @@ def main():
     app.config["LAN"] = {"scheme": "http" if a.insecure_http else "https", "port": a.port}
     from fmpro import upnp
     upnp.refresh_on_start(app, a.port)        # what the owner chose on Connect a Driver: current IP, port kept open
+    from fmpro import ingame
     if a.insecure_http:
+        app.config["OVERLAY_PORT"] = a.port                    # the in-game overlay talks to this PC directly
+        ingame.autostart(app)
         print(f"  Other PCs: http://{ip}:{a.port}   (NOT encrypted - passwords cross your network in the clear)")
         print("  Press Ctrl+C to stop.\n")
         if not a.no_browser:
@@ -105,6 +108,8 @@ def main():
     backend = _free_port()
     tlsfront.start("0.0.0.0", a.port, backend, cert, key)  # nosec B104  # listens on the network on purpose so other PCs can connect; admin is LAN-only + token
     app.wsgi_app = tlsfront.Middleware(app.wsgi_app)
+    app.config["OVERLAY_PORT"] = backend                       # the in-game overlay uses the private local port
+    ingame.autostart(app)
     print(f"  Other PCs: https://{ip}:{a.port}   (encrypted; browsers show a one-time warning for the self-made certificate)")
     print(f"  Certificate fingerprint (for agents, --pin): {pin}")
     print("  Press Ctrl+C to stop.\n")

@@ -293,7 +293,7 @@ def overlay_ingame():
         abort(403)
     if action == "start":
         key = db.val("SELECT agent_token FROM users WHERE id=?", (local,))
-        why = ingame.start(current_app.config.get("PORT"), key)
+        why = ingame.start(ingame.local_port(current_app), key)
         flash(why or "In-game overlay opened. Press its hotkey in the game to hide or show it.", "error" if why else "success")
     elif action == "stop":
         ingame.stop()

@@ -406,7 +406,31 @@ def main():
     check(overlay_fields.hos_warnings({"hos": {"available": 0, "break_left": 100, "status": "off", "cycle_left": 0}}, {})[0][0]
           == "drive-0", "out of drive time is a red warning")
     check(not ingame.running() and b"didn" not in post("/overlay/ingame", {"action": "start"}).data
-          and not ingame.running(), "the overlay window isn't started where the app has no local port (tests, LAN mode)")
+          and not ingame.running(), "the overlay window isn't started where the app has no local port (tests)")
+    # LAN mode: the app serves on a private local port behind the HTTPS front door; the overlay must use it
+    started_ = []
+
+    class _FakeProc:
+        pid = 4242
+        def poll(self): return None
+        def terminate(self): started_.append("stopped")
+
+    real_popen_ = ingame.subprocess.Popen
+    ingame.subprocess.Popen = lambda cmd, env=None, **k: (started_.append((cmd, env.get("FMP_OVERLAY_KEY"))), _FakeProc())[1]
+    app.config["LAN"], app.config["OVERLAY_PORT"] = {"scheme": "https", "port": 8760}, 54321
+    try:
+        r_ = post("/overlay/ingame", {"action": "start"}, follow_redirects=True)
+        cmd_ = started_[0][0] if started_ else []
+        check(ingame.running() and cmd_[-2:] == ["--port", "54321"] and started_[0][1]
+              and b"In-game overlay opened" in r_.data,
+              "in LAN mode the overlay opens and talks to the app's local port (it used to refuse)")
+        check(ingame.local_port(app) == 54321, "the overlay's port is the local one, not the network port")
+    finally:
+        ingame.stop()
+        ingame.subprocess.Popen = real_popen_
+        app.config.pop("LAN", None)
+        app.config.pop("OVERLAY_PORT", None)
+    check(not ingame.running(), "and it closes again")
     page_ = c.get("/overlay?show=fields,alerts").get_data(as_text=True)
     check('data-part="fields"' in page_ and 'id="ov-toasts"' in page_, "the stream overlay can show the chosen values and alerts")
     overlay_fields.save(uid, {})
