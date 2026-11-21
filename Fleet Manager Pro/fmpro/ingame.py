@@ -151,8 +151,8 @@ class Overlay:
             import ctypes
             # HWND_TOPMOST=-1; SWP_NOSIZE|SWP_NOMOVE|SWP_NOACTIVATE|SWP_NOOWNERZORDER so z-order is the only change
             ctypes.windll.user32.SetWindowPos(self.hwnd, -1, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010 | 0x0200)
-        except Exception:  # noqa: BLE001 - the -topmost attribute still applies
-            pass
+        except Exception as e:  # noqa: BLE001 - the -topmost attribute still applies
+            log.debug("overlay: SetWindowPos topmost failed: %s", e)
 
     def font(self, size, bold=False):
         k = (size, bold)
@@ -303,6 +303,6 @@ def main(port):
         ctypes.windll.kernel32.CreateMutexW(None, False, MUTEX)
         if ctypes.windll.kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS: an overlay is already open
             return
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as e:  # noqa: BLE001 - no single-instance guard; open the overlay anyway
+        log.debug("overlay: single-instance check unavailable: %s", e)
     Overlay(port, key).run()
