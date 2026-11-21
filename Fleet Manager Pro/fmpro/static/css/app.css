@@ -533,3 +533,9 @@ ol.steps ul { margin: 6px 0 0; padding-left: 18px; } ol.steps ul li { margin: 4p
   .fl-tank { width: 76px; height: 170px; } .fl-pct { font-size: 20px; } .fl-tank-row { gap: 14px; }
   .fl-chart svg { width: 640px; max-width: none; }
 }
+
+/* Connect a Driver */
+.step-no { display: inline-grid; place-items: center; width: 22px; height: 22px; margin-right: 8px; border-radius: 50%;
+  background: var(--crimson); color: #fff; font-size: 12px; font-weight: 700; vertical-align: 2px; }
+.connect-grid .cmd-line { width: 100%; min-width: 0; resize: none; font-size: 12px; line-height: 1.45; word-break: break-all; }
+@media (max-width: 700px) { .connect-grid .row { flex-wrap: wrap !important; } }

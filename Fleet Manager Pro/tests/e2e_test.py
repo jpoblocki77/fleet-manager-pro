@@ -1228,6 +1228,40 @@ def main():
     check("/pair/****" in logged and code not in logged and dc not in logged, "pairing codes never appear in the logs")
     app.config.pop("LAN", None)
 
+    # Connect a Driver + allowed host names
+    from fmpro import auth as _auth, pages as _pages
+    check(_pages.clean_hosts("Fleet.Example.com, https://x.ddns.net:8760/path  bad_name!, fleet.example.com") ==
+          (["fleet.example.com", "x.ddns.net"], ["bad_name!"]), "host names are cleaned: case, scheme, port and path dropped, junk rejected")
+    post("/settings", {"section": "telemetry", "allowed_hosts": "Fleet.Example.com, not a host!"})
+    check(db.setting("allowed_hosts") == "fleet.example.com, not, a", "Settings saves the allowed host names it can use")
+    post("/settings", {"section": "telemetry", "allowed_hosts": "fleet.example.com"})
+    check(_auth.host_allowed("fleet.example.com:8760") and not _auth.host_allowed("evil.example.net"),
+          "an allowed host name is accepted; others are still refused")
+    check('name="allowed_hosts"' in c.get("/settings?tab=telemetry").get_data(as_text=True), "the box is on the Telemetry tab")
+    check(uc.get("/drivers/connect").status_code in (302, 403), "a driver can't open Connect a driver")
+    page = c.get("/drivers/connect").get_data(as_text=True)
+    check("Start Fleet Manager Pro (LAN).bat" in page and "--token" not in page, "without LAN mode the page explains step 1 and shows no command")
+    app.config["LAN"] = {"scheme": "https", "port": 8760}
+    drv = db.one("SELECT id, agent_token FROM users WHERE username='up_driver'")
+    r = post("/drivers/connect", {"public_address": "https://MyCo.DDNS.net:8760/"})
+    check(r.status_code == 302 and db.setting("public_address") == "myco.ddns.net" and _auth.host_allowed("myco.ddns.net"),
+          "saving a host name as the internet address also allows it")
+    check(post("/drivers/connect", {"public_address": "not valid!"}).status_code == 302 and db.setting("public_address") == "myco.ddns.net",
+          "a bad address is refused and the old one kept")
+    page = c.get(f"/drivers/connect?driver={drv['id']}").get_data(as_text=True)
+    pin = __import__("fmpro.tlsfront", fromlist=["x"]).fingerprint(app.config["DATA_DIR"])
+    want = f"--server https://myco.ddns.net:8760 --token {drv['agent_token']}" + (f" --pin {pin}" if pin else "")
+    check(want in page and "--server https://192.168.1.50:8760" in page, "the page builds the internet and home-network lines for the picked driver")
+    r = c.get(f"/drivers/{drv['id']}/agent.bat?where=internet")
+    bat = r.get_data(as_text=True)
+    check(r.status_code == 200 and "attachment" in r.headers.get("Content-Disposition", "") and want in bat and bat.startswith("@echo off"),
+          "Download file gives the driver a ready-to-run .bat")
+    check(uc.get(f"/drivers/{drv['id']}/agent.bat").status_code in (302, 403, 404), "a driver can't download connection files")
+    check('href="/drivers/connect"' in c.get("/drivers").get_data(as_text=True), "the Drivers page links to Connect a driver")
+    db.set_setting("public_address", "")
+    db.set_setting("allowed_hosts", "")
+    app.config.pop("LAN", None)
+
     # Tablet access from the normal exe (no LAN .bat): a switch opens an HTTPS door on port+1, no restart
     import socket as _sock
     import ssl as _ssl
@@ -1903,6 +1937,16 @@ def main():
     sc.post("/settings", data=form)
     check(abs(db.setting_f("fuel_price") - 4 / 3.785411784) < 1e-6 and abs(db.setting_f("driver_pay_per_km") - 1 / 1.609344) < 1e-6
           and abs(db.setting_f("speeding_tolerance_kmh") - 16.09344) < 1e-6, "values typed in imperial are stored correctly in metric")
+    pdrv = db.val("SELECT id FROM users WHERE username='up_driver'")
+    db.ex("UPDATE users SET pay_per_km=0.5 WHERE id=?", (pdrv,))
+    prof = sc.get(f"/drivers/{pdrv}").get_data(as_text=True)
+    check("Pay per mile (blank = default)" in prof and 'value="0.80"' in prof and "/mi</dd>" in prof,
+          "imperial: a driver's own pay rate is shown and edited per mile on their profile")
+    sc.post(f"/drivers/{pdrv}/edit", data={"units": "imperial", "pay_per_km": "0.80", "csrf": stok})
+    check(db.val("SELECT pay_per_km FROM users WHERE id=?", (pdrv,)) == 0.5, "saving the profile unchanged keeps the exact per-km rate")
+    sc.post(f"/drivers/{pdrv}/edit", data={"units": "imperial", "pay_per_km": "1.00", "csrf": stok})
+    check(abs(db.val("SELECT pay_per_km FROM users WHERE id=?", (pdrv,)) - 1 / 1.609344) < 1e-9, "a per-mile pay rate is stored per km")
+    db.ex("UPDATE users SET pay_per_km=NULL WHERE id=?", (pdrv,))
     db.set_setting("units", "metric")
     page = sc.get("/settings?tab=economy").get_data(as_text=True)
     check("Fuel price per litre" in page and "Driver pay per km" in page and "Speeding tolerance (km/h)" in page

@@ -4,7 +4,7 @@
 {% block content %}
 <div class="page-head banner banner-drivers" title="Photo: Bhargav Panchal / Unsplash">
   <div><h1>Drivers</h1><p>{{ rows|length }} members. Roles, divisions, levels and who's on the road.</p></div>
-  {% if can('admin') %}<div class="actions"><button class="btn" data-open="dlg-div">Divisions</button><button class="btn primary" data-open="dlg-new">{{ icon('plus') }}Add member</button>{% if current_user().role == 'owner' and former %}<form method="post" action="/drivers/purge-former" style="display:inline">{{ csrf() }}<button class="btn danger" title="Members removed with an older version are still in the database" data-confirm="Delete {{ former }} former member(s) from the database for good? Their deliveries and pay stay in the books as Former driver.">Delete {{ former }} former member(s)</button></form>{% endif %}</div>{% endif %}
+  {% if can('admin') %}<div class="actions"><a class="btn" href="/drivers/connect">{{ icon('live') }}Connect a driver</a><button class="btn" data-open="dlg-div">Divisions</button><button class="btn primary" data-open="dlg-new">{{ icon('plus') }}Add member</button>{% if current_user().role == 'owner' and former %}<form method="post" action="/drivers/purge-former" style="display:inline">{{ csrf() }}<button class="btn danger" title="Members removed with an older version are still in the database" data-confirm="Delete {{ former }} former member(s) from the database for good? Their deliveries and pay stay in the books as Former driver.">Delete {{ former }} former member(s)</button></form>{% endif %}</div>{% endif %}
 </div>
 <div class="grid g3">
 {% for r in rows %}

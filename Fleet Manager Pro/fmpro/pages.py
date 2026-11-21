@@ -944,7 +944,15 @@ def driver_edit(uid):
             cols["status"] = st
         cols["division_id"] = opt_id("division_id", "divisions")
         rate = request.form.get("pay_per_km", "").strip()
-        cols["pay_per_km"] = num("pay_per_km", 0, 100) if rate else None
+        if not rate:
+            cols["pay_per_km"] = None
+        else:
+            v = num("pay_per_km", 0, 1000)
+            if request.form.get("units") == "imperial":     # typed per mile; stored per km
+                old = p["pay_per_km"]
+                shown = round(old * KM_PER_MI, 2) if old is not None else None
+                v = old if shown is not None and abs(v - shown) < 1e-9 else v / KM_PER_MI   # unchanged keeps the exact rate
+            cols["pay_per_km"] = max(0.0, min(100.0, v))
         if request.form.get("new_password"):
             if valid_password(request.form["new_password"], p["username"]):
                 from werkzeug.security import generate_password_hash
@@ -996,6 +1004,105 @@ def division_save():
         db.insert("divisions", name=name, description=txt("description", 200),
                   color=color if re.fullmatch(r"#[0-9a-fA-F]{6}", color) else "#c8102e")
     return redirect(url_for("pages.drivers"))
+
+
+# ------------------------------------------------------------------ connect a remote driver
+def _connect_info():
+    """Everything the Connect a driver page needs to build an agent command: whether this PC accepts other PCs (LAN
+    mode), its scheme / port / certificate fingerprint, its addresses on the home network and the internet address
+    the owner typed in."""
+    from . import AGENT_CMD, tlsfront
+    from .tablet import lan_addresses
+    lan = current_app.config.get("LAN")
+    pin = tlsfront.fingerprint(current_app.config["DATA_DIR"]) if lan and lan.get("scheme") == "https" else None
+    return {"lan": lan, "pin": pin, "local": lan_addresses(), "public": db.setting("public_address", "") or "",
+            "agent_cmd": AGENT_CMD}
+
+
+def agent_command(info, host, token):
+    """The exact line a driver runs, or None while this PC isn't accepting other PCs."""
+    lan = info["lan"]
+    if not lan or not host or not token:
+        return None
+    line = f"{info['agent_cmd']} --server {lan['scheme']}://{host}:{lan['port']} --token {token}"
+    return line + (f" --pin {info['pin']}" if info["pin"] else "")
+
+
+def _connectable():
+    me = user()
+    rows = db.q("SELECT id, display_name, role, agent_token FROM users WHERE status!='removed' ORDER BY display_name")
+    return [r for r in rows if _manages(r)] if me else []
+
+
+@bp.route("/drivers/connect", methods=["GET", "POST"])
+@login_required(role="admin")
+def drivers_connect():
+    """Walk the Owner or a Manager through letting a driver send their game from another PC over the internet."""
+    if request.method == "POST":
+        raw = txt("public_address", 253).lower()
+        raw = re.sub(r"^[a-z]+://", "", raw).split("/")[0]
+        raw = raw.rsplit(":", 1)[0] if raw.count(":") == 1 else raw
+        if not raw:
+            db.set_setting("public_address", "")
+            flash("Internet address cleared.", "success")
+        else:
+            import ipaddress
+            try:
+                ipaddress.ip_address(raw)
+                is_ip = True
+            except ValueError:
+                is_ip = False
+            if not is_ip and not HOST_RX.match(raw):
+                flash("That isn't an IP address or a host name.", "error")
+                return redirect(url_for("pages.drivers_connect"))
+            db.set_setting("public_address", raw)
+            added = allow_host(raw)
+            db.audit(user()["id"], "public address", raw)
+            flash("Internet address saved." + (f" {raw} was also added to the allowed host names (Settings, Telemetry tab)."
+                                              if added else ""), "success")
+        return redirect(url_for("pages.drivers_connect", driver=request.args.get("driver") or None))
+    info = _connect_info()
+    people = _connectable()
+    pick = next((p for p in people if str(p["id"]) == request.args.get("driver", "")), None)
+    pick = pick or next((p for p in people if p["role"] != "owner"), None) or (people[0] if people else None)
+    cmds = {}
+    if pick:
+        token = pick["agent_token"]
+        if info["public"]:
+            cmds["internet"] = agent_command(info, info["public"], token)
+        if info["local"]:
+            cmds["home"] = agent_command(info, info["local"][0], token)
+    return render_template("drivers_connect.html", info=info, people=people, pick=pick, cmds=cmds,
+                           port=(info["lan"] or {}).get("port") or 8760)
+
+
+@bp.route("/drivers/<int:uid>/agent.bat")
+@login_required(role="admin")
+def driver_agent_bat(uid):
+    """A ready-to-run file for the driver: put it in their Fleet Manager Pro folder and double-click it."""
+    p = db.one("SELECT id, display_name, role, agent_token FROM users WHERE id=? AND status!='removed'", (uid,))
+    if not p or not _manages(p):
+        abort(404)
+    info = _connect_info()
+    where = request.args.get("where", "internet")
+    host = info["public"] if where == "internet" else (info["local"][0] if info["local"] else "")
+    line = agent_command(info, host, p["agent_token"])
+    if not line:
+        flash("Start in LAN mode and set the address first.", "error")
+        return redirect(url_for("pages.drivers_connect", driver=uid))
+    company = re.sub(r"[^A-Za-z0-9 _-]", "", db.setting("company_name", "") or "the company").strip() or "the company"
+    body = ("@echo off\r\n"
+            f"title Fleet Manager Pro - sending your game to {company}\r\n"
+            'cd /d "%~dp0"\r\n'
+            f"echo Sending your truck to {company}. Leave this window open while you drive.\r\n"
+            f"{line}\r\n"
+            "pause\r\n")
+    db.audit(user()["id"], "agent file", f"#{uid} {where}")
+    name = re.sub(r"[^A-Za-z0-9_-]", "", f"Connect-to-{company.replace(' ', '-')}")[:60] or "Connect"
+    resp = current_app.response_class(body, mimetype="application/octet-stream")
+    resp.headers["Content-Disposition"] = f'attachment; filename="{name}.bat"'
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 
 # ------------------------------------------------------------------ recruitment
@@ -1388,7 +1495,42 @@ SETTING_FIELDS = {
     "hos_enabled": ("bool", None), "hos_rules_ats": ("choice", ("us70", "us60")), "hos_rules_ets2": ("choice", ("eu",)),
     "hos_fine": ("num", (0, 1e6)), "dvir_required": ("bool", None), "dvir_fine": ("num", (0, 1e6)),
     "fluid_alerts": ("bool", None), "inspections_enabled": ("bool", None), "inspection_chance_pct": ("num", (0, 100)), "oos_fine": ("num", (0, 1e6)),
+    "allowed_hosts": ("hosts", 400),
 }
+
+HOST_RX = re.compile(r"^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$")
+
+
+def clean_hosts(raw):
+    """'a.example.com, b.net' -> (['a.example.com', 'b.net'], [bad entries]). Accepts commas, spaces or new lines;
+    strips http(s)://, a path or a :port someone pasted with it."""
+    good, bad = [], []
+    for part in re.split(r"[\s,;]+", (raw or "").strip().lower()):
+        if not part:
+            continue
+        h = re.sub(r"^[a-z]+://", "", part).split("/")[0]
+        h = h.rsplit(":", 1)[0] if h.count(":") == 1 else h
+        if HOST_RX.match(h) and h not in good:
+            good.append(h)
+        elif h not in good:
+            bad.append(part)
+    return good, bad
+
+
+def allow_host(host):
+    """Add one host name to the allowed list (IP addresses never need it). True when it was added."""
+    hosts, _ = clean_hosts(db.setting("allowed_hosts", ""))
+    h = (host or "").strip().lower()
+    try:
+        import ipaddress
+        ipaddress.ip_address(h)
+        return False
+    except ValueError:
+        pass
+    if not HOST_RX.match(h) or h in hosts:
+        return False
+    db.set_setting("allowed_hosts", ", ".join(hosts + [h]))
+    return True
 
 
 @bp.route("/settings", methods=["GET", "POST"])
@@ -1421,6 +1563,11 @@ def settings():
                     db.set_setting(key, v)
                 else:
                     flash("Webhook URL must start with https://", "error")
+            elif kind == "hosts":
+                good, bad = clean_hosts(request.form.get(key, "")[:arg])
+                db.set_setting(key, ", ".join(good))
+                if bad:
+                    flash("Left out (not a host name): " + ", ".join(bad[:5]), "error")
             else:
                 db.set_setting(key, txt(key, arg))
         if "telemetry_user_id" in request.form:

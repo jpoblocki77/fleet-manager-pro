@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, csrf %}
+{% block title %}Connect a Driver{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Connect a Driver</h1><p>Let a driver send their game from their own PC, anywhere, so their jobs, truck and logbook show up here under their name.</p></div>
+  <div class="actions"><a class="btn" href="/drivers">{{ icon('users') }}Drivers</a></div>
+</div>
+
+<div class="grid g2 connect-grid">
+  <div class="stack">
+    <div class="card">
+      <div class="card-head"><h2><span class="step-no">1</span>Let other PCs in</h2>
+        <span class="right">{% if info.lan %}<span class="badge active">on, port {{ info.lan.port }}</span>{% else %}<span class="badge warn">this PC only</span>{% endif %}</span></div>
+      {% if info.lan %}
+      <p class="small muted" style="margin-top:0">Fleet Manager Pro is accepting other PCs{% if info.lan.scheme == 'https' %} over an encrypted (HTTPS) link{% else %} <b>without encryption</b>{% endif %}.</p>
+      {% if info.pin %}<p class="small muted">This PC's certificate fingerprint (drivers' copies check it, so nobody can pretend to be you):<br><span class="mono" style="word-break:break-all">{{ info.pin }}</span></p>{% endif %}
+      {% else %}
+      <p style="margin-top:0">Right now only this PC can use Fleet Manager Pro.</p>
+      <ol class="steps">
+        <li>Close Fleet Manager Pro.</li>
+        <li>In its folder, double-click <b>Start Fleet Manager Pro (LAN).bat</b>.</li>
+        <li>If Windows asks whether to allow it on networks, click <b>Allow</b>.</li>
+        <li>Come back to this page.</li>
+      </ol>
+      {% endif %}
+    </div>
+
+    <form class="card" method="post">{{ csrf() }}
+      <div class="card-head"><h2><span class="step-no">2</span>Your internet address</h2>
+        <span class="right">{% if info.public %}<span class="badge active">set</span>{% else %}<span class="badge">not set</span>{% endif %}</span></div>
+      <p class="small muted" style="margin-top:0">The address drivers outside your home use to reach this PC. Type your public IP address
+        (search the web for <i>what is my IP</i> on this PC), or better, a free dynamic-DNS name (No-IP, Duck DNS and others),
+        which keeps working when your internet provider changes your IP.</p>
+      <div class="row" style="gap:8px;flex-wrap:nowrap">
+        <input name="public_address" value="{{ info.public }}" maxlength="253" placeholder="e.g. 203.0.113.25 or mycompany.ddns.net" aria-label="Internet address" style="flex:1">
+        <button class="btn primary">Save</button></div>
+      <p class="hint">A name you type here is added to the allowed host names automatically (Settings, Telemetry tab).</p>
+    </form>
+
+    <div class="card">
+      <div class="card-head"><h2><span class="step-no">3</span>Open the door on your router</h2></div>
+      <p class="small muted" style="margin-top:0">Your router blocks the internet by default. Once, in your router's settings (often <span class="mono">192.168.1.1</span> or <span class="mono">192.168.0.1</span> in a browser), find <b>Port forwarding</b> and add:</p>
+      <dl class="kv">
+        <dt>Port</dt><dd class="mono">{{ port }}</dd>
+        <dt>Protocol</dt><dd>TCP</dd>
+        <dt>Send to (this PC)</dt><dd class="mono">{{ info.local[0] if info.local else 'this PC\'s address' }}</dd>
+      </dl>
+      <p class="hint">Drivers on your own Wi-Fi don't need this. Keep this PC on, with Fleet Manager Pro open in LAN mode, while drivers drive.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2><span class="step-no">4</span>Send the driver their connection</h2></div>
+    {% if not people %}
+    <p class="muted">Add a driver first on the <a href="/drivers">Drivers</a> page.</p>
+    {% else %}
+    <form method="get" class="row" style="gap:8px;margin-bottom:12px">
+      <label for="driver-pick" class="small muted">Driver</label>
+      <select id="driver-pick" name="driver" onchange="this.form.submit()">{% for p in people %}<option value="{{ p.id }}" {{ 'selected' if pick and p.id == pick.id }}>{{ p.display_name }}{% if p.role == 'owner' %} (you, on another PC){% endif %}</option>{% endfor %}</select>
+      <noscript><button class="btn sm">Show</button></noscript>
+    </form>
+
+    {% if not info.lan %}
+    <p class="muted">Do step 1 first: the connection line appears here once this PC accepts other PCs.</p>
+    {% else %}
+    {% for where, title, hint in [('internet', 'From anywhere (internet)', 'Needs steps 2 and 3.'), ('home', 'On your own Wi-Fi', 'Only works on the same network as this PC.')] %}
+    <h3 style="margin:14px 0 6px">{{ title }}</h3>
+    {% if cmds.get(where) %}
+    <div class="cmd-box">
+      <textarea class="cmd-line mono" readonly rows="4" aria-label="{{ title }} command">{{ cmds[where] }}</textarea>
+      <div class="row" style="gap:8px;margin-top:6px">
+        <a class="btn sm primary" href="/drivers/{{ pick.id }}/agent.bat?where={{ where }}">{{ icon('download') }}Download file</a>
+        <button type="button" class="btn sm copy-btn">Copy the line</button>
+      </div>
+    </div>
+    <p class="hint">{{ hint }}</p>
+    {% elif where == 'internet' %}
+    <p class="small muted">Save your internet address in step 2 to get this line.</p>
+    {% else %}
+    <p class="small muted">This PC isn't on a network.</p>
+    {% endif %}
+    {% endfor %}
+
+    <h3 style="margin:18px 0 6px">What the driver does</h3>
+    <ol class="steps small">
+      <li>Copy the Fleet Manager Pro folder onto their PC. No purchase key is needed to send their game.</li>
+      <li>Install the game plugin: copy <span class="mono">plugin\scs-telemetry.dll</span> into <span class="mono">&lt;game folder&gt;\bin\win_x64\plugins\</span>.</li>
+      <li>Put the downloaded file into that Fleet Manager Pro folder and double-click it (or run the line above there). Leave its window open.</li>
+      <li>Start the game and drive. Jobs show up here under <b>{{ pick.display_name }}</b>.</li>
+    </ol>
+    <p class="hint">The line contains {{ pick.display_name }}'s private token: send it only to them. If it leaks, press <b>New token</b> on <a href="/drivers/{{ pick.id }}">their profile</a> and send the new one.</p>
+    {% endif %}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll(".copy-btn").forEach((b) => b.addEventListener("click", () => {
+  const i = b.closest(".cmd-box").querySelector(".cmd-line"); i.select();
+  (navigator.clipboard ? navigator.clipboard.writeText(i.value) : Promise.reject()).catch(() => document.execCommand("copy"));
+  b.textContent = "Copied"; setTimeout(() => { b.textContent = "Copy the line"; }, 1500);
+}));
+</script>
+{% endblock %}

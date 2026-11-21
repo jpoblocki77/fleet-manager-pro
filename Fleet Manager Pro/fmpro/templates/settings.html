@@ -71,6 +71,15 @@
   <code>https://THIS-PC:8760</code> (encrypted; the browser shows a one-time warning because the certificate is self-made).
   Each driver's profile page shows the exact agent command with their token and this server's fingerprint.</p>
   {% if lan_pin %}<p class="small muted">Certificate fingerprint: <span class="mono" style="word-break:break-all">{{ lan_pin }}</span></p>{% endif %}
+  <p class="small muted"><a href="/drivers/connect">Connect a driver</a> walks you through it and builds each driver's command for you.</p>
+  <form method="post" style="margin-top:10px">{{ csrf() }}<input type="hidden" name="section" value="telemetry">
+    <div class="field"><label for="allowed_hosts">Allowed host names</label>
+      <input id="allowed_hosts" name="allowed_hosts" value="{{ S.allowed_hosts or '' }}" maxlength="400" placeholder="e.g. mycompany.ddns.net, fleet.example.com">
+      <div class="hint">Names other PCs may use to reach this PC, separated by commas: for example a free dynamic-DNS name that
+        always points at your home internet address. IP addresses and this PC's own name always work. Anything else is
+        refused, which stops other websites reaching Fleet Manager Pro through your browser.</div></div>
+    <button class="btn sm primary">Save host names</button>
+  </form>
 </div>
 </div>
 

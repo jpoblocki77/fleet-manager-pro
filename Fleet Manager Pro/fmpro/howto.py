@@ -124,6 +124,13 @@ GUIDES = {
         "Everyone in the company. Click a member to see their profile, jobs and records.",
         ("admin", "Press Add member to create a login for a new driver and set their role."),
         ("admin", "Divisions groups drivers into teams; former members can be deleted once they have left."),
+        ("admin", "Connect a driver sets up a driver who plays on their own PC, at home or anywhere, so their jobs show up here."),
+    ],
+    "drivers_connect": [
+        "Work down the steps: let other PCs in (LAN mode), save your internet address, open the port on your router once.",
+        "Pick the driver, then Download file (or Copy the line) and send it to them. Only that driver should get it: it holds their private token.",
+        "The driver puts the file in their own Fleet Manager Pro folder, double-clicks it and leaves it open while they drive.",
+        "Keep this PC on with Fleet Manager Pro open in LAN mode while drivers are on the road.",
     ],
     "driver": [
         "This member's profile: recent jobs, favourite cargo, top destinations, achievements and records.",
