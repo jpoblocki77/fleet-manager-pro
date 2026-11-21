@@ -1,0 +1,1 @@
+New Connect a Driver page (Drivers): set up drivers who play on their own PC anywhere, with a ready-to-run file to send them. Allowed host names in Settings, Telemetry tab. Driver pay rates now show per mile with ATS units.
