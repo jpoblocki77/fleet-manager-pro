@@ -1,0 +1,1 @@
+Beta release. Includes everything from 1.5.13-alpha: router setup on Connect a Driver, leaving or dissolving a company, and a separate Discord channel for new driver applications.
