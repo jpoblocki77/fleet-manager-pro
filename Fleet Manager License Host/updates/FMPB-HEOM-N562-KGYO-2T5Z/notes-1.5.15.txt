@@ -1,0 +1,1 @@
+Fixes lost driver applications: every application now reaches your Recruitment page. Small in-game overlay reliability fix.
