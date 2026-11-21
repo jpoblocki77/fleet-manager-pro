@@ -1,0 +1,1 @@
+Connect a Driver: Find it for me reads your internet address from the router, and Open the port for me sets up the router for you. Drivers can now leave a company from their profile, and owners can dissolve the company (Settings, Data tab). New driver applications can post to their own Discord channel.
