@@ -111,9 +111,16 @@
   <div class="field"><label>Webhook URL</label><input name="discord_webhook" value="{{ S.discord_webhook }}" placeholder="https://discord.com/api/webhooks/…" maxlength="300">
     <div class="hint">Discord → Server Settings → Integrations → Webhooks → New Webhook → Copy URL.</div></div>
   {{ check('webhook_on_delivery', 'Post every delivery') }}
-  {{ check('webhook_on_event', 'Post announcements, events, contracts and applications') }}
+  {{ check('webhook_on_event', 'Post announcements, events and contracts') }}
+  <h3 style="margin:18px 0 6px">New driver applications</h3>
+  {{ check('webhook_on_application', 'Post each new driver application') }}
+  <div class="field"><label>Applications webhook URL (optional)</label><input name="webhook_applications" value="{{ S.webhook_applications }}" placeholder="Blank = the webhook above" maxlength="300">
+    <div class="hint">Make a webhook in a staff-only channel so applications aren't posted where every driver sees them.</div></div>
   <div class="row"><button class="btn primary">Save</button></div></form>
-<form method="post" action="/settings/webhook-test" style="margin-top:10px">{{ csrf() }}<button class="btn">Send test message</button></form>
+<div class="row" style="gap:8px;margin-top:10px">
+  <form method="post" action="/settings/webhook-test">{{ csrf() }}<button class="btn">Send test message</button></form>
+  <form method="post" action="/settings/webhook-test">{{ csrf() }}<input type="hidden" name="which" value="applications"><button class="btn">Test the applications webhook</button></form>
+</div>
 
 {% elif tab == 'recruitment' %}
 <form method="post" class="card" style="max-width:820px">{{ csrf() }}<input type="hidden" name="section" value="recruitment">
@@ -161,6 +168,35 @@
   {% else %}<tr><td class="empty">There is nothing to clear.</td></tr>{% endfor %}</tbody></table>
   <button class="btn danger" data-open="dlg-clear">Clear all data…</button>
 </div>
+<div class="card" id="dissolve" style="max-width:820px;border-color:var(--crimson);margin-top:16px">
+  <h2>Dissolve the company</h2>
+  <p>Ends the VTC. Every member except you leaves for good, as if fired: their accounts and personal records are deleted
+    and their connections from their own PCs stop and close by themselves. Recruiting closes, and if Fleet Manager Pro
+    opened a port on your router, it's closed again. Your internet address and extra host names are forgotten.</p>
+  <p class="muted">Choose whether to keep your own books (jobs, money, fleet; past deliveries show as "Former driver")
+    or erase everything too. Erasing saves a backup to <code>data\backups</code> first.</p>
+  <button class="btn danger" data-open="dlg-dissolve">Dissolve the company…</button>
+</div>
+<dialog id="dlg-dissolve"><form method="post" action="/settings/dissolve" id="dissolve-form">{{ csrf() }}
+  <div class="dhead"><h2>Dissolve {{ S.company_name or 'the company' }}?</h2><button class="btn ghost sm" data-close>✕</button></div>
+  <div class="dbody">
+    <div class="flash error">Every member is removed for good. This can't be undone in the app.</div>
+    <label class="check"><input type="radio" name="erase" value="0" checked> Keep my books, fleet and logbook</label>
+    <label class="check"><input type="radio" name="erase" value="1"> Erase all company data too (backup saved first)</label>
+    <label class="check"><input type="checkbox" name="understand" value="1" required> I understand every member will be removed</label>
+    <div class="field"><label>Type <b>{{ dissolve_confirm }}</b> to confirm</label><input name="confirm" autocomplete="off" required placeholder="{{ dissolve_confirm }}"></div>
+    <div class="field"><label>Your password</label><input name="password" type="password" autocomplete="current-password" required></div>
+  </div>
+  <div class="dfoot"><button class="btn ghost" data-close>Cancel</button><button class="btn danger" id="dissolve-go" disabled>Dissolve</button></div>
+</form></dialog>
+<script>
+(function () {
+  const f = document.getElementById("dissolve-form"), go = document.getElementById("dissolve-go");
+  const ok = () => { go.disabled = !(f.elements["understand"].checked && f.elements["confirm"].value.trim() === {{ dissolve_confirm|tojson }} && f.elements["password"].value); };
+  f.addEventListener("input", ok); f.addEventListener("change", ok);
+  f.addEventListener("submit", (e) => { if (!confirm("Last check: dissolve the company and remove every member now?")) e.preventDefault(); });
+})();
+</script>
 <dialog id="dlg-clear"><form method="post" action="/settings/clear-data" id="clear-form">{{ csrf() }}
   <div class="dhead"><h2>Delete ALL company data?</h2><button class="btn ghost sm" data-close>✕</button></div>
   <div class="dbody">

@@ -724,6 +724,9 @@ def _agent_connection(server, pin):
     return conn, u
 
 
+AGENT_GIVE_UP = 3            # refused this many times in a row (about 30 s): the token is gone for good, stop
+
+
 def run_agent(server, token, pin=""):
     """Remote driver: read the local DLL and stream frames to a Fleet Manager Pro server."""
     server = server.rstrip("/")
@@ -732,7 +735,7 @@ def run_agent(server, token, pin=""):
         print("[agent] WARNING: http:// is not encrypted - your token crosses the network in the clear. "
               "Use the https:// address and --pin from your profile page.")
     print(f"[agent] streaming telemetry to {server}  (Ctrl+C to stop)")
-    last_sent, last_flags, conn = 0, None, None
+    last_sent, last_flags, conn, refused = 0, None, None, 0
     flag_keys = [k for k, g, *_ in reader.FIELDS if g == "flags"] + \
                 ["fine_amount", "toll_amount", "ferry_amount", "train_amount", "refuel_amount"]
     while True:
@@ -757,9 +760,17 @@ def run_agent(server, token, pin=""):
                 r = conn.getresponse()
                 r.read()
                 if r.status == 401:
+                    refused += 1
+                    if refused >= AGENT_GIVE_UP:
+                        print("[agent] this connection no longer works: you left the company, or its owner made a new "
+                              "token for you. Stopping. You can delete the connection file; ask the owner for a new "
+                              "one if you're still a member.")
+                        return
                     print("[agent] the server refused the token - copy the current one from your profile page")
                     time.sleep(10)
-                elif r.status >= 400:
+                    continue
+                refused = 0
+                if r.status >= 400:
                     print(f"[agent] server answered {r.status}")
                     time.sleep(3)
                 last_sent = time.time()

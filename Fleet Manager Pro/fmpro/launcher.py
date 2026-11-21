@@ -86,6 +86,8 @@ def main():
     except OSError:
         ip = "THIS-PC"
     app.config["LAN"] = {"scheme": "http" if a.insecure_http else "https", "port": a.port}
+    from fmpro import upnp
+    upnp.refresh_on_start(app, a.port)        # what the owner chose on Connect a Driver: current IP, port kept open
     if a.insecure_http:
         print(f"  Other PCs: http://{ip}:{a.port}   (NOT encrypted - passwords cross your network in the clear)")
         print("  Press Ctrl+C to stop.\n")

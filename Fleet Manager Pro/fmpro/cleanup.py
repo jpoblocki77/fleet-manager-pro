@@ -166,6 +166,34 @@ def fire(uid):
     return redirect(url_for("pages.drivers"))
 
 
+@bp.route("/account/leave", methods=["POST"])
+@login_required
+def leave():
+    """A member leaves the company for good, from their own profile: the same clean removal as being fired (account
+    and everything personal deleted, deliveries and pay kept as "Former driver", their agent token stops working),
+    confirmed with their own password. The Owner is the company, so they can't leave it."""
+    from flask import session
+    from werkzeug.security import check_password_hash
+    me = user()
+    if me["role"] == "owner" or me["username"] == FORMER_USERNAME:
+        abort(403)
+    if not check_password_hash(me["password_hash"] or "", request.form.get("password", "")):
+        flash("That password isn't right, so you're still a member.", "error")
+        return redirect(url_for("pages.profile") + "#leave")
+    company = db.setting("company_name", "") or "the company"
+    name = purge_member(me["id"])
+    if not name:
+        abort(403)
+    db.audit(None, "member left", f"member #{me['id']} ({me['role']}) left and was deleted")
+    for m in db.q("SELECT id FROM users WHERE role IN ('admin','owner') AND status!='removed'"):
+        db.notify(m["id"], f"{name} left the company. Their deliveries and pay stay in the books as \"Former driver\".",
+                  "/drivers", "info")
+    session.clear()
+    flash(f"You've left {company}. Your account and personal records are deleted. If you sent your game from your own "
+          "PC, its connection window closes by itself; you can delete the connection file.", "success")
+    return redirect(url_for("auth.login"))
+
+
 @bp.route("/drivers/purge-former", methods=["POST"])
 @login_required(role="admin")
 def purge_former():

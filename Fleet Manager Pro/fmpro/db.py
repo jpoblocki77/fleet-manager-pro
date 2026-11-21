@@ -210,6 +210,7 @@ DEFAULT_SETTINGS = {
     "telemetry_mode": "auto",           # auto | demo | off
     "telemetry_user_id": "",            # who local telemetry is credited to
     "discord_webhook": "", "webhook_on_delivery": "1", "webhook_on_event": "1",
+    "webhook_applications": "", "webhook_on_application": "1",   # new driver applications: own channel optional
     "recruitment_open": "1", "recruitment_text": "We're hiring professional, friendly drivers!",
     "starting_balance": str(STARTING_CAPITAL), "initialized": "0",
     # compliance (ELD / Hours of Service, DVIR, roadside inspections)

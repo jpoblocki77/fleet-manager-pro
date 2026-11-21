@@ -1016,6 +1016,7 @@ def _connect_info():
     lan = current_app.config.get("LAN")
     pin = tlsfront.fingerprint(current_app.config["DATA_DIR"]) if lan and lan.get("scheme") == "https" else None
     return {"lan": lan, "pin": pin, "local": lan_addresses(), "public": db.setting("public_address", "") or "",
+            "auto": db.setting("public_address_auto", "0") == "1", "upnp_port": db.setting("upnp_port", "") or "",
             "agent_cmd": AGENT_CMD}
 
 
@@ -1039,11 +1040,43 @@ def _connectable():
 def drivers_connect():
     """Walk the Owner or a Manager through letting a driver send their game from another PC over the internet."""
     if request.method == "POST":
+        back = redirect(url_for("pages.drivers_connect", driver=request.args.get("driver") or None))
+        action = request.form.get("action", "")
+        if action in ("detect", "open", "close"):
+            from . import upnp
+            port = (current_app.config.get("LAN") or {}).get("port")
+            try:
+                if action == "close":
+                    upnp.close_port(upnp.discover(), int(db.setting("upnp_port", "") or port or 8760))
+                    db.set_setting("upnp_port", "")
+                    db.audit(user()["id"], "router port closed", "")
+                    flash("The router no longer forwards the port to this PC.", "success")
+                    return back
+                if action == "open" and not port:
+                    flash("Do step 1 first: start Fleet Manager Pro in LAN mode, then open the port.", "error")
+                    return back
+                r = upnp.detect_and_save(port, open_it=(action == "open"))
+            except upnp.UPnPError as e:
+                flash(str(e), "error")
+                return back
+            db.audit(user()["id"], "router asked", f"{r['ip']}{' port ' + str(port) + ' opened' if r['opened'] else ''}")
+            msg = (f"Your internet address is {r['ip']}." if r["saved"] else
+                   f"Your router reports {r['ip']}; your saved host name was kept.")
+            if r["opened"]:
+                msg += f" Port {port} on the router now goes to this PC ({r['local']}). It's re-opened each time you start in LAN mode."
+            if r["nat2"]:
+                flash(msg + " But that address is not reachable from the internet: your router is behind another router or "
+                      "your provider shares one address between customers (CGNAT). Ask your provider for a public IP, or "
+                      "open the port on the first router too.", "error")
+            else:
+                flash(msg, "success")
+            return back
         raw = txt("public_address", 253).lower()
         raw = re.sub(r"^[a-z]+://", "", raw).split("/")[0]
         raw = raw.rsplit(":", 1)[0] if raw.count(":") == 1 else raw
         if not raw:
             db.set_setting("public_address", "")
+            db.set_setting("public_address_auto", "0")
             flash("Internet address cleared.", "success")
         else:
             import ipaddress
@@ -1056,11 +1089,12 @@ def drivers_connect():
                 flash("That isn't an IP address or a host name.", "error")
                 return redirect(url_for("pages.drivers_connect"))
             db.set_setting("public_address", raw)
+            db.set_setting("public_address_auto", "0")         # typed by hand: start-up must not overwrite it
             added = allow_host(raw)
             db.audit(user()["id"], "public address", raw)
             flash("Internet address saved." + (f" {raw} was also added to the allowed host names (Settings, Telemetry tab)."
                                               if added else ""), "success")
-        return redirect(url_for("pages.drivers_connect", driver=request.args.get("driver") or None))
+        return back
     info = _connect_info()
     people = _connectable()
     pick = next((p for p in people if str(p["id"]) == request.args.get("driver", "")), None)
@@ -1125,7 +1159,9 @@ def apply():
                   experience=txt("experience", 1000), message=txt("message", 2000), created_at=time.time())
         for m in db.q("SELECT id FROM users WHERE role IN ('admin','owner')"):
             db.notify(m["id"], f"New driver application from {name}.", "/recruitment", "info")
-        economy.webhook("event", f"📝 New driver application from **{name}**")
+        games_ = " / ".join(g.upper() for g in request.form.getlist("games") if g in ("ats", "ets2"))
+        economy.webhook("application", f"📝 New driver application from **{name}**" + (f" ({games_})" if games_ else "")
+                        + " - review it on the Recruitment page.")
         return render_template("apply.html", done=True)
     return render_template("apply.html")
 
@@ -1491,6 +1527,7 @@ SETTING_FIELDS = {
     "auto_create_trucks": ("bool", None), "auto_charge_repairs": ("bool", None),
     "require_manual_approval": ("bool", None), "agent_jobs_need_approval": ("bool", None), "telemetry_mode": ("choice", ("auto", "demo", "off")),
     "discord_webhook": ("url", 300), "webhook_on_delivery": ("bool", None), "webhook_on_event": ("bool", None),
+    "webhook_applications": ("url", 300), "webhook_on_application": ("bool", None),
     "recruitment_open": ("bool", None), "recruitment_text": ("str", 1000),
     "hos_enabled": ("bool", None), "hos_rules_ats": ("choice", ("us70", "us60")), "hos_rules_ets2": ("choice", ("eu",)),
     "hos_fine": ("num", (0, 1e6)), "dvir_required": ("bool", None), "dvir_fine": ("num", (0, 1e6)),
@@ -1580,10 +1617,10 @@ def settings():
     tab = request.args.get("tab", "company")
     if tab == "data" and not can("owner"):
         abort(403)
-    from .ops import CLEAR_CONFIRM, data_counts
+    from .ops import CLEAR_CONFIRM, DISSOLVE_CONFIRM, data_counts
     from .auth import current_units
     return render_template("settings.html", tab=tab, drivers=users_list(), uf=unit_settings_view(current_units()),
-                           data_counts=data_counts() if tab == "data" else None, clear_confirm=CLEAR_CONFIRM,
+                           data_counts=data_counts() if tab == "data" else None, clear_confirm=CLEAR_CONFIRM, dissolve_confirm=DISSOLVE_CONFIRM,
                            lic=licensing.LICENCE.status(),
                            status=HUB.local_status, plugin=plugin_status(),
                            frames=HUB.sampler.frames if HUB.sampler else 0,
@@ -1654,7 +1691,9 @@ def updates():
 @bp.route("/settings/webhook-test", methods=["POST"])
 @login_required(role="admin")
 def webhook_test():
-    economy.webhook("test", f"✅ Test message from {db.setting('company_name') or 'Fleet Manager Pro'}")
+    kind = "test_application" if request.form.get("which") == "applications" else "test"
+    economy.webhook(kind, f"✅ Test {'application ' if kind == 'test_application' else ''}message from "
+                          f"{db.setting('company_name') or 'Fleet Manager Pro'}")
     flash("Test message sent (if the webhook URL is valid it will appear in Discord).", "success")
     return redirect(url_for("pages.settings", tab="integrations"))
 

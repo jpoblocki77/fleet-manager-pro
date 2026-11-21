@@ -28,26 +28,34 @@
 
     <form class="card" method="post">{{ csrf() }}
       <div class="card-head"><h2><span class="step-no">2</span>Your internet address</h2>
-        <span class="right">{% if info.public %}<span class="badge active">set</span>{% else %}<span class="badge">not set</span>{% endif %}</span></div>
-      <p class="small muted" style="margin-top:0">The address drivers outside your home use to reach this PC. Type your public IP address
-        (search the web for <i>what is my IP</i> on this PC), or better, a free dynamic-DNS name (No-IP, Duck DNS and others),
-        which keeps working when your internet provider changes your IP.</p>
+        <span class="right">{% if info.public %}<span class="badge active">{{ 'found automatically' if info.auto else 'set' }}</span>{% else %}<span class="badge">not set</span>{% endif %}</span></div>
+      <p class="small muted" style="margin-top:0">The address drivers outside your home use to reach this PC. Press <b>Find it for me</b>
+        and Fleet Manager Pro asks your router; it then keeps it up to date each time it starts in LAN mode. Or type a free
+        dynamic-DNS name (No-IP, Duck DNS and others), which keeps working when your internet provider changes your IP.</p>
       <div class="row" style="gap:8px;flex-wrap:nowrap">
         <input name="public_address" value="{{ info.public }}" maxlength="253" placeholder="e.g. 203.0.113.25 or mycompany.ddns.net" aria-label="Internet address" style="flex:1">
-        <button class="btn primary">Save</button></div>
+        <button class="btn">Save</button>
+        <button class="btn primary" name="action" value="detect">{{ icon('refresh') }}Find it for me</button></div>
       <p class="hint">A name you type here is added to the allowed host names automatically (Settings, Telemetry tab).</p>
     </form>
 
-    <div class="card">
-      <div class="card-head"><h2><span class="step-no">3</span>Open the door on your router</h2></div>
-      <p class="small muted" style="margin-top:0">Your router blocks the internet by default. Once, in your router's settings (often <span class="mono">192.168.1.1</span> or <span class="mono">192.168.0.1</span> in a browser), find <b>Port forwarding</b> and add:</p>
+    <form class="card" method="post">{{ csrf() }}
+      <div class="card-head"><h2><span class="step-no">3</span>Open the door on your router</h2>
+        <span class="right">{% if info.upnp_port %}<span class="badge active">open, port {{ info.upnp_port }}</span>{% endif %}</span></div>
+      <p class="small muted" style="margin-top:0">Your router blocks the internet by default. Press <b>Open the port for me</b> and
+        Fleet Manager Pro asks your router to let drivers through to this PC (only this one port), and asks again each time it starts in LAN mode.</p>
+      <div class="row" style="gap:8px;margin-bottom:8px">
+        <button class="btn primary" name="action" value="open" {{ 'disabled' if not info.lan }}>{{ icon('server') }}Open the port for me</button>
+        {% if info.upnp_port %}<button class="btn" name="action" value="close">Close it</button>{% endif %}
+      </div>
+      <p class="small muted">If your router says no (its UPnP setting is off), do it by hand once: in the router's settings (often <span class="mono">192.168.1.1</span> or <span class="mono">192.168.0.1</span> in a browser), find <b>Port forwarding</b> and add:</p>
       <dl class="kv">
         <dt>Port</dt><dd class="mono">{{ port }}</dd>
         <dt>Protocol</dt><dd>TCP</dd>
         <dt>Send to (this PC)</dt><dd class="mono">{{ info.local[0] if info.local else 'this PC\'s address' }}</dd>
       </dl>
       <p class="hint">Drivers on your own Wi-Fi don't need this. Keep this PC on, with Fleet Manager Pro open in LAN mode, while drivers drive.</p>
-    </div>
+    </form>
   </div>
 
   <div class="card">

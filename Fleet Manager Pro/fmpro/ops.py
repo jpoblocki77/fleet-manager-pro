@@ -386,6 +386,76 @@ def clear_data():
     return redirect(url_for("pages.dashboard"))
 
 
+# ------------------------------------------------------------------ dissolve the company
+DISSOLVE_CONFIRM = "DISSOLVE"
+
+
+def dissolve_company(owner_id, erase=False):
+    """End the VTC: every member except the Owner leaves (as if fired: accounts and personal records deleted, their
+    agent tokens stop working), recruiting closes, and this PC stops being reachable from the internet (router port
+    closed, public address and extra host names forgotten). With erase=True all company data goes too (backup first).
+    Returns a dict for the summary."""
+    from .cleanup import FORMER_USERNAME, purge_member
+    out = {"members": 0, "backup": None, "port": None}
+    if erase:
+        out["members"] = db.val("SELECT COUNT(*) FROM users WHERE id!=? AND username!=?", (owner_id, FORMER_USERNAME), 0)
+        out["backup"], _removed = clear_all_data(owner_id, keep_members=False, restore_capital=True)
+    else:
+        for m in db.q("SELECT id FROM users WHERE id!=? AND role!='owner' AND username!=?", (owner_id, FORMER_USERNAME)):
+            if purge_member(m["id"]):
+                out["members"] += 1
+    port = db.setting("upnp_port", "") or ""
+    if port:
+        from . import upnp
+        try:
+            upnp.close_port(upnp.discover(), int(port))
+            out["port"] = "closed"
+        except (upnp.UPnPError, ValueError) as e:
+            out["port"] = f"not closed ({e})"
+    for key, value in (("upnp_port", ""), ("public_address", ""), ("public_address_auto", "0"), ("allowed_hosts", ""),
+                       ("recruitment_open", "0")):
+        db.set_setting(key, value)
+    return out
+
+
+@bp.route("/settings/dissolve", methods=["POST"])
+@login_required(role="owner")
+def dissolve():
+    from werkzeug.security import check_password_hash
+    u = user()
+    back = redirect(url_for("pages.settings", tab="data") + "#dissolve")
+    if request.form.get("understand") != "1":
+        flash("Tick the box to confirm you understand every member will be removed.", "error")
+        return back
+    if request.form.get("confirm", "").strip() != DISSOLVE_CONFIRM:
+        flash(f"Type {DISSOLVE_CONFIRM} exactly (capital letters) to confirm.", "error")
+        return back
+    recent = db.val("SELECT COUNT(*) FROM audit_log WHERE user_id=? AND action='dissolve refused' AND created_at > ?",
+                    (u["id"], time.time() - 900), 0)
+    if recent >= 5:
+        flash("Too many wrong passwords. Wait 15 minutes and try again.", "error")
+        return back
+    if not check_password_hash(u["password_hash"], request.form.get("password", "")):
+        db.audit(u["id"], "dissolve refused", "wrong password")
+        flash("That password isn't right. Nothing was changed.", "error")
+        return back
+    erase = request.form.get("erase") == "1"
+    company = db.setting("company_name", "") or "The company"
+    r = dissolve_company(u["id"], erase=erase)
+    db.audit(u["id"], "company dissolved", f"{r['members']} member(s) removed; data {'erased, backup ' + r['backup'] if erase else 'kept'}; "
+                                           f"router port {r['port'] or 'was not open'}")
+    msg = f"{company} is dissolved. {r['members']} member(s) removed; their connections stop working and close by themselves."
+    msg += (f" All company data was erased (backup: {r['backup']})." if erase else
+            " Your books, fleet and logbook are kept; past deliveries show as \"Former driver\".")
+    if r["port"] == "closed":
+        msg += " The router no longer lets the internet in."
+    elif r["port"]:
+        msg += f" The router port is {r['port']}: remove the forward in your router's settings."
+    msg += " To stop other PCs on your network connecting too, start Fleet Manager Pro normally (not the LAN file)."
+    flash(msg, "success")
+    return redirect(url_for("pages.settings", tab="data"))
+
+
 # ------------------------------------------------------------------ clear demo jobs
 DEMO_TRUCK = ("vehicle.kenworth.w900", "FMP 0001")          # the simulator's truck (telemetry/demo.py)
 

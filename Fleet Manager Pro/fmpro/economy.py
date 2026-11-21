@@ -269,18 +269,25 @@ def achievement_progress(uid):
 
 # ------------------------------------------------------------------ Discord webhook
 def webhook(kind, text):
+    """Post to Discord. New driver applications ("application", "test_application") go to their own webhook when
+    one is set (e.g. a staff-only channel), else to the company webhook."""
     url = db.setting("discord_webhook", "")
+    if kind in ("application", "test_application"):
+        url = db.setting("webhook_applications", "") or url
     if not url or not url.startswith("https://"):
         return
     if kind == "delivery" and db.setting("webhook_on_delivery") != "1":
         return
     if kind == "event" and db.setting("webhook_on_event") != "1":
         return
+    if kind == "application" and db.setting("webhook_on_application", "1") != "1":
+        return
     name = db.setting("company_name") or "Fleet Manager Pro"
 
     def send():
         try:
-            body = json.dumps({"username": name, "content": text[:1900]}).encode()
+            # no pings: names typed on the public Apply page could otherwise say @everyone
+            body = json.dumps({"username": name, "content": text[:1900], "allowed_mentions": {"parse": []}}).encode()
             req = urllib.request.Request(url, data=body, method="POST",
                                          headers={"Content-Type": "application/json",
                                                   "User-Agent": f"FleetManagerPro/{_version()}"})

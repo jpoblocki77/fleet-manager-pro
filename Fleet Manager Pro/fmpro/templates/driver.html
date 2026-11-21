@@ -77,6 +77,10 @@
       <div class="field"><label>Current password</label><input name="current" type="password" required autocomplete="current-password"></div>
       <div class="field"><label>New password</label><input name="new" type="password" minlength="8" required autocomplete="new-password"></div>
       <button class="btn">Change password</button></form>{% endif %}
+    {% if is_self and p.role != 'owner' %}<form class="card" id="leave" method="post" action="/account/leave">{{ csrf() }}<h2>Leave the company</h2>
+      <p class="small muted">Leaving is for good. Your account is deleted, with your messages, notifications, achievements, hours-of-service logs, inspections and event sign-ups. Your deliveries and pay stay in the company's books as "Former driver". If you send your game from your own PC, that connection stops and its window closes by itself. The owner is told you left.</p>
+      <div class="field"><label>Your password, to confirm</label><input name="password" type="password" required autocomplete="current-password"></div>
+      <button class="btn danger" data-confirm="Leave the company for good? Your account will be deleted and this can't be undone.">Leave the company</button></form>{% endif %}
     {% if can('admin') and not is_self and p.role != 'owner' %}{% if p.role != 'admin' or me.role == 'owner' %}<form class="card" method="post" action="/drivers/{{ p.id }}/fire">{{ csrf() }}<h2>Fire {{ ROLE_LABELS[p.role]|lower if p.role != 'driver' else 'driver' }}</h2>
       <p class="small muted">Deletes {{ p.display_name }} from the database for good: their account, messages, notifications, achievements, hours-of-service logs, inspections and event sign-ups. Their deliveries and pay stay in the books under "Former driver", so the ledger still adds up. Contracts they had taken go back on the board. This can't be undone.</p>
       <div class="field"><label>Type <b>{{ p.display_name }}</b> to confirm</label><input name="confirm" required autocomplete="off" maxlength="80"></div>

@@ -1258,6 +1258,106 @@ def main():
           "Download file gives the driver a ready-to-run .bat")
     check(uc.get(f"/drivers/{drv['id']}/agent.bat").status_code in (302, 403, 404), "a driver can't download connection files")
     check('href="/drivers/connect"' in c.get("/drivers").get_data(as_text=True), "the Drivers page links to Connect a driver")
+
+    # Router (UPnP): Find it for me / Open the port for me, against a fake router on this PC (never the real one)
+    import http.server
+    import threading
+    from fmpro import upnp as _upnp
+    seen, fake = [], {"ip": "203.0.113.25", "fault": False}
+
+    class FakeIGD(http.server.BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def do_GET(self):
+            if self.path == "/redir":
+                self.send_response(302); self.send_header("Location", "http://198.51.100.9/desc.xml"); self.end_headers()
+                return
+            if self.path == "/other.xml":
+                body = (b'<root><service><serviceType>urn:schemas-upnp-org:service:WANIPConnection:1</serviceType>'
+                        b'<controlURL>http://192.168.77.77/ctl</controlURL></service></root>')
+                self.send_response(200); self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
+                return
+            body = ('<?xml version="1.0"?><root xmlns="urn:schemas-upnp-org:device-1-0"><device><serviceList>'
+                    '<service><serviceType>urn:schemas-upnp-org:service:Layer3Forwarding:1</serviceType><controlURL>/l3</controlURL></service>'
+                    '<service><serviceType>urn:schemas-upnp-org:service:WANIPConnection:1</serviceType><controlURL>/ctl</controlURL></service>'
+                    '</serviceList></device></root>').encode()
+            self.send_response(200); self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
+
+        def do_POST(self):
+            data = self.rfile.read(int(self.headers.get("Content-Length", 0))).decode()
+            action = self.headers.get("SOAPAction", "").strip('"').split("#")[-1]
+            seen.append((action, data))
+            if fake["fault"] and action == "AddPortMapping":
+                body, code = (b'<s:Envelope><s:Body><s:Fault><detail><UPnPError><errorCode>718</errorCode>'
+                              b'<errorDescription>ConflictInMappingEntry</errorDescription></UPnPError></detail></s:Fault></s:Body></s:Envelope>', 500)
+            else:
+                body, code = (f'<s:Envelope><s:Body><u:{action}Response><NewExternalIPAddress>{fake["ip"]}</NewExternalIPAddress>'
+                              f'</u:{action}Response></s:Body></s:Envelope>').encode(), 200
+            self.send_response(code); self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
+
+    igd = http.server.HTTPServer(("127.0.0.1", 0), FakeIGD)
+    threading.Thread(target=igd.serve_forever, daemon=True).start()
+    loc = f"http://127.0.0.1:{igd.server_address[1]}/desc.xml"
+    real_search = _upnp._ssdp_search
+    _upnp._ssdp_search = lambda timeout: ["http://8.8.8.8/desc.xml", loc]   # an outside address is ignored, the local one used
+    try:
+        gw = _upnp.discover()
+        check(gw.control_url.endswith("/ctl") and gw.service.endswith("WANIPConnection:1") and gw.local_ip == "127.0.0.1",
+              "the router's internet service is found from its description; addresses outside the home network are ignored")
+        check(not _upnp._local_host("https://192.168.1.1/x") and not _upnp._local_host("http://evil.example.com/")
+              and _upnp._local_host("http://192.168.1.1:5000/x"), "only plain http to a home-network router address is ever contacted")
+        base = loc.rsplit("/", 1)[0]
+        try:
+            _upnp._get(base + "/redir")
+            redirected = True
+        except _upnp.UPnPError:
+            redirected = False
+        check(not redirected, "a router's redirect is never followed (it could lead outside the home network)")
+        try:
+            _upnp.discover(search=lambda t: [base + "/other.xml"])
+            other = True
+        except _upnp.UPnPError:
+            other = False
+        check(not other, "a device that points at another machine for its controls is ignored")
+        check(_upnp.behind_second_router("100.64.3.4") and _upnp.behind_second_router("10.0.0.2")
+              and not _upnp.behind_second_router("203.0.113.25"), "carrier-grade NAT / double router is recognised")
+        db.set_setting("public_address", "")
+        r = post("/drivers/connect", {"action": "open"})
+        check(r.status_code == 302 and db.setting("public_address") == "203.0.113.25" and db.setting("public_address_auto") == "1"
+              and db.setting("upnp_port") == "8760", "Open the port for me saves the found address and remembers the port")
+        add = next((d for a, d in seen if a == "AddPortMapping"), "")
+        check("<NewExternalPort>8760</NewExternalPort>" in add and "<NewInternalClient>127.0.0.1</NewInternalClient>" in add
+              and "<NewProtocol>TCP</NewProtocol>" in add, "the router is asked to forward TCP 8760 to this PC")
+        check({a for a, _ in seen} <= {"GetExternalIPAddress", "AddPortMapping", "DeletePortMapping"}, "only the three known router actions are sent")
+        page = c.get("/drivers/connect").get_data(as_text=True)
+        check("found automatically" in page and "open, port 8760" in page and "Close it" in page, "the page shows the found address and open port")
+        fake["ip"] = "198.51.100.7"; seen.clear()
+        _upnp.refresh_on_start(app, 8760).join(10)
+        check(db.setting("public_address") == "198.51.100.7" and any(a == "AddPortMapping" for a, _ in seen),
+              "starting in LAN mode refreshes a changed address and re-opens the port")
+        post("/drivers/connect", {"public_address": "myco.ddns.net"})
+        check(db.setting("public_address_auto") == "0", "typing an address turns automatic updates off")
+        post("/drivers/connect", {"action": "detect"})
+        check(db.setting("public_address") == "myco.ddns.net", "Find it for me never replaces a typed host name")
+        _upnp.refresh_on_start(app, 8760).join(10)
+        check(db.setting("public_address") == "myco.ddns.net", "nor does starting in LAN mode")
+        fake["fault"] = True
+        r = post("/drivers/connect", {"action": "open"}, follow_redirects=True)
+        check("ConflictInMappingEntry" in r.get_data(as_text=True), "a router refusal is shown to the owner in plain words")
+        fake["fault"] = False; seen.clear()
+        post("/drivers/connect", {"action": "close"})
+        check(db.setting("upnp_port") == "" and any(a == "DeletePortMapping" for a, _ in seen), "Close it removes the forward")
+        _upnp._ssdp_search = lambda timeout: []
+        check(post("/drivers/connect", {"action": "detect"}).status_code == 302, "no router answering is handled")
+        check("UPnP setting is probably switched off" in c.get("/drivers/connect").get_data(as_text=True),
+              "and the owner is told why")
+        check(uc.post("/drivers/connect", data={"action": "open"}).status_code in (302, 400, 403), "a driver can't touch the router")
+    finally:
+        _upnp._ssdp_search = real_search
+        igd.shutdown()
+        db.set_setting("public_address_auto", "0")
+        db.set_setting("upnp_port", "")
     db.set_setting("public_address", "")
     db.set_setting("allowed_hosts", "")
     app.config.pop("LAN", None)
@@ -1607,6 +1707,86 @@ def main():
           db.val("SELECT COUNT(*) FROM jobs WHERE user_id=?", (former,)) == 2, "older removed members can be deleted too")
     check(c.get(f"/jobs/{fjob}").status_code == 200, "a fired driver's job still opens in the logbook")
 
+    # Leaving the company (a member, from their own profile)
+    from fmpro.auth import create_user as _cu_lv
+    lvid = _cu_lv("leaver", "Lena Leaver", "leavepw123", role="driver")
+    ltoken = db.val("SELECT agent_token FROM users WHERE id=?", (lvid,))
+    ljob = db.insert("jobs", user_id=lvid, status="delivered", revenue=3000, driven_km=400, started_at=now_, finished_at=now_)
+    db.insert("ledger", category="driver pay", amount=-600, description="Pay Lena", user_id=lvid, job_id=ljob, created_at=now_)
+    db.insert("messages", from_id=lvid, to_id=rid, body="so long", created_at=now_)
+    db.insert("hos_logs", user_id=lvid, status="driving", start_min=0, created_at=now_)
+    money2 = tot()
+    lc = app.test_client()
+    lc.get("/login")
+    with lc.session_transaction() as s_:
+        ltok = s_.get("csrf")
+    lc.post("/login", data={"username": "leaver", "password": "leavepw123", "csrf": ltok})
+    with lc.session_transaction() as s_:
+        ltok = s_.get("csrf")
+    lp = lc.get("/profile").get_data(as_text=True)
+    with lc.session_transaction() as s_:
+        ltok = s_.get("csrf")
+    check('action="/account/leave"' in lp and "Leave the company" in lp, "a member's own profile has a Leave the company button")
+    check('action="/account/leave"' not in c.get("/profile").get_data(as_text=True), "the owner has no Leave button (the owner is the company)")
+    check(post("/account/leave", {"password": "x"}).status_code == 403 and db.val("SELECT id FROM users WHERE role='owner'"),
+          "the owner can't leave their own company")
+    check('action="/account/leave"' not in c.get(f"/drivers/{lvid}").get_data(as_text=True), "nobody else sees a member's Leave button")
+    r = lc.post("/account/leave", data={"password": "wrong-password", "csrf": ltok})
+    check(r.status_code == 302 and "#leave" in r.headers.get("Location", ""), "a wrong password sends them back to the form")
+    check(db.val("SELECT COUNT(*) FROM users WHERE id=?", (lvid,)) == 1, "leaving needs the member's own password")
+    check(lc.post("/account/leave", data={"password": "leavepw123"}).status_code in (400, 403)
+          and db.val("SELECT COUNT(*) FROM users WHERE id=?", (lvid,)) == 1, "leaving needs the form's CSRF token")
+    with lc.session_transaction() as s_:
+        ltok = s_.get("csrf")
+    r = lc.post("/account/leave", data={"password": "leavepw123", "csrf": ltok})
+    check(r.status_code == 302 and "/login" in r.headers.get("Location", "")
+          and db.val("SELECT COUNT(*) FROM users WHERE id=?", (lvid,)) == 0, "with the password, the member leaves and is signed out")
+    check(sum(db.val(f"SELECT COUNT(*) FROM {t} WHERE {col}=?", (lvid,)) for t, col in
+              (("messages", "from_id"), ("hos_logs", "user_id"), ("jobs", "user_id"), ("ledger", "user_id"))) == 0
+          and db.val("SELECT user_id FROM jobs WHERE id=?", (ljob,)) == former and tot() == money2,
+          "everything personal is gone; their deliveries and pay stay in the books as Former driver")
+    check(lc.get("/profile").status_code == 302, "the old session no longer works")
+    check(app.test_client().post("/api/agent/frame", json={"frame": None}, headers={"X-Agent-Token": ltoken}).status_code == 401,
+          "their PC's agent token stops working")
+    owner_id = db.val("SELECT id FROM users WHERE role='owner'")
+    check(db.val("SELECT COUNT(*) FROM notifications WHERE user_id=? AND text LIKE 'Lena Leaver left the company%'", (owner_id,)) == 1,
+          "the owner is told who left")
+    check(db.val("SELECT COUNT(*) FROM audit_log WHERE action='member left'") >= 1, "leaving is in the audit log")
+
+    # the agent on a leaver's PC stops by itself once the token is refused for good
+    from fmpro.telemetry import service as _svc
+
+    class _Mem:
+        is_open = True
+        def open(self): return True
+        def read(self): return b""
+
+    class _Reader:
+        FIELDS = []
+        SharedMemory = _Mem
+        @staticmethod
+        def parse(_b): return {"values": __import__("collections").defaultdict(int, sdk_active=True), "trailers": [], "substances": []}
+
+    class _Resp:
+        status = 401
+        def read(self): return b""
+
+    class _Conn:
+        sent = 0
+        def request(self, *a, **k): _Conn.sent += 1
+        def getresponse(self): return _Resp()
+        def close(self): pass
+
+    saved = (_svc.reader, _svc._agent_connection, _svc.time.sleep)
+    _svc.reader, _svc._agent_connection = _Reader, (lambda s, p: (_Conn(), None))
+    _svc.time.sleep = lambda s: None
+    try:
+        done = threading.Event()
+        threading.Thread(target=lambda: (_svc.run_agent("https://203.0.113.25:8760", "gone-token"), done.set()), daemon=True).start()
+        check(done.wait(5) and _Conn.sent == _svc.AGENT_GIVE_UP, "a refused agent gives up and closes instead of retrying forever")
+    finally:
+        _svc.reader, _svc._agent_connection, _svc.time.sleep = saved
+
     page = c.get("/fleet").get_data(as_text=True)
     check("Maintenance prices" in page and 'data-price="800.00"' in page and 'data-price="2400.00"' in page and 'data-price="150.00"' in page
           and 'data-price="40.00"' in page and 'data-price="0.00"' in page and "m-repair" in page and "spent on maintenance so far" in page
@@ -1726,9 +1906,52 @@ def main():
 
     print("Public pages and agent API")
     post("/logout")
-    c.get("/apply")
-    post("/apply", {"name": "Applicant Ann", "contact": "ann@example.com", "games": "ats"})
-    check(db.val("SELECT COUNT(*) FROM applications", (), 0) == 1, "public application")
+    # new-application webhook: its own switch and (optional) its own channel; nothing really leaves this PC
+    from fmpro import economy as _eco
+    sent_hooks = []
+
+    class _HookResp:
+        def read(self): return b""
+
+    def _fake_urlopen(req, timeout=None):
+        body_ = __import__("json").loads(req.data)
+        check(body_.get("allowed_mentions") == {"parse": []}, "webhook posts can't ping @everyone or roles")
+        sent_hooks.append((req.full_url, body_["content"]))
+        return _HookResp()
+
+    class _NowThread:
+        def __init__(self, target=None, daemon=None, **k): self.t = target
+        def start(self): self.t()
+
+    real_open, real_thread = _eco.urllib.request.urlopen, _eco.threading.Thread
+    _eco.urllib.request.urlopen, _eco.threading.Thread = _fake_urlopen, _NowThread
+    try:
+        db.set_setting("discord_webhook", "https://discord.example/api/webhooks/company")
+        db.set_setting("webhook_applications", "")
+        c.get("/apply")
+        post("/apply", {"name": "Applicant Ann", "contact": "ann@example.com", "games": "ats"})
+        check(db.val("SELECT COUNT(*) FROM applications", (), 0) == 1, "public application")
+        check(sent_hooks and sent_hooks[-1][0].endswith("/company") and "Applicant Ann" in sent_hooks[-1][1] and "(ATS)" in sent_hooks[-1][1],
+              "a new application is posted to the company webhook when it has no channel of its own")
+        db.set_setting("webhook_applications", "https://discord.example/api/webhooks/staff")
+        db.set_setting("webhook_on_event", "0")
+        sent_hooks.clear()
+        c.get("/apply")
+        post("/apply", {"name": "Applicant Bob", "contact": "bob@example.com", "games": "ets2"})
+        check(len(sent_hooks) == 1 and sent_hooks[0][0].endswith("/staff") and "Applicant Bob" in sent_hooks[0][1],
+              "with its own webhook, applications go to that channel only (even with event posts off)")
+        db.set_setting("webhook_on_application", "0")
+        sent_hooks.clear()
+        c.get("/apply")
+        post("/apply", {"name": "Applicant Cal", "contact": "cal@example.com"})
+        check(not sent_hooks, "switching application posts off stops them")
+        _eco.webhook("event", "an event")
+        check(not sent_hooks, "event posts follow their own switch")
+    finally:
+        _eco.urllib.request.urlopen, _eco.threading.Thread = real_open, real_thread
+        for k_, v_ in (("discord_webhook", ""), ("webhook_applications", ""), ("webhook_on_application", "1"), ("webhook_on_event", "1")):
+            db.set_setting(k_, v_)
+        db.ex("DELETE FROM applications WHERE name IN ('Applicant Bob', 'Applicant Cal')")
     tok = db.val("SELECT agent_token FROM users WHERE username='rookie'")
     payload = {"frame": {"values": dict(frame["values"]), "trailers": frame["trailers"], "substances": frame["substances"]}}
     r = c.post("/api/agent/frame", json=payload, headers={"X-Agent-Token": tok})
@@ -2133,6 +2356,60 @@ def main():
           "optionally members are removed too, the Owner stays")
     page = c.get("/").get_data(as_text=True)
     check("Live Cockpit<span class=\"nav-ok\"" in page, "Live Cockpit marked complete")
+
+    # Dissolving the company (after Clear all data: it removes every member)
+    print("Dissolve")
+    from fmpro import ops as _ops
+    from fmpro.auth import create_user as _cu_ds
+    if True:
+        owner_ = db.one("SELECT id, username FROM users WHERE role='owner'")
+        d1 = _cu_ds("ds_driver", "Dee Driver", "dsdriver12", role="driver")
+        _cu_ds("ds_manager", "Max Manager", "dsmanager12", role="admin")
+        dtoken = db.val("SELECT agent_token FROM users WHERE id=?", (d1,))
+        djob = db.insert("jobs", user_id=d1, status="delivered", revenue=2000, driven_km=300, started_at=now_, finished_at=now_)
+        for k_, v_ in (("public_address", "198.51.100.7"), ("public_address_auto", "1"), ("allowed_hosts", "myco.ddns.net"),
+                       ("recruitment_open", "1")):
+            db.set_setting(k_, v_)
+        members_before = db.val("SELECT COUNT(*) FROM users WHERE role!='owner' AND username!='former-drivers'")
+        jobs_before = db.val("SELECT COUNT(*) FROM jobs")
+        rr_ = c.get("/settings?tab=data")
+        page = rr_.get_data(as_text=True)
+        check('action="/settings/dissolve"' in page and "Dissolve the company" in page, "the owner's Data tab has Dissolve the company")
+        dc = app.test_client()
+        dc.get("/login")
+        with dc.session_transaction() as s_:
+            dt_ = s_.get("csrf")
+        dc.post("/login", data={"username": "ds_manager", "password": "dsmanager12", "csrf": dt_})
+        dc.get("/")
+        with dc.session_transaction() as s_:
+            dt_ = s_.get("csrf")
+        check(dc.post("/settings/dissolve", data={"understand": "1", "confirm": "DISSOLVE", "password": "dsmanager12", "csrf": dt_}).status_code == 403,
+              "only the owner can dissolve the company")
+        post("/settings/dissolve", {"understand": "1", "confirm": "dissolve", "password": "x"})
+        post("/settings/dissolve", {"confirm": "DISSOLVE", "password": "x"})
+        post("/settings/dissolve", {"understand": "1", "confirm": "DISSOLVE", "password": "wrong-password"})
+        check(db.val("SELECT COUNT(*) FROM users WHERE role!='owner' AND username!='former-drivers'") == members_before,
+              "dissolving needs the box ticked, DISSOLVE typed and the owner's password")
+        check(db.val("SELECT COUNT(*) FROM audit_log WHERE action='dissolve refused'") >= 1, "a wrong password is recorded")
+        r = post("/settings/dissolve", {"understand": "1", "confirm": "DISSOLVE", "password": "secret12", "erase": "0"})
+        check(r.status_code == 302 and db.val("SELECT COUNT(*) FROM users WHERE role!='owner' AND status!='removed'") == 0,
+              "dissolving removes every member except the owner")
+        check(db.val("SELECT COUNT(*) FROM jobs") == jobs_before and db.val("SELECT user_id FROM jobs WHERE id=?", (djob,))
+              == db.val("SELECT id FROM users WHERE username='former-drivers'"), "keeping the books keeps every job, under Former driver")
+        check(all((db.setting(k_, "") or "") in ("", "0") for k_ in ("public_address", "public_address_auto", "allowed_hosts", "recruitment_open", "upnp_port")),
+              "the internet address, host names, router port and recruiting are switched off")
+        check(app.test_client().post("/api/agent/frame", json={"frame": None}, headers={"X-Agent-Token": dtoken}).status_code == 401,
+              "members' PC connections stop working")
+        check(dc.get("/profile").status_code == 302, "members' sessions end")
+        check(c.get("/").status_code == 200 and db.val("SELECT COUNT(*) FROM audit_log WHERE action='company dissolved'") == 1,
+              "the owner carries on, and the dissolve is in the audit log")
+        _cu_ds("ds_again", "Again Driver", "dsagain123", role="driver")
+        r = post("/settings/dissolve", {"understand": "1", "confirm": "DISSOLVE", "password": "secret12", "erase": "1"})
+        check(r.status_code == 302 and db.val("SELECT COUNT(*) FROM jobs") == 0
+              and db.val("SELECT COUNT(*) FROM users WHERE id!=?", (owner_["id"],)) == 0
+              and db.val("SELECT COUNT(*) FROM users WHERE id=?", (owner_["id"],)) == 1, "erase also wipes the company data and keeps the owner")
+        bks = os.listdir(os.path.join(os.path.dirname(db.DB_PATH), "backups"))
+        check(any(b.startswith("fleet-before-clear") for b in bks), "a backup is saved before erasing")
 
     print("Licence lifecycle")
     c.get("/login")

@@ -105,7 +105,8 @@ def main():
     dest = os.path.join(dest_dir, dest_name)
     shutil.copy2(src, dest)
     if a.notes.strip():
-        with open(os.path.join(dest_dir, f"notes-{version}.txt"), "w", encoding="utf-8") as fh:
+        served = VERSION_RX.search(dest_name).group(1)    # the server reads "1.5.13" out of "1.5.13-alpha": match it
+        with open(os.path.join(dest_dir, f"notes-{served}.txt"), "w", encoding="utf-8") as fh:
             fh.write(a.notes.strip()[:2000])
 
     print(f"Published Fleet Manager Pro {version} ({a.flavor}) for '{folder}'.")

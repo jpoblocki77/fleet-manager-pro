@@ -51,7 +51,7 @@ def sync():
             for m in db.q("SELECT id FROM users WHERE role IN ('admin','owner') AND status!='removed'"):
                 db.notify(m["id"], f"{new} new driver application{'s' if new > 1 else ''} from your Apply page.",
                           "/recruitment", "info")
-            economy.webhook("event", f"📝 {new} new driver application{'s' if new > 1 else ''} received")
+            economy.webhook("application", f"📝 {new} new driver application{'s' if new > 1 else ''} received")
         return new, None
 
 
