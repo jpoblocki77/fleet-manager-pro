@@ -159,6 +159,9 @@ UPDATE_ZIP_RX = re.compile(r"(\d+(?:\.\d+)+)")       # a version like 1.4 or 1.4
 _SHA_CACHE = {}
 
 
+HONEYPOT = "fmp_trap_q"                               # the Apply form's hidden anti-bot box (see apply_page)
+
+
 def vtuple(s):
     """Compare version strings like '1.3', '1.4', '1.4.2' as tuples of ints."""
     out = []
@@ -657,7 +660,9 @@ class Server:
         company = html.escape(name)
         if method == "POST":
             form = {k: v[0] for k, v in urllib.parse.parse_qs(raw.decode("utf-8", "replace"), max_num_fields=20).items()}
-            if form.get("website"):                                 # honeypot: people never see this field
+            # honeypot: people never see this box. Its name and label must not look like anything a browser
+            # autofills (it used to be "website", which autofill filled in - real applications were dropped)
+            if form.get(HONEYPOT):
                 return 200, _page("Thank you", f"<p>Your application to <b>{company}</b> was sent.</p>")
             if not self.apply_rate_ok(ip):
                 return 429, _page("Slow down", "<p>Too many applications from your connection. Try again in an hour.</p>")
@@ -681,7 +686,8 @@ class Server:
     <option value="ets2">Euro Truck Simulator 2</option><option value="both">Both</option></select></label>
   <label>Experience<textarea name="experience" maxlength="400" rows="3" placeholder="Hours driven, other VTCs..."></textarea></label>
   <label>Message<textarea name="message" maxlength="1500" rows="4"></textarea></label>
-  <label class="hp">Website<input name="website" tabindex="-1" autocomplete="off"></label>
+  <div class="hp" aria-hidden="true"><label>Leave this box empty<input name="{HONEYPOT}" tabindex="-1" autocomplete="off"
+    data-lpignore="true" data-1p-ignore data-form-type="other"></label></div>
   <button>Send application</button>
   <p class="small">Your details go only to {company}. They are deleted from this server as soon as the company
   has received them.</p>

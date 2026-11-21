@@ -2040,8 +2040,16 @@ def main():
     st, page = web(f"/apply/{code}", {"name": "Road Runner", "contact": "runner#0001", "age": "29", "country": "USA",
                                       "games": "both", "experience": "500 h ATS", "message": "<script>alert(9)</script>"})
     check(st == 200 and "was sent" in page, "an applicant can apply from anywhere")
-    web(f"/apply/{code}", {"name": "Bot", "contact": "spam", "website": "http://spam"})
+    _st, page_ = web(f"/apply/{code}")
+    check(f'name="{sys.modules["license_server"].HONEYPOT}"' in page_ and 'name="website"' not in page_ and "Website" not in page_,
+          "the hidden anti-bot box has a name and label browsers don't autofill")
+    web(f"/apply/{code}", {"name": "Bot", "contact": "spam", sys.modules["license_server"].HONEYPOT: "http://spam"})
     check(srv.store.db.execute("SELECT COUNT(*) FROM applications").fetchone()[0] == 1, "bots filling the hidden field are ignored")
+    web(f"/apply/{code}", {"name": "Autofill Al", "contact": "al#0002", "website": "https://al.example.com"})
+    check(srv.store.db.execute("SELECT COUNT(*) FROM applications").fetchone()[0] == 2,
+          "an applicant whose browser autofilled a website is no longer thrown away")
+    srv.store.db.execute("DELETE FROM applications WHERE id=(SELECT MAX(id) FROM applications)")
+    srv.store.db.commit()
     st, _ = web(f"/apply/{code}", {"name": "", "contact": ""})
     check(st == 400, "name and contact are required")
     new, err = recruit.sync()
@@ -2487,6 +2495,8 @@ def main():
     check(r.status_code == 302 and not lic.ok and not srv.store.active(pro_key), "deactivate frees this PC's slot")
 
     print("Sealed pages and hidden buyer ID (buyer copies)")
+    with srv.hits_lock:                    # a fresh minute for the licence server's request limit
+        srv.hits.clear()
     import importlib
     import subprocess
     from jinja2 import TemplateNotFound
