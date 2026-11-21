@@ -209,10 +209,11 @@ class Store:
                   issued TEXT, released TEXT, file TEXT);
                 CREATE TABLE IF NOT EXISTS recruit(key TEXT PRIMARY KEY, code TEXT UNIQUE NOT NULL, company TEXT,
                   intro TEXT DEFAULT '', open INTEGER DEFAULT 1, updated TEXT);
-                CREATE TABLE IF NOT EXISTS applications(id INTEGER PRIMARY KEY, code TEXT NOT NULL, created TEXT,
-                  data TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS applications(id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL,
+                  created TEXT, data TEXT NOT NULL);
                 CREATE INDEX IF NOT EXISTS ix_apps_code ON applications(code);
             """)
+            self._never_reuse_application_ids()
             for table, col, decl in (("purchases", "revoked", "TEXT"), ("activations", "last_seen", "TEXT"),
                                      ("activations", "last_ip", "TEXT"), ("purchases", "resets", "INTEGER DEFAULT 0"),
                                      ("purchases", "last_reset", "TEXT"), ("purchases", "product", "TEXT"),
@@ -221,6 +222,31 @@ class Store:
                 if col not in cols:
                     self.db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
             self.db.commit()
+
+    APP_ID_FLOOR = 1_000_000          # above every number the old server ever handed out
+
+    def _never_reuse_application_ids(self):
+        """Application numbers must never repeat: the app skips a number it has already saved and confirms it,
+        which deletes it here. The old table (plain INTEGER PRIMARY KEY) reused 1 whenever it was empty, so every
+        application after the first was thrown away. Rebuild it with AUTOINCREMENT and start well above old numbers."""
+        sql = (self.db.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='applications'").fetchone()
+               or [""])[0] or ""
+        if "AUTOINCREMENT" not in sql.upper():
+            self.db.executescript("""
+                ALTER TABLE applications RENAME TO applications_old;
+                CREATE TABLE applications(id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL, created TEXT,
+                  data TEXT NOT NULL);
+                INSERT INTO applications(id, code, created, data) SELECT id, code, created, data FROM applications_old;
+                DROP TABLE applications_old;
+                CREATE INDEX IF NOT EXISTS ix_apps_code ON applications(code);
+            """)
+        top = max(self.db.execute("SELECT COALESCE(MAX(id), 0) FROM applications").fetchone()[0], self.APP_ID_FLOOR)
+        row = self.db.execute("SELECT seq FROM sqlite_sequence WHERE name='applications'").fetchone()
+        if row is None:
+            self.db.execute("INSERT INTO sqlite_sequence(name, seq) VALUES('applications', ?)", (top,))
+        elif row[0] < top:
+            self.db.execute("UPDATE sqlite_sequence SET seq=? WHERE name='applications'", (top,))
+        self.db.commit()
 
     def purchase(self, key):
         p = self.db.execute("SELECT * FROM purchases WHERE key=?", (key,)).fetchone()

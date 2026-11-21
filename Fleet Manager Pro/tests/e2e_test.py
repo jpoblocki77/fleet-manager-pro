@@ -2058,6 +2058,47 @@ def main():
           "the application is collected into Recruitment")
     check(srv.store.db.execute("SELECT COUNT(*) FROM applications").fetchone()[0] == 0, "and deleted from the licence server")
     check(recruit.sync() == (0, None), "nothing is collected twice")
+    # regression: the server used to reuse number 1 once its list was empty, and the app then took every later
+    # application for the one it already had and told the server to delete it
+    first_rid = ra["remote_id"]
+    st, page = web(f"/apply/{code}", {"name": "Second Sam", "contact": "sam#0003", "games": "ats"})
+    new2, _e = recruit.sync()
+    sam = db.one("SELECT remote_id FROM applications WHERE name='Second Sam'")
+    check(new2 == 1 and sam and sam["remote_id"] != first_rid and sam["remote_id"] > 1_000_000,
+          "a second application gets a new number and is collected (numbers are never reused)")
+    st, page = web(f"/apply/{code}", {"name": "Third Tia", "contact": "tia#0004"})
+    new3, _e = recruit.sync()
+    check(new3 == 1 and db.val("SELECT COUNT(*) FROM applications WHERE name='Third Tia'") == 1, "and so is the next one")
+    # an older server that reuses a number: a different person with an old number is still saved
+    db.ex("UPDATE applications SET remote_id=? WHERE name='Second Sam'", (424242,))
+    import json as _js
+    lsv = sys.modules["license_server"]
+    with srv.store.lock:
+        srv.store.db.execute("INSERT INTO applications(id, code, created, data) VALUES(?,?,?,?)",
+                             (424242, code, lsv.iso(lsv.now()), _js.dumps({"name": "Reused Rex", "contact": "rex#0005"})))
+        srv.store.db.commit()
+    new4, _e = recruit.sync()
+    check(new4 == 1 and db.val("SELECT COUNT(*) FROM applications WHERE name='Reused Rex'") == 1,
+          "the app doesn't mistake a new applicant for an old one just because a server reused a number")
+    check(recruit.sync() == (0, None), "still nothing is collected twice")
+    # an old licenses.db is upgraded in place: same rows, numbers start above anything handed out before
+    import sqlite3 as _sq3
+    old_dir = tempfile.mkdtemp(prefix="fmp-oldlic-")
+    odb = _sq3.connect(os.path.join(old_dir, "licenses.db"))
+    odb.executescript("CREATE TABLE applications(id INTEGER PRIMARY KEY, code TEXT NOT NULL, created TEXT, data TEXT NOT NULL);"
+                      "INSERT INTO applications(id, code, created, data) VALUES(3, 'abcdefgh', 'x', '{}');")
+    odb.commit(); odb.close()
+    st2 = lsv.Store(old_dir)
+    sql_ = st2.db.execute("SELECT sql FROM sqlite_master WHERE name='applications'").fetchone()[0]
+    st2.db.execute("INSERT INTO applications(code, created, data) VALUES('abcdefgh', 'y', '{}')")
+    ids_ = [r[0] for r in st2.db.execute("SELECT id FROM applications ORDER BY id")]
+    check("AUTOINCREMENT" in sql_.upper() and ids_[0] == 3 and ids_[1] > 1_000_000,
+          "an existing licence database is upgraded, keeping waiting applications")
+    st2.db.close()
+    shutil.rmtree(old_dir, ignore_errors=True)
+    db.ex("DELETE FROM applications WHERE name IN ('Second Sam', 'Third Tia', 'Reused Rex')")
+    with srv.hits_lock:                    # the extra applications above used up this address's hourly allowance
+        srv.apply_hits.clear()
     c.get("/login")
     post("/login", {"username": "boss", "password": "secret12"})
     c.get("/")

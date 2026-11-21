@@ -30,7 +30,10 @@ def sync():
                     rid = int(a.get("id") or 0)
                     if not rid:
                         continue
-                    if not db.val("SELECT id FROM applications WHERE remote_id=?", (rid,)):
+                    # the same number AND the same person = already saved (a retry). Older servers reused numbers
+                    # once their list was empty, so the number alone used to drop every new application.
+                    if not db.val("SELECT id FROM applications WHERE remote_id=? AND name=? AND contact=?",
+                                  (rid, str(a.get("name") or "")[:48] or "(no name)", str(a.get("contact") or "")[:100])):
                         _store(a, rid)
                         new += 1
                     saved.append(rid)
