@@ -1,0 +1,1 @@
+Find a VTC now shows Owners and Managers whether their company is in the VTC Finder, with a List my company button. Also new since 1.5.21: a banner on every page when a driver applies, and the VTC Finder (Company > VTC Profile) so drivers can find your company and apply.
