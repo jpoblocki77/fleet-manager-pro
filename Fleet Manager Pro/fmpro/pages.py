@@ -6,7 +6,7 @@ import secrets
 import shutil
 import time
 
-from flask import Blueprint, current_app, abort, flash, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, abort, flash, make_response, redirect, render_template, request, url_for
 
 from . import RES, db, economy, licensing, updater
 from .auth import PASSWORD_RULE, ROLES, game_scope, game_sql, can, create_user, login_required, role_level, user, valid_password
@@ -1172,7 +1172,9 @@ def recruitment():
     rows = db.q("""SELECT a.*, u.display_name reviewer FROM applications a LEFT JOIN users u ON u.id=a.reviewed_by
                    ORDER BY a.status='pending' DESC, a.created_at DESC""")
     synced = float(db.setting("recruit_synced", "0") or 0)
+    reviewed = sum(1 for r in rows if r["status"] in ("accepted", "rejected"))
     return render_template("recruitment.html", rows=rows, divisions=db.q("SELECT * FROM divisions ORDER BY name"),
+                           reviewed=reviewed,
                            apply_url=db.setting("recruit_url", ""), synced=synced or None,
                            sync_error=db.setting("recruit_error", ""))
 
@@ -1211,6 +1213,41 @@ def recruitment_review(aid):
             flash(f"Account created — username {un}, temporary password {pw} (shown once; send it to them).", "success")
         else:
             flash(f"Application marked {action}.", "success")
+    return redirect(url_for("pages.recruitment"))
+
+
+@bp.route("/recruitment/<int:aid>/delete", methods=["POST"])
+@login_required(role="admin")
+def recruitment_delete(aid):
+    a = db.one("SELECT name, status FROM applications WHERE id=?", (aid,))
+    if not a:
+        abort(404)
+    db.ex("DELETE FROM applications WHERE id=?", (aid,))
+    db.audit(user()["id"], "application deleted", f"{a['name']} ({a['status']})")
+    flash(f"Application from {a['name']} deleted.", "success")
+    return redirect(url_for("pages.recruitment"))
+
+
+CLEAR_WHICH = {"rejected": ("rejected",), "accepted": ("accepted",), "reviewed": ("accepted", "rejected")}
+
+
+@bp.route("/recruitment/clear", methods=["POST"])
+@login_required(role="admin")
+def recruitment_clear():
+    """Delete old, already-decided applications in one go. Pending and interview applications are never touched."""
+    statuses = CLEAR_WHICH.get(request.form.get("which", ""))
+    days = request.form.get("days", "")
+    if not statuses or days not in ("0", "7", "30", "90"):
+        abort(400)
+    cutoff = time.time() - int(days) * 86400
+    marks = ",".join("?" * len(statuses))
+    where = f"status IN ({marks}) AND COALESCE(reviewed_at, created_at) <= ?"
+    n = db.val(f"SELECT COUNT(*) FROM applications WHERE {where}", (*statuses, cutoff), 0)  # nosec B608  # only ? placeholders are built here
+    db.ex(f"DELETE FROM applications WHERE {where}", (*statuses, cutoff))  # nosec B608  # only ? placeholders are built here
+    if n:
+        db.audit(user()["id"], "applications cleared", f"{n} {request.form['which']}, older than {days} days")
+    flash(f"{n} old application{'s' if n != 1 else ''} deleted." if n else "No applications matched - nothing deleted.",
+          "success" if n else "info")
     return redirect(url_for("pages.recruitment"))
 
 
@@ -1516,7 +1553,7 @@ def unit_settings_view(units):
 
 SETTING_FIELDS = {
     "company_name": ("str", 64), "company_tag": ("str", 8), "company_motto": ("str", 120),
-    "company_color": ("color", 7), "currency": ("str", 4), "units": ("choice", ("imperial", "metric")),
+    "company_color": ("color", 7), "theme_navy": ("color", 7), "theme_accent": ("color", 7), "currency": ("str", 4), "units": ("choice", ("imperial", "metric")),
     "default_game": ("choice", ("ats", "ets2")), "fuel_price": ("num", (0, 100)),
     "driver_pay_per_km": ("num", (0, 100)), "driver_commission_pct": ("num", (0, 100)),
     "xp_per_km": ("num", (0, 100)), "xp_per_tonne": ("num", (0, 100)), "speeding_tolerance_kmh": ("num", (0, 50)),
@@ -1570,6 +1607,16 @@ def allow_host(host):
     return True
 
 
+@bp.route("/settings/colours.css")
+@login_required(role="admin")
+def theme_preview():
+    """Settings > Company live preview: the exact CSS that saving these two colours would give."""
+    from . import theme
+    resp = make_response(theme.css(request.args.get("navy", ""), request.args.get("accent", "")))
+    resp.headers["Content-Type"] = "text/css; charset=utf-8"
+    return resp
+
+
 @bp.route("/settings", methods=["GET", "POST"])
 @login_required(role="admin")
 def settings():
@@ -1611,6 +1658,9 @@ def settings():
             tu = opt_id("telemetry_user_id", "users")
             if tu:
                 db.set_setting("telemetry_user_id", tu)
+        if section == "company" and request.form.get("theme_reset") == "1":
+            db.set_setting("theme_navy", "")
+            db.set_setting("theme_accent", "")
         db.audit(user()["id"], "settings", section)
         flash("Settings saved.", "success")
         return redirect(url_for("pages.settings", tab=section or None))

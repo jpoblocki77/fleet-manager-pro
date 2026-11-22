@@ -25,7 +25,7 @@
 
 <div class="card" style="margin-bottom:16px">
   <div class="card-head"><h2>12 months</h2>
-    <div class="right legend"><span><i style="background:#2fb67c"></i>Revenue</span><span><i style="background:#c8102e"></i>Costs</span><span><i style="background:#4d8fe0"></i>Profit</span></div></div>
+    <div class="right legend"><span><i style="background:#2fb67c"></i>Revenue</span><span><i style="background:var(--crimson)"></i>Costs</span><span><i style="background:#4d8fe0"></i>Profit</span></div></div>
   <div id="chart-months" style="height:260px"></div>
   <div class="table-wrap" style="margin-top:10px"><table class="compact"><thead><tr><th>Month</th>{% for m in months %}<th class="num">{{ m.label }}</th>{% endfor %}</tr></thead><tbody>
     <tr><td class="muted">Loads</td>{% for m in months %}<td class="num">{{ m.loads or '·' }}</td>{% endfor %}</tr>
@@ -62,10 +62,11 @@
 {% endblock %}
 {% block scripts %}
 <script>
+const ACCENT = getComputedStyle(document.documentElement).getPropertyValue("--crimson").trim() || "#c8102e";
 const months = {{ months|tojson }};
 FMP.chart(document.getElementById("chart-months"), { labels: months.map(m => m.label), prefix: FMP.cur, series: [
   { name: "Revenue", color: "#2fb67c", values: months.map(m => m.revenue) },
-  { name: "Costs", color: "#c8102e", values: months.map(m => m.cost) },
+  { name: "Costs", color: ACCENT, values: months.map(m => m.cost) },
   { name: "Profit", color: "#4d8fe0", values: months.map(m => m.profit), type: "line" }] });
 </script>
 {% endblock %}

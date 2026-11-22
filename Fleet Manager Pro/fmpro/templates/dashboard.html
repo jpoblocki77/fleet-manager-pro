@@ -27,7 +27,7 @@
 <div class="grid g3" style="margin-bottom:16px">
   <div class="card span2">
     <div class="card-head"><h2>Last 14 days</h2>
-      <div class="right legend"><span><i style="background:#c8102e"></i>Revenue</span><span><i style="background:#4d8fe0"></i>Distance</span></div></div>
+      <div class="right legend"><span><i style="background:var(--crimson)"></i>Revenue</span><span><i style="background:#4d8fe0"></i>Distance</span></div></div>
     <div id="chart-daily" style="height:230px"></div>
   </div>
   <div class="card">
@@ -99,10 +99,11 @@
 {% endblock %}
 {% block scripts %}
 <script>
+const ACCENT = getComputedStyle(document.documentElement).getPropertyValue("--crimson").trim() || "#c8102e";
 const daily = {{ daily|tojson }};
 FMP.chart(document.getElementById("chart-daily"), {
   labels: daily.map(d => d.d.slice(5)),
-  series: [{ name: "Revenue", color: "#c8102e", values: daily.map(d => d.revenue || 0) },
+  series: [{ name: "Revenue", color: ACCENT, values: daily.map(d => d.revenue || 0) },
            { name: "Distance", color: "#4d8fe0", type: "line", values: daily.map(d => (d.km || 0) * (FMP.imp() ? 0.621371 : 1)) }]
 });
 function mini() {

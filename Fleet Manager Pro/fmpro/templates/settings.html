@@ -18,7 +18,46 @@
     <div class="field"><label>Main game</label><select name="default_game"><option value="ats" {{ 'selected' if S.default_game=='ats' }}>ATS</option><option value="ets2" {{ 'selected' if S.default_game=='ets2' }}>ETS2</option></select></div>
     <div class="field"><label>Units</label><select name="units"><option value="imperial" {{ 'selected' if S.units=='imperial' }}>Imperial</option><option value="metric" {{ 'selected' if S.units=='metric' }}>Metric</option></select></div>
     <div class="field"><label>Currency symbol</label><input name="currency" value="{{ S.currency }}" maxlength="4"></div>
-  </div><button class="btn primary">Save</button></form>
+  </div>
+  <div id="company-colours-card" style="border-top:1px solid var(--line);margin:6px 0 14px;padding-top:14px">
+    <h3>Colours</h3>
+    <p class="hint" style="margin-top:0">Swap the navy blue and crimson red for your company's colours. Everyone in the company sees them,
+      on every page and the sign-in screen. Backgrounds stay dark (or light, in the light theme) so text stays readable.</p>
+    <div class="fields">
+      <div class="field"><label>Main colour <span class="faint">(navy)</span></label>
+        <input type="color" name="theme_navy" id="theme-navy" value="{{ S.theme_navy or '#0a1a33' }}"><div class="hint">Sidebar and backgrounds.</div></div>
+      <div class="field"><label>Accent colour <span class="faint">(crimson)</span></label>
+        <input type="color" name="theme_accent" id="theme-accent" value="{{ S.theme_accent or '#c8102e' }}"><div class="hint">Buttons, links, highlights.</div></div>
+    </div>
+    <div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:6px">
+      {% for label, n, a in [('Navy & crimson','#0a1a33','#c8102e'),('Forest & gold','#123220','#e0a800'),('Charcoal & orange','#1f1f22','#ff6a13'),
+                             ('Midnight & teal','#0b1630','#14b8a6'),('Plum & pink','#2a0f2e','#ec4899'),('Black & white','#0b0b0b','#f2f2f2')] %}
+      <button type="button" class="btn sm theme-preset" data-navy="{{ n }}" data-accent="{{ a }}">
+        <i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:{{ n }};border:1px solid var(--line)"></i><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:{{ a }};margin-right:4px"></i>{{ label }}</button>
+      {% endfor %}
+    </div>
+    <p class="hint">Changes show here straight away as a preview; press <b>Save</b> to keep them.</p>
+  </div>
+  <button class="btn primary">Save</button>
+  {% if S.theme_navy or S.theme_accent %}<button class="btn" name="theme_reset" value="1"
+    data-confirm="Go back to the original navy blue and crimson red?">Reset to navy &amp; crimson</button>{% endif %}
+</form>
+<script>
+(function () {
+  const n = document.getElementById("theme-navy"), a = document.getElementById("theme-accent");
+  let st = document.getElementById("company-colours"), seq = 0;
+  if (!st) { st = document.createElement("style"); st.id = "company-colours"; document.head.appendChild(st); }
+  function preview() {   // the app works out the exact shades, the same way it does when you save
+    const my = ++seq, q = new URLSearchParams({ navy: n.value, accent: a.value });
+    fetch("/settings/colours.css?" + q, { credentials: "same-origin" }).then(r => r.ok ? r.text() : null)
+      .then(css => { if (css !== null && my === seq) st.textContent = css; }).catch(() => {});
+  }
+  n.addEventListener("input", preview); a.addEventListener("input", preview);
+  document.querySelectorAll(".theme-preset").forEach(b => b.addEventListener("click", () => {
+    n.value = b.dataset.navy; a.value = b.dataset.accent; preview();
+  }));
+})();
+</script>
 
 {% elif tab == 'economy' %}
 <form method="post" class="card" style="max-width:820px">{{ csrf() }}<input type="hidden" name="section" value="economy"><input type="hidden" name="units" value="{{ current_units() }}">

@@ -17,7 +17,7 @@
   {{ stat('Net', (income + expense)|money, 'selected period') }}
 </div>
 <div class="grid g3" style="margin-bottom:16px">
-  <div class="card span2"><div class="card-head"><h2>Cash flow · 30 days</h2><div class="right legend"><span><i style="background:#2fb67c"></i>Income</span><span><i style="background:#c8102e"></i>Expenses</span></div></div>
+  <div class="card span2"><div class="card-head"><h2>Cash flow · 30 days</h2><div class="right legend"><span><i style="background:#2fb67c"></i>Income</span><span><i style="background:var(--crimson)"></i>Expenses</span></div></div>
     <div id="chart-flow" style="height:240px"></div></div>
   <div class="card"><div class="card-head"><h2>By category</h2></div>
     <div class="row" style="justify-content:center"><div id="donut"></div></div>
@@ -61,10 +61,11 @@
 {% endblock %}
 {% block scripts %}
 <script>
+const ACCENT = getComputedStyle(document.documentElement).getPropertyValue("--crimson").trim() || "#c8102e";
 const trend = {{ trend|tojson }}, cats = {{ cats|tojson }};
 FMP.chart(document.getElementById("chart-flow"), { labels: trend.map(t => t.d.slice(5)), prefix: FMP.cur,
-  series: [{ name: "Income", color: "#2fb67c", values: trend.map(t => t.inc) }, { name: "Expenses", color: "#c8102e", values: trend.map(t => t.exp) }] });
-const palette = ["#c8102e", "#2a5592", "#e0662b", "#4d8fe0", "#d9a400", "#2fb67c", "#a020a0", "#8fa8cc", "#ff6d86", "#15325e", "#79acf0", "#f3b951"];
+  series: [{ name: "Income", color: "#2fb67c", values: trend.map(t => t.inc) }, { name: "Expenses", color: ACCENT, values: trend.map(t => t.exp) }] });
+const palette = [ACCENT, "#2a5592", "#e0662b", "#4d8fe0", "#d9a400", "#2fb67c", "#a020a0", "#8fa8cc", "#ff6d86", "#15325e", "#79acf0", "#f3b951"];
 const colorOf = {}; cats.forEach((c, i) => colorOf[c.category] = palette[i % palette.length]);
 FMP.donut(document.getElementById("donut"), cats.filter(c => c.total < 0).map(c => ({ label: c.category, value: -c.total, color: colorOf[c.category] })));
 document.querySelectorAll(".cat-dot").forEach(d => d.style.background = colorOf[d.dataset.cat]);

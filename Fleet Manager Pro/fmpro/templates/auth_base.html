@@ -5,6 +5,7 @@
 <title>{% block title %}{% endblock %} · {{ S.company_name or APP_NAME }}</title>
 <script>try{var t=localStorage.getItem("fmp-theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v={{ VERSION }}">
+{% if THEME_CSS %}<style id="company-colours">{{ THEME_CSS }}</style>{% endif %}
 </head>
 <body data-units="{{ current_units() }}" data-currency="{{ S.currency }}">
 <div class="auth-wrap">

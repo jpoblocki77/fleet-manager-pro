@@ -100,7 +100,9 @@ class JobTracker:
             truck = (v["truck_id"], v["license_plate"])
             if truck != self.fuel_truck:
                 self.fuel_truck, self.fuel_hist = truck, []
-            self.fuel_hist = [(t, f) for t, f in self.fuel_hist if now - t < 120] + [(now, v["fuel"])]
+            # While a save loads the game reports an empty tank for a moment, then the real level. Keep those
+            # 0 L readings out, or a refuel event raised on load would look like a fill from empty.
+            self.fuel_hist = [(t, f) for t, f in self.fuel_hist if now - t < 120] +                 ([(now, v["fuel"])] if v["fuel"] > 0.5 else [])
             # The game raises "refuel" when the pump starts and "refuel_paid" only when the driver closes the
             # pump screen, which can be minutes later - long after the 2-minute history forgot the low level.
             if v.get("refuel") and not (self.prev or {}).get("refuel") and v["fuel"] > 0.5:
@@ -380,7 +382,7 @@ class JobTracker:
                 if kind == "refuel":
                     # The game also raises this event when a job or truck is loaded, without any fuel
                     # being added. Only book it once the tank level actually rises.
-                    base = min(f for _t, f in self.fuel_hist)
+                    base = min((f for _t, f in self.fuel_hist), default=v["fuel"])
                     rs = self.refuel_start
                     if rs and rs[1] == (v["truck_id"], v["license_plate"]) and now - rs[0] < 1800:
                         base = min(base, rs[2])
@@ -409,7 +411,8 @@ class JobTracker:
             jlog.debug("driver #%s: refuel event ignored (the tank didn't fill - the game raises it on load too)",
                        self.user_id)
             return
-        p["base"] = min(p["base"], v["fuel"])
+        if v["fuel"] > 0.5:                 # a 0 L reading is a save loading, not an empty tank
+            p["base"] = min(p["base"], v["fuel"])
         if v["fuel"] - p["base"] >= max(1.0, 0.5 * p["litres"]):
             self.pending_refuel = None
             cost = round(p["litres"] * db.setting_f("fuel_price", 1.25), 2)

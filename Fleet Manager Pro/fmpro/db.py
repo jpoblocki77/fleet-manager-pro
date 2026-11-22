@@ -190,7 +190,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
 STARTING_CAPITAL = 275000          # every new company starts with this; it can't be changed
 
 DEFAULT_SETTINGS = {
-    "company_name": "", "company_tag": "", "company_motto": "", "company_color": "#c8102e",
+    "company_name": "", "company_tag": "", "company_motto": "", "company_color": "#c8102e", "theme_navy": "", "theme_accent": "",
     "currency": "$", "units": "imperial", "default_game": "ats",
     "tablet_access": "0",               # 1 = tablets/phones on this network can connect (HTTPS on port+1)
     "fluid_alerts": "1",                # 1 = notify the driver and managers when fuel or AdBlue runs low

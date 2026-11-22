@@ -306,6 +306,21 @@ def main():
     feed(t5, dict(roam, fuel=830.0))
     check(db.val("SELECT COUNT(*) FROM ledger WHERE category='fuel'", (), 0) == fuel_before + 2,
           "a later phantom refuel isn't matched to the old pump start")
+    # loading a save: the tank reads 0 L for a moment, then the real level, with a refuel event
+    clock.t += 300
+    feed(t5, dict(roam, fuel=0.0))
+    clock.t += 1
+    feed(t5, dict(roam, fuel=830.0, refuel_paid=True, refuel_amount=61.0))   # event after the 0 L reading
+    clock.t += 1
+    feed(t5, dict(roam, fuel=830.0, refuel_paid=True, refuel_amount=62.0))   # event before it...
+    clock.t += 1
+    feed(t5, dict(roam, fuel=0.0, refuel_paid=True, refuel_amount=62.0))
+    clock.t += 1
+    feed(t5, dict(roam, fuel=830.0, refuel_paid=True, refuel_amount=62.0))   # ...then the level comes back
+    clock.t += 130
+    feed(t5, dict(roam, fuel=830.0))
+    check(db.val("SELECT COUNT(*) FROM ledger WHERE category='fuel'", (), 0) == fuel_before + 2,
+          "a save loading (0 L, then full) isn't booked as a refuel")
     service.time = _time
 
     print("Compliance (ELD / HOS, DVIR, roadside inspections)")
@@ -426,6 +441,14 @@ def main():
     check(codes_ == ["drive-15", "break-0", "rest-30"], f"Hours of Service warnings: drive time, break and rest stop {codes_}")
     check(overlay_fields.hos_warnings({"hos": {"available": 0, "break_left": 100, "status": "off", "cycle_left": 0}}, {})[0][0]
           == "drive-0", "out of drive time is a red warning")
+    ws_ = [{"code": c_, "text": t_, "level": l_} for c_, t_, l_ in overlay_fields.hos_warnings(hud_t, {"next_rest_stop": 20})]
+    bn_ = ingame.pick_banner(ws_)
+    check(bn_ and bn_["code"] == "break-0", f"the overlay keeps the most urgent logbook warning on screen ({bn_})")
+    bn_ = ingame.pick_banner([w for w in ws_ if w["code"] != "break-0"])
+    check(bn_ and bn_["code"] == "drive-15" and "drive time left" in bn_["text"],
+          "the 15-minute drive-time warning stays on screen, not just a pop-up")
+    check(ingame.pick_banner([{"code": "rest-30", "text": "x", "level": "warn"}]) is None and ingame.pick_banner([]) is None,
+          "no strip when no drive / break / cycle limit is near")
     check(not ingame.running() and b"didn" not in post("/overlay/ingame", {"action": "start"}).data
           and not ingame.running(), "the overlay window isn't started where the app has no local port (tests)")
     # LAN mode: the app serves on a private local port behind the HTTPS front door; the overlay must use it
@@ -970,6 +993,46 @@ def main():
     check(db.setting("fuel_price") == "1.5" and db.setting("auto_charge_repairs") == "0", "save settings (incl. unticked box)")
     post("/settings", {"section": "economy", "fuel_price": "nan"})
     check(db.setting("fuel_price") == "1.5", "rejects NaN setting")
+
+    print("Company colours: swap the navy and crimson")
+    from fmpro import theme as _th
+    page = c.get("/settings?tab=company").get_data(as_text=True)
+    check('name="theme_navy"' in page and 'name="theme_accent"' in page and "theme-preset" in page,
+          "Settings > Company has colour pickers and ready-made pairs")
+    check('id="company-colours"' not in c.get("/").get_data(as_text=True), "with the built-in colours no extra CSS is added")
+    post("/settings", {"section": "company", "theme_navy": "#0a1a33", "theme_accent": "#c8102e"})
+    check('id="company-colours"' not in c.get("/").get_data(as_text=True), "saving the built-in colours changes nothing")
+    post("/settings", {"section": "company", "theme_navy": "#123220", "theme_accent": "#E0A800"})
+    page = c.get("/").get_data(as_text=True)
+    check(db.setting("theme_navy") == "#123220" and "--navy-900:#123220;" in page and "--crimson:#e0a800;" in page,
+          "the chosen colours apply to every page")
+    check("--on-accent:#000;" in page, "button text turns black on a light accent so it stays readable")
+    lc_ = app.test_client()
+    check("--crimson:#e0a800;" in lc_.get("/login", follow_redirects=True).get_data(as_text=True),
+          "the sign-in screen uses the company colours too")
+    d_, l_ = _th.palette("#123220", "#e0a800")
+    check(d_["--bg"] != "#071327" and _th._hls(d_["--bg"])[1] <= _th._hls("#071327")[1] + 0.01,
+          f"page backgrounds take the new colour but stay as dark as before ({d_['--bg']})")
+    check(_th.palette("#ff00ff", "")[0]["--navy-900"] != "#ff00ff", "a very bright main colour is darkened so white text stays readable")
+    post("/settings", {"section": "company", "theme_navy": "red;}body{display:none", "theme_accent": "url(x)"})
+    check(db.setting("theme_navy") == "#123220" and db.setting("theme_accent").lower() == "#e0a800",
+          "anything that isn't a #rrggbb colour is refused")
+    db.set_setting("theme_navy", "red;}</style><script>alert(1)</script>")
+    page = c.get("/").get_data(as_text=True)
+    check("<script>alert(1)" not in page and "--navy-900:red" not in page, "a bad stored value never reaches the page")
+    db.set_setting("theme_navy", "#123220")
+    post("/settings", {"section": "company", "theme_reset": "1"})
+    check(db.setting("theme_navy") == "" and db.setting("theme_accent") == ""
+          and 'id="company-colours"' not in c.get("/").get_data(as_text=True), "Reset goes back to navy and crimson")
+    r_ = c.get("/settings/colours.css?navy=%23123220&accent=%2314b8a6")
+    check(r_.status_code == 200 and "text/css" in r_.headers["Content-Type"] and "--crimson:#14b8a6;" in r_.get_data(as_text=True),
+          "the live preview gets the exact colours from the app")
+    check(c.get("/settings/colours.css?navy=red;}x{&accent=%3C/style%3E").get_data(as_text=True) == "",
+          "the preview ignores anything that isn't a colour")
+    check(app.test_client().get("/settings/colours.css?navy=%23123220").status_code in (302, 401, 403),
+          "the preview needs an admin sign-in")
+    check(_th.css("", "") == "" and _th.on_colour("#c8102e") == "#fff" and _th.on_colour("#f2f2f2") == "#000",
+          "white text on crimson, black on near-white")
 
     print("0.02 Alpha: damage deduction, expenses, performance, ELD reset, garages")
     import time as _tm
@@ -2330,6 +2393,42 @@ def main():
     post(f"/recruitment/{aid2}", {"action": "accepted"})
     check(db.val("SELECT COUNT(*) FROM users") == n_users + 1, "accepting without 'create account' doesn't create one")
     check(post("/recruitment/999999", {"action": "accepted"}).status_code == 404, "an unknown application gives a 404")
+
+    print("Recruitment: deleting old applications")
+    old_ = _time.time() - 40 * 86400
+    del_one = db.insert("applications", name="Delete Me", contact="d", status="pending", created_at=_time.time())
+    old_rej = db.insert("applications", name="Old Reject", contact="o1", status="rejected", created_at=old_, reviewed_at=old_)
+    new_rej = db.insert("applications", name="New Reject", contact="o2", status="rejected", created_at=_time.time(),
+                        reviewed_at=_time.time())
+    old_acc = db.insert("applications", name="Old Accept", contact="o3", status="accepted", created_at=old_, reviewed_at=old_)
+    old_pend = db.insert("applications", name="Old Pending", contact="o4", status="pending", created_at=old_)
+    old_int = db.insert("applications", name="Old Interview", contact="o5", status="interview", created_at=old_)
+    page = c.get("/recruitment").get_data(as_text=True)
+    check(f"/recruitment/{del_one}/delete" in page and 'action="/recruitment/clear"' in page,
+          "each application has a Delete button and there's a clean-up form")
+    users_before = db.val("SELECT COUNT(*) FROM users")
+    r_ = nc.post(f"/recruitment/{del_one}/delete", data={"csrf": ntok})
+    check(r_.status_code in (302, 403) and db.val("SELECT id FROM applications WHERE id=?", (del_one,)) == del_one,
+          "a driver can't delete applications")
+    check(c.post(f"/recruitment/{del_one}/delete").status_code in (400, 403)
+          and db.val("SELECT id FROM applications WHERE id=?", (del_one,)) == del_one, "deleting needs the CSRF token")
+    r_ = post(f"/recruitment/{del_one}/delete")
+    check(r_.status_code == 302 and not db.val("SELECT id FROM applications WHERE id=?", (del_one,)),
+          "an admin deletes one application")
+    check(post("/recruitment/999999/delete").status_code == 404, "deleting an unknown application gives a 404")
+    check(db.val("SELECT detail FROM audit_log WHERE action='application deleted' ORDER BY id DESC LIMIT 1") == "Delete Me (pending)",
+          "the deletion is in the audit log")
+    left = lambda: {r["id"] for r in db.q("SELECT id FROM applications")}
+    post("/recruitment/clear", {"which": "rejected", "days": "30"})
+    check(old_rej not in left() and new_rej in left() and old_acc in left(), "clean-up deletes only old rejected applications")
+    post("/recruitment/clear", {"which": "reviewed", "days": "0"})
+    check(not ({new_rej, old_acc} & left()) and {old_pend, old_int} <= left(),
+          "accepted and rejected of any age go; pending and interview applications are never cleared")
+    check(post("/recruitment/clear", {"which": "pending", "days": "0"}).status_code == 400
+          and post("/recruitment/clear", {"which": "rejected", "days": "1; DROP"}).status_code == 400
+          and {old_pend, old_int} <= left(), "odd clean-up choices are refused")
+    check(db.val("SELECT COUNT(*) FROM users") == users_before, "deleting applications never removes driver accounts")
+    db.ex("DELETE FROM applications WHERE id IN (?,?)", (old_pend, old_int))
 
     print("Two games: a job left open in one game waits while you drive the other")
     service.time = clock

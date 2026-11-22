@@ -23,7 +23,9 @@
 <div class="card {{ 'accent' if a.status == 'pending' }}">
   <div class="between"><div><b style="font-size:16px">{{ a.name }}</b> {{ status(a.status) }}
     <div class="small muted">{% if a.source == 'online' %}<span class="badge info">online</span> {% endif %}{{ a.contact }}{% if a.discord %} · Discord {{ a.discord }}{% endif %}{% if a.age %} · {{ a.age }} y/o{% endif %}{% if a.country %} · {{ a.country }}{% endif %} · {{ (a.games or '')|upper }} · {{ a.created_at|ago }}</div></div>
-    {% if a.reviewer %}<span class="small faint">reviewed by {{ a.reviewer }}</span>{% endif %}</div>
+    <div class="row" style="gap:8px;align-items:center">{% if a.reviewer %}<span class="small faint">reviewed by {{ a.reviewer }}</span>{% endif %}
+      <form method="post" action="/recruitment/{{ a.id }}/delete" class="inline">{{ csrf() }}<button class="btn ghost sm"
+        data-confirm="Delete the application from {{ a.name }}? This can't be undone.">Delete</button></form></div></div>
   {% if a.experience %}<p><b class="small muted">Experience</b><br>{{ a.experience }}</p>{% endif %}
   {% if a.message %}<p><b class="small muted">Message</b><br>{{ a.message }}</p>{% endif %}
   <form method="post" action="/recruitment/{{ a.id }}" class="row" style="margin-top:8px">{{ csrf() }}
@@ -38,6 +40,22 @@
 </div>
 {% else %}<div class="card empty">No applications yet. Share your Apply link above with prospective drivers.</div>{% endfor %}
 </div>
+{% if reviewed %}
+<div class="card" id="clear-old" style="margin-top:16px">
+  <div class="card-head"><h2>Clean up old applications</h2></div>
+  <p class="hint">Deletes applications you've already accepted or rejected. Pending and interview applications are never deleted here;
+    accepted drivers keep their accounts.</p>
+  <form method="post" action="/recruitment/clear" class="row">{{ csrf() }}
+    <label style="margin:0">Delete <select name="which" style="width:auto">
+      <option value="rejected">rejected</option><option value="accepted">accepted</option>
+      <option value="reviewed">accepted and rejected</option></select></label>
+    <label style="margin:0">applications <select name="days" style="width:auto">
+      <option value="30">older than 30 days</option><option value="7">older than 7 days</option>
+      <option value="90">older than 90 days</option><option value="0">of any age</option></select></label>
+    <button class="btn danger sm" data-confirm="Delete these applications? This can't be undone.">Delete</button>
+  </form>
+</div>
+{% endif %}
 {% endblock %}
 {% block scripts %}
 <script>

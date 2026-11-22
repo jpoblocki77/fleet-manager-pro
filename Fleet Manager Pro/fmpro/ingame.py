@@ -102,6 +102,18 @@ def _hm(m):
     return f"{m // 60}:{m % 60:02d}"
 
 
+STICKY = ("drive-", "break-", "cycle-")         # Hours of Service warnings that stay on screen while they're true
+
+
+def pick_banner(warnings):
+    """The one Hours of Service warning to keep on screen under the panel: the most urgent drive / break / cycle
+    warning that is true right now, or None. A pop-up lasts seconds; 15 game minutes pass in under a minute of real
+    time, so the warning has to stay up until the driver rests."""
+    rank = {"bad": 0, "warn": 1}
+    live = [w for w in warnings or [] if str(w.get("code", "")).startswith(STICKY) and w.get("level") in rank]
+    return min(live, key=lambda w: rank[w["level"]]) if live else None
+
+
 class Overlay:
     def __init__(self, port, key):
         import tkinter as tk
@@ -123,6 +135,7 @@ class Overlay:
         self.toasts = []                                  # [text, level, until]
         self.pending = []                                 # alerts fetched but not shown yet
         self.seen_warn = set()
+        self.banner = None                                # the HOS warning kept on screen (pick_banner)
         self.last_status = None
         self.fails = 0
         self.last_ok = time.time()                        # the overlay closes itself 30 s after the app goes away
@@ -221,11 +234,12 @@ class Overlay:
         hud = d.get("hud") or {}
         while self.pending:
             a = self.pending.pop(0)
-            self.toast(a["text"], a.get("level", "info"))
+            self.toast(a["text"], a.get("level", "info"), 20 if a.get("level") in ("warn", "bad") else 9)
+        self.banner = pick_banner(d.get("warnings"))
         codes = set()
         for w in d.get("warnings") or []:
             codes.add(w["code"])
-            if w["code"] not in self.seen_warn:
+            if w["code"] not in self.seen_warn and not (self.banner and w["code"] == self.banner["code"]):
                 self.toast(w["text"], w.get("level", "warn"), 12)
         self.seen_warn = codes                            # a warning shows again only after it has cleared
         status = (hud.get("hos") or {}).get("status")
@@ -273,7 +287,8 @@ class Overlay:
                 c.create_text(w - pad, yy + line // 2, anchor="e", text=val, fill=COLORS.get(state, COLORS[""]), font=f_val)
                 yy += line
             y = h + gap
-        for text, level, _until in self.toasts if self.visible else []:
+        stack = ([[self.banner["text"], self.banner["level"], 0]] if self.banner else []) + self.toasts
+        for text, level, _until in stack if self.visible else []:
             tw = max(w, min(int(380 * s), f_toast.measure(text) + pad * 3))
             ty = int(9 * s)
             t_id = c.create_text(pad + int(4 * s), y + ty, anchor="nw", text=text, fill="#f2f6fc", font=f_toast,

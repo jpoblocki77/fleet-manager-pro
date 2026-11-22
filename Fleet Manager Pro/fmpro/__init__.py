@@ -266,6 +266,10 @@ def _filters(app):
         h, m = sec // 3600, (sec % 3600) // 60
         return f"{h}h {m:02d}m" if h else f"{m}m {sec % 60:02d}s"
 
+    def _theme_css():
+        from . import theme
+        return theme.from_settings(db.all_settings())   # plain text, still auto-escaped: only #rrggbb values ever get in
+
     @app.context_processor
     def globals_():
         from . import tlsfront, updater
@@ -273,4 +277,4 @@ def _filters(app):
                 "lan_pin": tlsfront.fingerprint(app.config["DATA_DIR"]),
                 "S": db.all_settings(), "now": time.time(), "AGENT_CMD": AGENT_CMD,
                 "UPDATE": updater.state(),
-                "dvir_price": economy.dvir_repair_price}
+                "dvir_price": economy.dvir_repair_price, "THEME_CSS": _theme_css()}
