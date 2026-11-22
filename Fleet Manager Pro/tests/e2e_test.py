@@ -388,7 +388,7 @@ def main():
     tid = db.val("SELECT id FROM trucks LIMIT 1")
     for url in ["/", "/live", "/telemetry", "/map", "/overlay", "/jobs", f"/jobs/{j['id']}", "/jobs/new", "/dispatch",
                 "/fleet", f"/fleet/truck/{tid}", "/finance", "/finance?period=all", "/drivers", f"/drivers/{uid}", "/profile",
-                "/recruitment", "/events", "/leaderboard", "/leaderboard?metric=realism&period=all",
+                "/recruitment", "/vtc-profile", "/find-vtc", "/events", "/leaderboard", "/leaderboard?metric=realism&period=all",
                 "/leaderboard?metric=revenue&period=year&game=ats", "/achievements", "/announcements", "/messages",
                 "/settings", "/settings?tab=economy", "/settings?tab=telemetry", "/settings?tab=integrations",
                 "/settings?tab=recruitment", "/settings?tab=audit", "/api/live", "/api/live/all", "/api/notifications",
@@ -2332,6 +2332,258 @@ def main():
     except Exception as e:
         check(getattr(e, "code", "") == "unknown_key", f"collecting needs a real activated key ({getattr(e, 'code', e)})")
     recruit.sync()
+
+    print("New-application banner (every page)")
+    from fmpro.auth import create_user as _cuv
+    others_ = [r_["id"] for r_ in db.q("SELECT id FROM applications WHERE status='pending' AND name!='Road Runner'")]
+    for i_ in others_:
+        db.update("applications", i_, status="interview")
+    page = c.get("/jobs").get_data(as_text=True)
+    ban = page[page.index('id="app-banner"'):page.index('id="app-banner"') + 2500]
+    check("New application" in ban and "Road Runner" in ban and " hidden" not in ban.split(">")[0] and 'href="/recruitment"' in ban,
+          "a waiting application shows a banner on other pages")
+    check('data-off="1"' in c.get("/recruitment").get_data(as_text=True), "but not on the Recruitment page itself")
+    check(c.get("/api/notifications").get_json()["applications"]["name"] == "Road Runner", "pages that are already open learn of it too")
+    db.insert("applications", name="<b>Eve</b>", contact="e", created_at=__import__("time").time())
+    page = c.get("/jobs").get_data(as_text=True)
+    check("<b>2 drivers</b>" in page and "&lt;b&gt;Eve&lt;/b&gt;" in page and "<b>Eve</b>" not in page, "several applications are counted, names escaped")
+    upto_ = c.get("/api/notifications").get_json()["applications"]["upto"]
+    post("/recruitment/banner/hide", {"upto": str(upto_)})
+    check(c.get("/api/notifications").get_json()["applications"] is None
+          and " hidden" in c.get("/jobs").get_data(as_text=True).split('id="app-banner"')[1].split(">")[0], "Hide puts the banner away")
+    db.insert("applications", name="Later Lou", contact="l", created_at=__import__("time").time() + 0.01)
+    __import__("time").sleep(0.05)
+    check(c.get("/api/notifications").get_json()["applications"]["n"] == 1, "and it comes back for the next application")
+    for bad in ("nan", "inf", "-5", "abc", "1e999", "9" * 400):
+        post("/recruitment/banner/hide", {"upto": bad})
+    check(c.get("/api/notifications").get_json()["applications"]["n"] == 1, "nonsense times don't hide it")
+    db.ex("UPDATE applications SET status='rejected' WHERE name='Later Lou'")
+    check(c.get("/api/notifications").get_json()["applications"] is None, "a reviewed application no longer counts")
+    db.ex("DELETE FROM applications WHERE name IN ('<b>Eve</b>', 'Later Lou')")
+    for i_ in others_:
+        db.update("applications", i_, status="pending")
+    _cuv("vt_driver", "Vt Driver", "vtdriver77", role="driver")
+    dv = app.test_client()
+    dv.get("/login")
+    with dv.session_transaction() as s_:
+        dvt = s_["csrf"]
+    dv.post("/login", data={"username": "vt_driver", "password": "vtdriver77", "csrf": dvt})
+    db.update("users", db.val("SELECT id FROM users WHERE username='boss'"), apps_seen=0)
+    check('id="app-banner"' not in dv.get("/jobs").get_data(as_text=True)
+          and dv.get("/api/notifications").get_json()["applications"] is None, "drivers never see applications")
+
+    print("VTC Finder: the company's profile")
+    from fmpro import vtc_profile
+    with srv.hits_lock:
+        srv.hits.clear()
+        srv.apply_hits.clear()
+    check((lsv.VTC_GAMES, lsv.VTC_REGIONS, lsv.VTC_STYLES, lsv.VTC_PLAYS, lsv.VTC_LANGS)
+          == (vtc_profile.GAMES, vtc_profile.REGIONS, vtc_profile.STYLES, vtc_profile.PLAYS, vtc_profile.LANGS),
+          "the app and the licence server offer the same choices")
+    recruit.sync()
+    check(web(f"/vtc/{code}")[0] == 404 and code not in web("/vtcs?open=all")[1], "a company isn't listed until its owner says so")
+    check(srv.store.db.execute("SELECT COUNT(*) FROM vtc_profiles").fetchone()[0] == 0, "and nothing about it is kept on the server")
+    with dv.session_transaction() as s_:
+        dvt = s_["csrf"]
+    check(dv.get("/vtc-profile").status_code == 403 and dv.post("/vtc-profile", data={"listed": "1", "about": "x", "csrf": dvt}).status_code == 403,
+          "drivers can't open or change the profile")
+    check("Open the VTC Finder" in dv.get("/find-vtc").get_data(as_text=True) and 'href="/vtc-profile"' not in dv.get("/find-vtc").get_data(as_text=True),
+          "every member can open Find a VTC")
+    page = c.get("/vtc-profile").get_data(as_text=True)
+    check("Not visible yet" in page and "isn't listed" in page.replace("&#39;", "'") and 'name="listed" value="1">' in page, "the profile page says why it isn't visible; listing is off")
+    db.set_setting("company_tag", "CRI")
+    db.set_setting("company_motto", "Steel & <wheels>")
+    form = {"listed": "1", "about": "We drive <b>carefully</b>.\r\nEvery week.", "games": "ats", "region": "na", "languages": ["en", "de"],
+            "styles": ["realistic"], "plays": ["convoy", "tmp"], "age": "18", "week": "500", "units": "imperial", "mic": "1",
+            "dlc": "Texas <DLC>", "trial": "2 weeks", "asks_text": "Be kind", "offer": ["Weekly convoys", "", "<i>Awards</i>"],
+            "discord": "https://discord.gg/crimson", "website": "https://crimson.example.com/a?b=1&c=2", "truckersmp": "https://truckersmp.com/vtc/1",
+            "question": ["Why <us>?", "Do you have a mic?", "", ""], "question_type": ["text", "yesno", "text", "text"], "action": "save"}
+    r = post("/vtc-profile", dict(form, website="http://plain.example.com"))
+    check("Nothing was saved" in r.get_data(as_text=True) and db.setting("vtc_listed") == "0", "a link that isn't https is refused and nothing is saved")
+    for k, bad in (("discord", "https://evil.example.com/discord.gg"), ("discord", "https://discord.com/channels/1"),
+                   ("truckersmp", "https://truckersmp.com.evil.example"), ("website", "javascript:alert(1)"),
+                   ("website", 'https://a.example.com/"onmouseover=1'), ("website", "https://user@evil.example.com"),
+                   ("discord", "https://discord.gg@evil.example.com/x"), ("website", "https://a.example.com/ x"), ("website", "https://localhost")):
+        check(not vtc_profile.link_ok(k, bad) and lsv.vtc_link(k, bad) == "", f"bad {k} link refused by the app and the server ({bad})")
+    check(vtc_profile.link_ok("discord", "https://discord.com/invite/abc") and lsv.vtc_link("website", "https://x.example.com") != "", "good links are kept")
+    r = post("/vtc-profile", dict(form, about=" "))
+    check("before listing it" in r.get_data(as_text=True) and db.setting("vtc_listed") == "0", "a company can't be listed without a description")
+    r = post("/vtc-profile", dict(form, action="preview"))
+    check("&lt;b&gt;carefully&lt;/b&gt;" in r.get_data(as_text=True) and db.setting("vtc_profile") == "", "Preview shows it without saving")
+    post("/vtc-profile", form)
+    page = c.get("/vtc-profile").get_data(as_text=True)
+    check("Your company is in the VTC Finder" in page and f"/vtc/{code}" in page, "saving lists the company straight away and shows its link")
+    check(">500<" in page or 'value="500"' in page, "the weekly distance comes back in the units it was typed in")
+    st, pub = web(f"/vtc/{code}")
+    check(st == 200 and "Crimson &lt;Line&gt; &amp; Co" in pub and "&lt;b&gt;carefully&lt;/b&gt;.<br>Every week." in pub and "<b>carefully" not in pub
+          and "Steel &amp; &lt;wheels&gt;" in pub and "&lt;i&gt;Awards&lt;/i&gt;" in pub and "Texas &lt;DLC&gt;" in pub, "the profile page shows everything, escaped")
+    check("At least 18" in pub and "805 km (500 mi) a week" in pub and "A microphone" in pub and "2 weeks" in pub, "with what the company asks for")
+    check('href="https://crimson.example.com/a?b=1&amp;c=2" target="_blank" rel="nofollow noopener noreferrer"' in pub
+          and "https://discord.gg/crimson" in pub, "links are safe ones")
+    check(f'/apply/{code}?via=finder' in pub and "Open to drivers" in pub, "with an Apply button")
+    check(lic.key not in pub and lic.machine not in pub and "<script" not in pub.lower() and "revenue" not in pub.lower(), "no key, PC, money or script on it")
+    hdr = _ur.urlopen(base + "/vtcs").headers
+    check("default-src 'none'" in hdr["Content-Security-Policy"] and hdr["X-Frame-Options"] == "DENY", "the finder has the strict page rules")
+
+    print("VTC Finder: searching")
+    def add_vtc(i, company, open_=1, revoked=None, listed=1, hidden=0, age_days=0, month=None, **prof):
+        key_ = f"FMP-TEST-VTC0-{i:04d}-AAAA"
+        when = lsv.iso(lsv.now() - __import__("datetime").timedelta(days=age_days))
+        data = lsv.vtc_clean(dict({"about": "A fine company", "games": "both", "drivers": 3}, **prof))
+        d_ = srv.store.db
+        al = "abcdefghjkmnpqrstuvwxyz23456789"
+        code_ = "zz" + al[i // 900] + al[(i // 30) % 30] + al[i % 30] + "qqq"
+        d_.execute("INSERT INTO purchases(key,name,email,created,slots,revoked) VALUES(?,?,?,?,2,?)", (key_, "T", "", when, revoked))
+        d_.execute("INSERT INTO recruit(key,code,company,intro,open,updated) VALUES(?,?,?,?,?,?)", (key_, code_, company, "", open_, when))
+        d_.execute("INSERT INTO vtc_profiles(key,listed,hidden,data,created,updated) VALUES(?,?,?,?,?,?)",
+                   (key_, listed, hidden, _js.dumps(data), prof.get("created", when), when))
+        if month is not None:
+            v_ = [month, 777123, 4, 5, 90, 1, 1, 2]
+            d_.execute("INSERT INTO leaderboard(key,pid,company,currency,stats,drivers,updated) VALUES(?,?,?,'$',?,'{}',?)",
+                       (key_, f"pid{i}", company, _js.dumps({"month": {"all": v_}, "all": {"all": v_}}), when))
+        d_.commit()
+        srv.store._vtc_cache = None
+        return code_
+    names_ = lambda **kw: [x["company"] for x in srv.store.vtc_search(**kw)]
+    a1 = add_vtc(1, "Alpine Haulage", games="ets2", region="eu", languages=["de"], styles=["relaxed"], plays=["tmp"], drivers=12, month=900, tag="ALP")
+    add_vtc(2, "Bolt Freight", games="ats", region="na", languages=["en"], styles=["competitive"], plays=["single"], drivers=40, month=5000, about="Friendly alpine trips")
+    add_vtc(3, "Closed Cargo", open_=0, region="world", drivers=5, month=10)
+    hid_c = add_vtc(4, "Hidden Haul", hidden=1)
+    add_vtc(5, "Unlisted Lines", listed=0)
+    rev_c = add_vtc(6, "Revoked Roads", revoked="2026-01-01T00:00:00Z")
+    stale_c = add_vtc(7, "Stale Wheels", age_days=31)
+    noab = add_vtc(8, "Empty Words", about="")
+    everyone_ = names_(is_open=False)
+    check(not set(everyone_) & {"Hidden Haul", "Unlisted Lines", "Revoked Roads", "Stale Wheels", "Empty Words"},
+          "hidden, unlisted, revoked, stale and empty companies aren't found")
+    check(all(web(f"/vtc/{x}")[0] == 404 for x in (hid_c, rev_c, stale_c, noab)), "and have no page")
+    check("Closed Cargo" in everyone_ and "Closed Cargo" not in names_(), "closed companies only when everyone is asked for")
+    check(names_(words="alpine") == ["Alpine Haulage", "Bolt Freight"], "a name match comes before a description match")
+    check(names_(words="ALP") == ["Alpine Haulage", "Bolt Freight"] and names_(words="alpine nothere") == [], "every word must be there")
+    check(names_(game="ets2") == ["Alpine Haulage"] and set(names_(game="ats")) == {"Bolt Freight", "Crimson <Line> & Co"}, "game")
+    check(names_(lang="de") == ["Alpine Haulage", "Crimson <Line> & Co"] or set(names_(lang="de")) == {"Alpine Haulage", "Crimson <Line> & Co"}, "language")
+    check(set(names_(region="na")) == {"Bolt Freight", "Crimson <Line> & Co"} and "Closed Cargo" in names_(region="eu", is_open=False), "region (worldwide companies fit every region)")
+    check(names_(style="competitive") == ["Bolt Freight"] and "Alpine Haulage" in names_(plays="tmp") and "Bolt Freight" not in names_(plays="tmp"), "style and where it plays")
+    check(names_(size="m") == ["Alpine Haulage"] and names_(size="l") == ["Bolt Freight"], "size")
+    check(names_(sort="active")[0] == "Bolt Freight" and names_(sort="name", is_open=False) == sorted(everyone_, key=str.lower), "sorting")
+    check(len(names_(game="<x>", lang="zz", region="q", style="q", plays="q", size="q", sort="q")) == 3, "unknown choices are ignored")
+    st, pub = web("/vtcs?" + _up.urlencode({"q": '"><script>alert(1)</script>', "game": "ats"}))
+    check(st == 200 and "<script" not in pub and "No company matches" in pub and "Clear filters" in pub and "aren&#39;t recruiting" in pub, "an empty result offers a way out; the search is escaped")
+    st, pub = web(f"/vtc/{a1}")
+    check("900 km" in pub and "Reported by the company" in pub and "777" not in pub, "activity comes from the leaderboard, without money")
+    check(web("/vtcs?p=99999999999999999999")[0] == 200 and web("/vtcs?p=-1")[0] == 200 and web("/vtcs?p=%C2%B2")[0] == 200, "odd page numbers are fine")
+    for i in range(20, 45):
+        add_vtc(i, f"Page Co {i}", about="pagetest")
+    with srv.hits_lock:
+        srv.hits.clear()
+    p1, p2 = web("/vtcs?q=pagetest&sort=name")[1], web("/vtcs?q=pagetest&sort=name&p=2")[1]
+    check(p1.count('class="vtc"') == 20 and p2.count('class="vtc"') == 5 and "Page 1 of 2" in p1 and "p=2" in p1 and "Page Co 44" in p2, "20 to a page")
+    check(web("/vtcs?" + "&".join(f"a{i}=1" for i in range(60)))[0] in (200, 413), "a flood of fields doesn't crash it")
+    check(web("/vtc/../v1/admin/vtc")[0] == 404 and web(f"/vtc/{code}/edit")[0] == 404, "odd addresses get a 404")
+
+    print("VTC Finder: applying, questions, reports, hiding")
+    st, pub = web(f"/apply/{code}?via=finder")
+    q1, q2 = lsv.vtc_question_id("Why <us>?"), lsv.vtc_question_id("Do you have a mic?")
+    check("Why &lt;us&gt;?" in pub and f'name="{q1}"' in pub and f'<select name="{q2}"' in pub and 'name="via" value="finder"' in pub, "the Apply form has the company's questions")
+    st, pub = web(f"/apply/{code}?via=finder", {"name": "Quinn", "contact": "q#1", q1: "<u>Nice</u>", q2: "yes", "q_unknown": "x", "via": "finder"})
+    check(st == 200 and "/vtcs" in pub, "after applying there's a way back to the finder")
+    web(f"/apply/{code}", {"name": "Lin", "contact": "l#1", q2: "maybe", "via": "hacked"})
+    recruit.sync()
+    qa = db.one("SELECT * FROM applications WHERE name='Quinn'")
+    la = db.one("SELECT * FROM applications WHERE name='Lin'")
+    check(_js.loads(qa["answers"]) == [["Why <us>?", "<u>Nice</u>"], ["Do you have a mic?", "Yes"]] and qa["found_via"] == "finder", "answers and where they came from arrive in the app")
+    check(la["answers"] == "" and la["found_via"] == "link", "odd answers are dropped")
+    page = c.get("/recruitment").get_data(as_text=True)
+    check("Why &lt;us&gt;?" in page and "&lt;u&gt;Nice&lt;/u&gt;" in page and ">VTC Finder</span>" in page, "Recruitment shows them, escaped")
+    db.ex("DELETE FROM applications WHERE name IN ('Quinn', 'Lin')")
+    with srv.hits_lock:
+        srv.hits.clear()
+    codes = [web(f"/vtc/{code}/report", {"reason": "spam", "note": "<b>bad</b>" * 99})[0] for _ in range(4)]
+    check(codes == [200, 200, 200, 429], f"3 reports per address per hour ({codes})")
+    check(web(f"/vtc/{code}/report", {"reason": "nope"})[0] == 400 and web("/vtc/zzzzzzzz/report", {"reason": "spam"})[0] == 404, "a report needs a reason and a company")
+    web(f"/vtc/{code}/report", {"reason": "spam", lsv.HONEYPOT: "x"})
+    tok_ = {"Authorization": f"Bearer {srv.cfg['admin_token']}"}
+    adm = lambda path, body=None, hd=tok_, m="POST": srv.handle(m, path, body or {}, hd, "127.0.0.1", peer="127.0.0.1")
+    rows_ = adm("/v1/admin/vtc", m="GET")["listings"]
+    me_ = next(x for x in rows_ if x["code"] == code)
+    check(len(me_["reports"]) == 3 and len(me_["reports"][0]["note"]) <= 300 and rows_[0]["code"] == code, "License Manager sees the reports, most reported first")
+    for pth in ("/v1/admin/vtc", "/v1/admin/vtc_hide", "/v1/admin/vtc_clear"):
+        try:
+            adm(pth, {"key": lic.key}, {}, "POST")
+            check(False, f"{pth} needs the admin token")
+        except lsv.LicenceError as e:
+            check(e.status == 401, f"{pth} needs the admin token")
+    adm("/v1/admin/vtc_hide", {"key": lic.key, "hidden": True})
+    check(web(f"/vtc/{code}")[0] == 404 and "Crimson" not in web("/vtcs?open=all")[1], "a hidden company is gone at once")
+    post("/vtc-profile", dict(form, about="Edited while hidden"))
+    check(web(f"/vtc/{code}")[0] == 404 and "hidden by the owner of the licence server" in c.get("/vtc-profile").get_data(as_text=True),
+          "it stays hidden when edited, and the app says so")
+    post("/vtc-profile", {k: v for k, v in form.items() if k != "listed"})
+    check(srv.store.db.execute("SELECT hidden FROM vtc_profiles WHERE key=?", (lic.key,)).fetchone()[0] == 1, "unlisting doesn't lift the hide switch")
+    adm("/v1/admin/vtc_hide", {"key": lic.key, "hidden": False})
+    check(adm("/v1/admin/vtc_clear", {"key": lic.key})["cleared"] == 3, "reports can be cleared")
+    check(web(f"/vtc/{code}")[0] == 404, "an unlisted company isn't shown")
+    kept = srv.store.db.execute("SELECT data FROM vtc_profiles WHERE key=?", (lic.key,)).fetchone()[0]
+    check("carefully" not in kept and "Why <us>?" in kept, "only its Apply questions are kept on the server")
+    check("Why &lt;us&gt;?" in web(f"/apply/{code}")[1], "and the shared Apply link still asks them")
+    post("/vtc-profile", form)
+    db.set_setting("recruitment_open", "0")
+    recruit.sync()
+    st, pub = web(f"/vtc/{code}")
+    check(st == 200 and "Not taking applications" in pub and "via=finder" not in pub and web(f"/apply/{code}", {"name": "x", "contact": "y"})[0] == 404,
+          "a closed company shows its profile but can't be applied to")
+    db.set_setting("recruitment_open", "1")
+    recruit.sync()
+    big = dict(form, about="\u8f66" * 1500, asks_text="\u8f66" * 400, offer=["\u8f66" * 80] * 6, question=["\u8f66" * 110 + str(i) for i in range(5)],
+               question_type=["text"] * 5, dlc="\u8f66" * 120, trial="\u8f66" * 120)
+    post("/vtc-profile", big)
+    check("\u8f66" * 1500 in web(f"/vtc/{code}")[1], "a full profile in any alphabet reaches the server")
+    post("/vtc-profile", form)
+    junk = [None, [], "x", 5, {"listed": True}, {"listed": True, "asks": [], "links": 5, "offers": {"a": 1}, "questions": ["x", {"q": 5}, None],
+            "languages": "en", "styles": [[], {}], "games": [], "region": {}, "drivers": float("nan"), "colours": ["red;}", "#fff"]},
+            {"about": "\u202eevil\x00", "colours": ["#12345\n", "url(x)"], "asks": {"age": 1e400, "km_week": True}, "drivers": -9}]
+    cleaned = [lsv.vtc_clean(x) for x in junk]
+    check(all(x["colours"] == ["#0a1a33", "#c8102e"] for x in cleaned) and cleaned[-1]["about"] == "evil"
+          and cleaned[-1]["asks"]["age"] == 0 and cleaned[-1]["drivers"] == 0, "nonsense profiles are cleaned, never stored as sent")
+    real_post = licensing._post
+    def old_server(path, body, timeout=10):
+        check("profile" not in body, "an older licence server is never sent a profile")
+        d_ = real_post(path, body, timeout=timeout)
+        return {k: v for k, v in d_.items() if k not in ("profile_url", "finder_url", "profile")}
+    licensing._post = old_server
+    err_ = recruit.sync()[1]
+    e2_ = recruit.push_profile()
+    licensing._post = real_post
+    check(err_ is None and "needs updating" in e2_ and "needs updating" in c.get("/vtc-profile").get_data(as_text=True)
+          and "needs updating" in c.get("/find-vtc").get_data(as_text=True), "with an older server recruiting works and the app says it needs updating")
+    recruit.sync()
+    srv.handle("POST", "/v1/recruit", {"key": lic.key, "machine": lic.machine, "product": "Fleet Manager Pro", "company": "Crimson <Line> & Co",
+                                       "open": True}, {}, "127.0.0.1")
+    check(web(f"/vtc/{code}")[0] == 200, "an older app (no profile) doesn't break the listing")
+    db.set_setting("vtc_profile", "{broken")
+    check(c.get("/vtc-profile").status_code == 200 and vtc_profile.load() == vtc_profile.blank(), "a damaged saved profile still opens")
+    db.set_setting("vtc_profile", '{"asks": [], "links": {"x": 1}, "languages": "en"}')
+    check(c.get("/vtc-profile").status_code == 200, "and an odd one too")
+    post("/vtc-profile", form)
+    # what dissolving the company does
+    db.set_setting("vtc_listed", "0")
+    db.set_setting("vtc_profile", "")
+    recruit.push_profile()
+    check(srv.store.db.execute("SELECT COUNT(*) FROM vtc_profiles WHERE key=?", (lic.key,)).fetchone()[0] == 0 and web(f"/vtc/{code}")[0] == 404,
+          "an emptied profile leaves nothing on the server")
+    srv.store.delete_purchase("FMP-TEST-VTC0-0001-AAAA")
+    check(web(f"/vtc/{a1}")[0] == 404 and srv.store.db.execute("SELECT COUNT(*) FROM vtc_profiles WHERE key LIKE '%VTC0-0001%'").fetchone()[0] == 0,
+          "deleting a purchase removes its listing")
+    for tb in ("vtc_profiles", "recruit", "leaderboard", "purchases"):
+        srv.store.db.execute(f"DELETE FROM {tb} WHERE key LIKE 'FMP-TEST-VTC0%'")
+    srv.store.db.execute("DELETE FROM vtc_reports")
+    srv.store.db.commit()
+    db.set_setting("company_tag", "")
+    db.set_setting("company_motto", "")
+    db.ex("DELETE FROM users WHERE username='vt_driver'")
+    with srv.hits_lock:
+        srv.hits.clear()
+        srv.apply_hits.clear()
 
     print("Global leaderboard (every company on the licence server)")
     from fmpro import global_board

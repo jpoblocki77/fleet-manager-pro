@@ -1175,6 +1175,9 @@ def apply():
 def recruitment():
     rows = db.q("""SELECT a.*, u.display_name reviewer FROM applications a LEFT JOIN users u ON u.id=a.reviewed_by
                    ORDER BY a.status='pending' DESC, a.created_at DESC""")
+    from . import recruit
+    for r in rows:
+        r["answer_rows"] = recruit.answers_of(r["answers"])
     synced = float(db.setting("recruit_synced", "0") or 0)
     reviewed = sum(1 for r in rows if r["status"] in ("accepted", "rejected"))
     return render_template("recruitment.html", rows=rows, divisions=db.q("SELECT * FROM divisions ORDER BY name"),
@@ -1229,6 +1232,16 @@ def recruitment_delete(aid):
     db.ex("DELETE FROM applications WHERE id=?", (aid,))
     db.audit(user()["id"], "application deleted", f"{a['name']} ({a['status']})")
     flash(f"Application from {a['name']} deleted.", "success")
+    return redirect(url_for("pages.recruitment"))
+
+
+@bp.route("/recruitment/banner/hide", methods=["POST"])
+@login_required(role="admin")
+def recruitment_banner_hide():
+    """Hide the new-application banner for this manager until another application arrives."""
+    upto = num("upto", 0, time.time())
+    if upto > (user()["apps_seen"] or 0):
+        db.update("users", user()["id"], apps_seen=upto)
     return redirect(url_for("pages.recruitment"))
 
 

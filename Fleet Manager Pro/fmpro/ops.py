@@ -413,13 +413,19 @@ def dissolve_company(owner_id, erase=False):
         except (upnp.UPnPError, ValueError) as e:
             out["port"] = f"not closed ({e})"
     for key, value in (("upnp_port", ""), ("public_address", ""), ("public_address_auto", "0"), ("allowed_hosts", ""),
-                       ("recruitment_open", "0"), ("global_board", "0"), ("global_board_drivers", "0")):
+                       ("recruitment_open", "0"), ("global_board", "0"), ("global_board_drivers", "0"),
+                       ("vtc_listed", "0"), ("vtc_profile", "")):
         db.set_setting(key, value)
     from . import global_board
     try:
         global_board.sync()             # take the company off the global leaderboard now (else at the next update)
     except Exception as e:              # dissolving must never fail because of the leaderboard
         logging.getLogger(__name__).warning("leaving the global leaderboard failed: %s", e)
+    from . import recruit
+    try:
+        recruit.push_profile()          # and out of the VTC Finder
+    except Exception as e:
+        logging.getLogger(__name__).warning("leaving the VTC Finder failed: %s", e)
     return out
 
 

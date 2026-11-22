@@ -12,7 +12,8 @@
   <div class="row" style="flex-wrap:nowrap"><input id="apply-url" value="{{ apply_url }}" readonly style="flex:1">
     <button type="button" class="btn primary" id="copy-apply">Copy</button><a class="btn" href="{{ apply_url }}" target="_blank" rel="noopener">Open</a></div>
   <p class="hint">Share this link on Discord, TruckersMP, your website or socials. It works from anywhere, even when this PC is off —
-    applications wait online and arrive here within about 10 minutes of Fleet Manager Pro running (or press <b>Check now</b>).</p>
+    applications wait online and arrive here within about 10 minutes of Fleet Manager Pro running (or press <b>Check now</b>).
+    To be found by drivers who don't know you yet, list your company on <a href="/vtc-profile">VTC Profile</a>.</p>
   {% else %}
   <p class="muted">Your online Apply page is being set up{% if not sync_error %} — press <b>Check now</b> to get your link{% endif %}.</p>
   {% endif %}
@@ -22,11 +23,12 @@
 {% for a in rows %}
 <div class="card {{ 'accent' if a.status == 'pending' }}">
   <div class="between"><div><b style="font-size:16px">{{ a.name }}</b> {{ status(a.status) }}
-    <div class="small muted">{% if a.source == 'online' %}<span class="badge info">online</span> {% endif %}{{ a.contact }}{% if a.discord %} · Discord {{ a.discord }}{% endif %}{% if a.age %} · {{ a.age }} y/o{% endif %}{% if a.country %} · {{ a.country }}{% endif %} · {{ (a.games or '')|upper }} · {{ a.created_at|ago }}</div></div>
+    <div class="small muted">{% if a.source == 'online' %}<span class="badge info">online</span> {% endif %}{% if a.found_via %}<span class="badge" title="How they reached your Apply form">{{ 'VTC Finder' if a.found_via == 'finder' else 'shared link' }}</span> {% endif %}{{ a.contact }}{% if a.discord %} · Discord {{ a.discord }}{% endif %}{% if a.age %} · {{ a.age }} y/o{% endif %}{% if a.country %} · {{ a.country }}{% endif %} · {{ (a.games or '')|upper }} · {{ a.created_at|ago }}</div></div>
     <div class="row" style="gap:8px;align-items:center">{% if a.reviewer %}<span class="small faint">reviewed by {{ a.reviewer }}</span>{% endif %}
       <form method="post" action="/recruitment/{{ a.id }}/delete" class="inline">{{ csrf() }}<button class="btn ghost sm"
         data-confirm="Delete the application from {{ a.name }}? This can't be undone.">Delete</button></form></div></div>
   {% if a.experience %}<p><b class="small muted">Experience</b><br>{{ a.experience }}</p>{% endif %}
+  {% for q, ans in a.answer_rows %}<p><b class="small muted">{{ q }}</b><br>{{ ans }}</p>{% endfor %}
   {% if a.message %}<p><b class="small muted">Message</b><br>{{ a.message }}</p>{% endif %}
   <form method="post" action="/recruitment/{{ a.id }}" class="row" style="margin-top:8px">{{ csrf() }}
     <input name="notes" placeholder="Internal notes" value="{{ a.notes }}" style="flex:1;min-width:200px">

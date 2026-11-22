@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf %}
+{% block title %}VTC Profile{% endblock %}
+{% block head %}<style>
+.vp-checks { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.vp-checks .check { margin: 2px 0; }
+.vp-count { float: right; font-weight: 400; }
+.vp-q { display: flex; gap: 8px; margin-bottom: 8px; }
+.vp-q input { flex: 1; min-width: 0; } .vp-q select { width: auto; }
+.vp-badge { display: inline-grid; place-items: center; min-width: 46px; height: 46px; padding: 0 6px; border-radius: 11px; font-weight: 800; font-size: 13px; color: #fff; }
+.vp-prev { overflow-wrap: anywhere; } .vp-prev .badge { margin: 3px 4px 0 0; }
+</style>{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>VTC Profile</h1><p>Your company's public page in the VTC Finder, where drivers look for a company to join.</p></div>
+  <div class="actions">{% if st.finder %}<a class="btn" href="{{ st.finder }}" target="_blank" rel="noopener">Open the VTC Finder</a>{% endif %}</div></div>
+
+<div class="card" style="margin-bottom:16px">
+  <div class="card-head"><h2>{% if why %}Not visible yet{% else %}Your company is in the VTC Finder{% endif %}</h2>{% if st.at %}<span class="right small muted">sent {{ st.at|ago }}</span>{% endif %}</div>
+  {% if why %}<ul style="margin:0 0 8px;padding-left:20px">{% for w in why %}<li>{{ w }}</li>{% endfor %}</ul>{% endif %}
+  {% if S.recruitment_open != '1' %}<p class="hint">Recruiting is closed, so drivers can read your profile but not apply. Open it in Settings, Recruitment.</p>{% endif %}
+  {% if st.url and not why %}<div class="row" style="flex-wrap:nowrap"><input id="vtc-url" value="{{ st.url }}" readonly style="flex:1">
+    <button type="button" class="btn primary" id="copy-vtc">Copy</button><a class="btn" href="{{ st.url }}" target="_blank" rel="noopener">Open</a></div>{% endif %}
+</div>
+
+<form method="post" action="/vtc-profile" class="stack">{{ csrf() }}<input type="hidden" name="units" value="{{ units }}">
+<div class="card">
+  <label class="check"><input type="checkbox" name="listed" value="1"{% if want %} checked{% endif %}> <b>List my company in the VTC Finder</b></label>
+  <p class="hint">Listing makes everything on this page public on the web, with your company's name, tag, motto, colours, number of drivers and whether
+    you are recruiting. If you are on the Global Leaderboard, your distance, deliveries and average score are shown too. Members' names, money and your
+    PC's address are never shown. Untick and save to take it off at once.</p>
+</div>
+
+<div class="card"><div class="card-head"><h2>The company</h2></div>
+  <div class="field"><label>About the company <span class="vp-count small faint" data-count-for="about"></span></label>
+    <textarea name="about" rows="8" maxlength="{{ LIMITS.about }}" placeholder="Who you are, how you drive, what a normal week looks like.">{{ p.about }}</textarea>
+    <div class="hint">Plain text. Name, tag, motto and colours come from Settings, Company.</div></div>
+  <div class="fields">
+    <div class="field"><label>Game</label><select name="games">{% for k, v in GAMES.items() %}<option value="{{ k }}"{% if p.games == k %} selected{% endif %}>{{ v }}</option>{% endfor %}</select></div>
+    <div class="field"><label>Region</label><select name="region">{% for k, v in REGIONS.items() %}<option value="{{ k }}"{% if p.region == k %} selected{% endif %}>{{ v }}</option>{% endfor %}</select></div>
+  </div>
+  <div class="field"><label>Style</label><div class="vp-checks">{% for k, v in STYLES.items() %}<label class="check"><input type="checkbox" name="styles" value="{{ k }}"{% if k in p.styles %} checked{% endif %}> {{ v }}</label>{% endfor %}</div></div>
+  <div class="field"><label>Plays on</label><div class="vp-checks">{% for k, v in PLAYS.items() %}<label class="check"><input type="checkbox" name="plays" value="{{ k }}"{% if k in p.plays %} checked{% endif %}> {{ v }}</label>{% endfor %}</div></div>
+  <div class="field"><label>Languages <span class="faint">(up to {{ MAX_LANGS }})</span></label><div class="vp-checks">{% for k, v in LANGS.items() %}<label class="check"><input type="checkbox" name="languages" value="{{ k }}"{% if k in p.languages %} checked{% endif %}> {{ v }}</label>{% endfor %}</div></div>
+</div>
+
+<div class="card"><div class="card-head"><h2>What you ask for</h2></div>
+  <p class="hint" style="margin-top:0">All optional. Leave a box empty to leave it out.</p>
+  <div class="fields">
+    <div class="field"><label>Minimum age</label><input name="age" inputmode="numeric" maxlength="2" value="{{ p.asks.age or '' }}"></div>
+    <div class="field"><label>Distance a week ({{ 'mi' if units == 'imperial' else 'km' }})</label><input name="week" inputmode="numeric" maxlength="7" value="{{ ((p.asks.km_week / 1.609344) if units == 'imperial' else p.asks.km_week)|round|int or '' }}"></div>
+    <div class="field"><label>DLC needed</label><input name="dlc" maxlength="{{ LIMITS.dlc }}" value="{{ p.asks.dlc }}"></div>
+    <div class="field"><label>Trial period</label><input name="trial" maxlength="{{ LIMITS.trial }}" value="{{ p.asks.trial }}" placeholder="2 weeks"></div>
+  </div>
+  <label class="check"><input type="checkbox" name="mic" value="1"{% if p.asks.mic %} checked{% endif %}> A microphone is needed</label>
+  <div class="field"><label>Anything else <span class="vp-count small faint" data-count-for="asks_text"></span></label><textarea name="asks_text" rows="3" maxlength="{{ LIMITS.text }}">{{ p.asks.text }}</textarea></div>
+</div>
+
+<div class="card"><div class="card-head"><h2>What you offer</h2></div>
+  <p class="hint" style="margin-top:0">Up to {{ MAX_OFFERS }} short lines.</p>
+  {% for i in range(MAX_OFFERS) %}<div class="field"><input name="offer" aria-label="Offer {{ i + 1 }}" maxlength="{{ LIMITS.offer }}" value="{{ p.offers[i] if i < p.offers|length else '' }}"></div>{% endfor %}
+</div>
+
+<div class="card"><div class="card-head"><h2>Links</h2></div>
+  {% for k, label in LINKS.items() %}<div class="field"><label>{{ label }}</label><input name="{{ k }}" maxlength="{{ LIMITS.link }}" value="{{ p.links[k] }}" placeholder="{{ {'discord': 'https://discord.gg/...', 'website': 'https://...', 'truckersmp': 'https://truckersmp.com/vtc/...'}[k] }}"></div>{% endfor %}
+</div>
+
+<div class="card"><div class="card-head"><h2>Your own questions</h2></div>
+  <p class="hint" style="margin-top:0">Up to {{ MAX_QUESTIONS }}, added to your Apply form (also when you aren't listed). The answers show on the Recruitment page.</p>
+  {% for i in range(MAX_QUESTIONS) %}{% set q = p.questions[i] if i < p.questions|length else {'q': '', 'type': 'text'} %}
+  <div class="vp-q"><input name="question" aria-label="Question {{ i + 1 }}" maxlength="{{ LIMITS.question }}" value="{{ q.q }}">
+    <select name="question_type" aria-label="Kind of answer {{ i + 1 }}"><option value="text">Short text</option><option value="yesno"{% if q.type == 'yesno' %} selected{% endif %}>Yes or no</option></select></div>{% endfor %}
+</div>
+
+<div class="row"><button class="btn primary" name="action" value="save">Save</button><button class="btn" name="action" value="preview">Preview without saving</button></div>
+</form>
+
+{% if preview %}
+<div class="card vp-prev" id="preview" style="margin-top:16px"><div class="card-head"><h2>Preview</h2></div>
+  <div class="row" style="flex-wrap:nowrap;align-items:flex-start"><span class="vp-badge" style="background:{{ S.theme_navy or '#0a1a33' }};border:2px solid {{ S.theme_accent or '#c8102e' }}">{{ (S.company_tag or S.company_name[:3])|upper }}</span>
+    <div><b style="font-size:18px">{{ S.company_name or 'Your company' }}</b>{% if S.company_motto %}<br>{{ S.company_motto }}{% endif %}<br>
+      <span class="badge {{ 'ok' if S.recruitment_open == '1' }}">{{ 'Open to drivers' if S.recruitment_open == '1' else 'Closed' }}</span><span class="badge">{{ GAMES[p.games] }}</span><span class="badge">{{ REGIONS[p.region] }}</span>
+      {% for k in p.languages %}<span class="badge">{{ LANGS[k] }}</span>{% endfor %}{% for k in p.styles %}<span class="badge">{{ STYLES[k] }}</span>{% endfor %}{% for k in p.plays %}<span class="badge">{{ PLAYS[k] }}</span>{% endfor %}
+      <div class="small muted">{{ drivers }} driver{{ '' if drivers == 1 else 's' }}</div></div></div>
+  <h3>About</h3><p style="white-space:pre-line">{{ p.about or 'Nothing written yet.' }}</p>
+  {% if p.asks.age or p.asks.km_week or p.asks.mic or p.asks.dlc or p.asks.trial or p.asks.text %}<h3>What we ask for</h3><ul>
+    {% if p.asks.age %}<li>At least {{ p.asks.age }} years old</li>{% endif %}{% if p.asks.km_week %}<li>{{ '{:,}'.format(p.asks.km_week) }} km ({{ '{:,.0f}'.format(p.asks.km_week / 1.609344) }} mi) a week</li>{% endif %}
+    {% if p.asks.mic %}<li>A microphone</li>{% endif %}{% if p.asks.dlc %}<li>DLC: {{ p.asks.dlc }}</li>{% endif %}{% if p.asks.trial %}<li>Trial period: {{ p.asks.trial }}</li>{% endif %}</ul>
+    {% if p.asks.text %}<p style="white-space:pre-line">{{ p.asks.text }}</p>{% endif %}{% endif %}
+  {% if p.offers %}<h3>What we offer</h3><ul>{% for o in p.offers %}<li>{{ o }}</li>{% endfor %}</ul>{% endif %}
+  {% if p.links.values()|select|list %}<h3>Links</h3><p>{% for k, label in LINKS.items() if p.links[k] %}{{ label }}: {{ p.links[k] }}<br>{% endfor %}</p>{% endif %}
+  {% if p.questions %}<h3>Questions on the Apply form</h3><ul>{% for q in p.questions %}<li>{{ q.q }}{% if q.type == 'yesno' %} <span class="muted">(yes or no)</span>{% endif %}</li>{% endfor %}</ul>{% endif %}
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll("[data-count-for]").forEach((el) => {
+  const box = document.querySelector(`textarea[name="${el.dataset.countFor}"]`);
+  const show = () => { el.textContent = `${box.value.length} / ${box.maxLength}`; };
+  box.addEventListener("input", show); show();
+});
+const cv = document.getElementById("copy-vtc");
+if (cv) cv.addEventListener("click", () => {
+  const i = document.getElementById("vtc-url"); i.select();
+  (navigator.clipboard ? navigator.clipboard.writeText(i.value) : Promise.reject()).catch(() => document.execCommand("copy"));
+  cv.textContent = "Copied"; setTimeout(() => cv.textContent = "Copy", 1500);
+});
+</script>
+{% endblock %}

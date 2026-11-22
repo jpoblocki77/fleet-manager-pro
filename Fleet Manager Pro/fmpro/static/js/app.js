@@ -62,6 +62,24 @@
   });
 
   // ---------- notifications + telemetry chip ----------
+  // the new-application banner (managers): also appears on a page that was already open
+  function showApps(a) {
+    const b = $("#app-banner"), pill = $("#nav-app-pill");
+    if (pill) { pill.textContent = a ? a.n : 0; pill.style.display = a ? "" : "none"; }
+    if (!b || b.dataset.off) return;
+    b.hidden = !a;
+    if (!a) return;
+    $("#app-banner-hide input[name=upto]").value = a.upto;
+    $("#app-banner-text").innerHTML = a.n === 1 ? `<b>${esc(a.name)}</b> has applied to drive for you.`
+      : `<b>${Number(a.n)} drivers</b> have applied to drive for you. Newest: ${esc(a.name)}.`;
+  }
+  const hideApps = $("#app-banner-hide");
+  if (hideApps) hideApps.addEventListener("submit", (e) => {
+    e.preventDefault();
+    fetch(hideApps.action, { method: "POST", body: new FormData(hideApps), credentials: "same-origin", headers: { "X-CSRF": FMP.csrf } })
+      .then((r) => { if (r.ok) showApps(null); else alert("Couldn't hide that - reload the page and try again."); })
+      .catch(() => alert("Couldn't hide that - reload the page and try again."));
+  });
   function pollNotifs() {
     if (!$("#bell")) return;
     FMP.get("/api/notifications").then((d) => {
@@ -69,6 +87,7 @@
       if (p) { p.textContent = d.unread; p.style.display = d.unread ? "" : "none"; }
       const mp = $("#nav-msg-pill");
       if (mp) { mp.textContent = d.messages; mp.style.display = d.messages ? "" : "none"; }
+      showApps(d.applications);
       const list = $("#notif-list");
       if (list) list.innerHTML = d.items.length ? d.items.map((n) =>
         `<div class="item notif ${n.read ? "" : "unread"}"><a href="${esc(n.link || "#")}">${esc(n.text)}<div class="small faint">${new Date(n.created_at * 1000).toLocaleString()}</div></a>` +

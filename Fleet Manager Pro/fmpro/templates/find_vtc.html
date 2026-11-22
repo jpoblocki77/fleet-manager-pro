@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Find a VTC{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Find a VTC</h1><p>Search every company that has listed itself, read its profile and apply.</p></div></div>
+<div class="card">
+  <div class="card-head"><h2>VTC Finder</h2></div>
+  {% if st.finder %}
+  <p>The VTC Finder is a public web page. Anyone can use it, with or without Fleet Manager Pro, so you can share it with friends too.</p>
+  <div class="row" style="flex-wrap:nowrap"><input id="finder-url" value="{{ st.finder }}" readonly style="flex:1">
+    <button type="button" class="btn" id="copy-finder">Copy</button>
+    <a class="btn primary" href="{{ st.finder }}" target="_blank" rel="noopener">Open the VTC Finder</a></div>
+  {% elif st.old_server %}<p class="muted">{{ needs_update }}</p>
+  {% else %}<p class="muted">The VTC Finder's address arrives with the next check of the licence server, within about 10 minutes of Fleet Manager Pro running.</p>{% endif %}
+  <p class="hint">What you send in an application goes only to the company you apply to.{% if can('admin') %} To list your own company, open <a href="/vtc-profile">VTC Profile</a>.{% endif %}</p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const cf = document.getElementById("copy-finder");
+if (cf) cf.addEventListener("click", () => {
+  const i = document.getElementById("finder-url"); i.select();
+  (navigator.clipboard ? navigator.clipboard.writeText(i.value) : Promise.reject()).catch(() => document.execCommand("copy"));
+  cf.textContent = "Copied"; setTimeout(() => cf.textContent = "Copy", 1500);
+});
+</script>
+{% endblock %}

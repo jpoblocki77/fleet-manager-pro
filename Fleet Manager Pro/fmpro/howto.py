@@ -151,6 +151,17 @@ GUIDES = {
         "Share your Apply link (press Copy) on Discord, TruckersMP or socials; it works even when this PC is off.",
         "Applications appear here; press Check now to fetch new ones, then Accept, Interview or Reject each one.",
         "Applications must be opened in Settings, Recruitment tab.",
+        "A blue banner on every page tells Owners and Managers about new applications; Hide keeps it away until the next one.",
+    ],
+    "vtc_profile": [
+        "Write about your company, choose its game, region, style and languages, and say what you ask for and offer.",
+        "Tick List my company in the VTC Finder, then Save: drivers on the web can now find it, read it and apply.",
+        "Your own questions are added to your Apply form; the answers show on the Recruitment page.",
+        "The box at the top says why the company can't be seen, or gives its public link to share.",
+    ],
+    "find_vtc": [
+        "Open the VTC Finder to search for a company by name, game, language, region, style or size.",
+        "Open a company to read its profile, then press Apply. The company answers you with the contact details you give.",
     ],
     "leaderboard": [
         "Pick what to rank by (distance, revenue, deliveries, tonnage, score, XP or realism) and the period.",

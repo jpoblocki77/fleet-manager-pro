@@ -134,6 +134,8 @@ def create_app(data_dir=None, start_telemetry=True, check_licence=True):
     from . import fluids_views
     app.register_blueprint(fluids_views.bp)
     app.register_blueprint(cleanup.bp)
+    from . import vtc_profile
+    app.register_blueprint(vtc_profile.bp)
     app.register_blueprint(leasing_views.bp)
     app.register_blueprint(trailer_leasing_views.bp)
     auth.install(app)
@@ -289,8 +291,8 @@ def _filters(app):
 
     @app.context_processor
     def globals_():
-        from . import tlsfront, updater
-        return {"APP_NAME": APP_NAME, "COPYRIGHT": COPYRIGHT, "STARTING_CAPITAL": db.STARTING_CAPITAL, "VERSION": VERSION, "progress": economy.progress,
+        from . import recruit, tlsfront, updater
+        return {"NEW_APPS": recruit.waiting(auth.user()), "APP_NAME": APP_NAME, "COPYRIGHT": COPYRIGHT, "STARTING_CAPITAL": db.STARTING_CAPITAL, "VERSION": VERSION, "progress": economy.progress,
                 "lan_pin": tlsfront.fingerprint(app.config["DATA_DIR"]),
                 "S": db.all_settings(), "now": time.time(), "AGENT_CMD": AGENT_CMD,
                 "UPDATE": updater.state(),

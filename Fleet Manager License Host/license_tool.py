@@ -13,6 +13,9 @@ license-server.sh, or wherever you deployed it). On Linux run ./license-manager.
     python license_tool.py reset KEY                         free ALL PCs on a purchase (buyer couldn't deactivate)
     python license_tool.py delete KEY                        delete a purchase for good (active or revoked)
     python license_tool.py delete-revoked                    delete every revoked purchase
+    python license_tool.py vtc                               VTC Finder listings and reports
+    python license_tool.py vtc-hide KEY  |  vtc-unhide KEY   hide / show a company in the VTC Finder
+    python license_tool.py vtc-clear KEY                     forget the reports about a company
     python license_tool.py whose FMPB-XXXX-XXXX-XXXX-XXXX     which buyer a copy was built for (its hidden build tag)
 """
 import hashlib
@@ -134,6 +137,16 @@ class Admin:
         """Delete every revoked purchase. Returns what was deleted."""
         return self._call("/v1/admin/delete", {"all_revoked": True})["deleted"]
 
+    def vtc(self):
+        """VTC Finder listings with their reports, most reported first."""
+        return self._call("/v1/admin/vtc")["listings"]
+
+    def vtc_hide(self, key, hidden=True):
+        self._call("/v1/admin/vtc_hide", {"key": key.strip().upper(), "hidden": hidden})
+
+    def vtc_clear(self, key):
+        return self._call("/v1/admin/vtc_clear", {"key": key.strip().upper()})["cleared"]
+
     def reset(self, key):
         """Free every PC on a purchase (buyer couldn't deactivate). Returns the Machine IDs that were freed."""
         return self._call("/v1/admin/reset", {"key": key.strip().upper()})["freed"]
@@ -153,6 +166,18 @@ def _print(admin):
                 print(f"        ! LEAK? this PC runs a copy built for {a['build_owner']}, not for this purchase")
 
 
+def _print_vtc(admin):
+    rows = admin.vtc()
+    if not rows:
+        print("  No companies in the VTC Finder yet.")
+    for v in rows:
+        flag = "  ** HIDDEN **" if v["hidden"] else ""
+        flag += "" if v["listed"] else "  (not listed by its owner)"
+        print(f"  {v['key']}  {v['company']}  /vtc/{v['code']}  updated {(v['updated'] or '')[:10]}  {len(v['reports'])} report(s){flag}")
+        for r in v["reports"][:10]:
+            print(f"      {r['created'][:10]}  {r['reason']}{': ' + r['note'] if r['note'] else ''}")
+
+
 def menu():
     default_app = os.path.join(os.path.dirname(HERE), "Fleet Manager Pro")
     while True:
@@ -167,7 +192,7 @@ def menu():
               " 4) Release a PC (buyer replaced a PC)\n 5) Revoke a purchase\n 6) Restore a revoked purchase\n"
               " 7) Reset a purchase's uses (frees all PCs - buyer couldn't deactivate)\n"
               " 8) Delete a purchase (active or revoked)\n 9) Delete ALL revoked purchases\n"
-              "10) Identify a copy (whose is it? - by its build tag)\n 0) Quit")
+              "10) Identify a copy (whose is it? - by its build tag)\n11) VTC Finder listings and reports (hide or show a company)\n 0) Quit")
         c = input("> ").strip()
         try:
             if c == "1":
@@ -225,6 +250,19 @@ def menu():
                           f"{'  (REVOKED)' if w.get('revoked') else ''}")
                 else:
                     print("  ! No purchase matches that tag (typo, a deleted purchase, or not one of your copies).")
+            elif admin and c == "11":
+                _print_vtc(admin)
+                key = input("  Purchase key to change (Enter = none): ").strip().upper()
+                if not key:
+                    continue
+                what = input("  H) hide it   S) show it again   C) forget its reports: ").strip().lower()
+                if what in ("h", "s"):
+                    admin.vtc_hide(key, what == "h")
+                    print("  Hidden from the VTC Finder. It stays hidden when the company edits its profile." if what == "h" else "  Shown again.")
+                elif what == "c":
+                    print(f"  {admin.vtc_clear(key)} report(s) forgotten.")
+                else:
+                    print("  Nothing changed.")
             elif admin and c == "9":
                 revoked = [x for x in admin.purchases() if x.get("revoked")]
                 if not revoked:
@@ -273,6 +311,13 @@ def main(argv):
         elif cmd == "whose":
             w = Admin().whose(a[0])
             print("stock copy (no buyer)" if w == "STOCK" else (f"{w['key']} {w['name']}" if w else "no match"))
+        elif cmd == "vtc":
+            _print_vtc(Admin())
+        elif cmd in ("vtc-hide", "vtc-unhide"):
+            Admin().vtc_hide(a[0], cmd == "vtc-hide")
+            print("hidden" if cmd == "vtc-hide" else "shown")
+        elif cmd == "vtc-clear":
+            print(f"{Admin().vtc_clear(a[0])} report(s) forgotten")
         elif cmd == "delete-revoked":
             d = Admin().delete_revoked()
             print(f"deleted {len(d)} revoked purchase(s)" + (": " + ", ".join(x["key"] for x in d) if d else ""))

@@ -16,6 +16,7 @@ Public API (used by Fleet Manager and Fleet Manager Pro):
   POST /v1/deactivate  {key, machine}   free this PC's slot (moving to a new PC)
   POST /v1/recruit     {key, machine, product, company, intro, open, ack: [ids]}   (Fleet Manager Pro)
                        publishes the company's Apply page and hands over new applications; acked ones are deleted
+                       An optional  profile: {...}  is the company's VTC Finder profile (see vtc_clean)
   POST /v1/leaderboard {key, machine, product, join, company, currency, stats, drivers}   (Fleet Manager Pro)
                        posts this company's totals to the global leaderboard (join=false leaves it) and returns
                        every company on it, plus the best drivers of companies that share driver names
@@ -24,6 +25,8 @@ Public API (used by Fleet Manager and Fleet Manager Pro):
   GET  /v1/update/file?build=<tag>&name=<zip>   download a package (its SHA-256 is pinned by the signed manifest)
 Public pages (no key):
   GET/POST /apply/<code>   the company's application form (rate-limited, honeypot, length limits)
+  GET  /vtcs?q=&game=&open=&lang=&region=&style=&plays=&size=&sort=&p=   VTC Finder: search for a company
+  GET  /vtc/<code>         a company's profile page   POST /vtc/<code>/report   report it (3 an hour per address)
   GET  /leaderboard?metric=km&period=month&game=all   the global leaderboard of every Fleet Manager Pro company
 Admin API (Authorization: Bearer <admin_token>), used by License Manager:
   POST /v1/admin/purchase {name, email}   GET /v1/admin/list
@@ -32,6 +35,9 @@ Admin API (Authorization: Bearer <admin_token>), used by License Manager:
   POST /v1/admin/whose    {tag}           which purchase a copy's hidden build tag (FMPB-...) belongs to
   POST /v1/admin/delete   {key} | {all_revoked: true}   delete a purchase (active or revoked) for good, or every
                           revoked one; its PCs lock at their next check. A copy goes to deleted_purchases.jsonl first.
+
+  GET  /v1/admin/vtc                      VTC Finder listings and the reports about them
+  POST /v1/admin/vtc_hide {key, hidden: true|false}     POST /v1/admin/vtc_clear {key}   (forget its reports)
 
 Every lease is signed with Ed25519; Fleet Manager only trusts leases signed by this server's key, so a fake
 server can't unlock it.
@@ -58,6 +64,7 @@ import ssl
 import sys
 import threading
 import time
+import unicodedata
 from logging.handlers import RotatingFileHandler
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -166,6 +173,98 @@ _SHA_CACHE = {}
 HONEYPOT = "fmp_trap_q"                               # the Apply form's hidden anti-bot box (see apply_page)
 
 
+# ---------------------------------------------------------------------------------------------- VTC Finder
+# The app keeps the same lists in fmpro/vtc_profile.py (the tests check they match).
+VTC_GAMES = {"ats": "American Truck Simulator", "ets2": "Euro Truck Simulator 2", "both": "ATS and ETS2"}
+VTC_REGIONS = {"world": "Worldwide", "na": "North America", "sa": "South America", "eu": "Europe", "as": "Asia",
+               "oc": "Oceania", "af": "Africa"}
+VTC_STYLES = {"realistic": "Realistic", "relaxed": "Relaxed", "competitive": "Competitive", "roleplay": "Roleplay"}
+VTC_PLAYS = {"single": "Single-player", "convoy": "Convoy", "tmp": "TruckersMP"}
+VTC_LANGS = {"en": "English", "de": "German", "fr": "French", "es": "Spanish", "pt": "Portuguese", "it": "Italian",
+             "nl": "Dutch", "pl": "Polish", "cs": "Czech", "sk": "Slovak", "hu": "Hungarian", "ro": "Romanian",
+             "bg": "Bulgarian", "hr": "Croatian", "sr": "Serbian", "el": "Greek", "tr": "Turkish", "ru": "Russian",
+             "uk": "Ukrainian", "lt": "Lithuanian", "lv": "Latvian", "et": "Estonian", "fi": "Finnish",
+             "sv": "Swedish", "no": "Norwegian", "da": "Danish", "ja": "Japanese", "ko": "Korean", "zh": "Chinese"}
+VTC_SIZES = {"s": ("1-5 drivers", 1, 5), "m": ("6-20 drivers", 6, 20), "l": ("21+ drivers", 21, 10 ** 9)}
+VTC_SORTS = {"match": "Best match", "active": "Most active this month", "new": "Newest", "name": "Name"}
+VTC_REASONS = {"offensive": "Offensive or hateful", "pretend": "Pretends to be someone else", "scam": "Scam or bad link",
+               "spam": "Spam", "other": "Something else"}
+VTC_PER_PAGE = 20
+VTC_LISTS = {"languages": (VTC_LANGS, 5), "styles": (VTC_STYLES, 4), "plays": (VTC_PLAYS, 3)}
+_HEX = re.compile(r"#[0-9a-fA-F]{6}")
+
+
+def vtc_text(v, limit, lines=False):
+    """Plain text: no control or direction-changing characters, spaces tidied, cut to the limit."""
+    v = "".join(c for c in str(v if v is not None else "")
+                if c == "\n" or (unicodedata.category(c) not in ("Cc", "Cs", "Co") and c not in "\u202a\u202b\u202c\u202d\u202e"
+                                  "\u2066\u2067\u2068\u2069\u200e\u200f\u2028\u2029"))
+    if lines:
+        v = re.sub(r"\n{3,}", "\n\n", "\n".join(" ".join(x.split()) for x in v.split("\n"))).strip()
+    else:
+        v = " ".join(v.split())
+    return v[:limit].strip()
+
+
+def vtc_link(kind, v):
+    """An https link, or '' . Discord must be an invite and TruckersMP must be truckersmp.com."""
+    v = str(v or "").strip()
+    if not v or len(v) > 200 or not re.fullmatch(r"https://[A-Za-z0-9.\-]+(?:/[A-Za-z0-9\-._~!$&'()*+,;=:@%/]*)?(?:\?[A-Za-z0-9\-._~!$&'()*+,;=:@%/?]*)?(?:#[A-Za-z0-9\-._~!$&'()*+,;=:@%/?]*)?", v):
+        return ""
+    u = urllib.parse.urlsplit(v)
+    host = (u.hostname or "").lower()
+    if "." not in host or host.startswith((".", "-")) or host.endswith((".", "-")) or ".." in host:
+        return ""
+    if kind == "discord":
+        ok = (host in ("discord.gg", "www.discord.gg") and len(u.path) > 1) or \
+             (host in ("discord.com", "www.discord.com") and u.path.startswith("/invite/") and len(u.path) > 8)
+        return v if ok else ""
+    if kind == "truckersmp":
+        return v if host in ("truckersmp.com", "www.truckersmp.com") else ""
+    return v
+
+
+def _vtc_int(v, hi):
+    return min(hi, max(0, int(v))) if isinstance(v, (int, float)) and not isinstance(v, bool) and v == v and abs(v) < 1e15 else 0
+
+
+def vtc_clean(p):
+    """Only the expected shape, choices and lengths are kept - nothing else a client sends is stored."""
+    p = p if isinstance(p, dict) else {}
+    asks = p.get("asks") if isinstance(p.get("asks"), dict) else {}
+    links = p.get("links") if isinstance(p.get("links"), dict) else {}
+    out = {"tag": vtc_text(p.get("tag"), 8), "motto": vtc_text(p.get("motto"), 120),
+           "about": vtc_text(p.get("about"), 1500, True),
+           "games": p.get("games") if isinstance(p.get("games"), str) and p["games"] in VTC_GAMES else "both",
+           "region": p.get("region") if isinstance(p.get("region"), str) and p["region"] in VTC_REGIONS else "world",
+           "drivers": _vtc_int(p.get("drivers"), 100_000)}
+    for name, (known, most) in VTC_LISTS.items():
+        vals = p.get(name) if isinstance(p.get(name), list) else []
+        out[name] = [k for k in known if k in [v for v in vals if isinstance(v, str)]][:most]
+    out["asks"] = {"age": _vtc_int(asks.get("age"), 99), "km_week": _vtc_int(asks.get("km_week"), 100_000),
+                   "mic": asks.get("mic") is True, "dlc": vtc_text(asks.get("dlc"), 120),
+                   "trial": vtc_text(asks.get("trial"), 120), "text": vtc_text(asks.get("text"), 400, True)}
+    offers = p.get("offers") if isinstance(p.get("offers"), list) else []
+    out["offers"] = [x for x in (vtc_text(o, 80) for o in offers[:20]) if x][:6]
+    out["links"] = {k: vtc_link(k, links.get(k)) for k in ("discord", "website", "truckersmp")}
+    col = p.get("colours") if isinstance(p.get("colours"), list) else []
+    col = [c if isinstance(c, str) and _HEX.fullmatch(c) else "" for c in col[:2]]
+    out["colours"] = [col[0] if col and col[0] else "#0a1a33", col[1] if len(col) > 1 and col[1] else "#c8102e"]
+    qs, seen = [], set()
+    for q in (p.get("questions") if isinstance(p.get("questions"), list) else [])[:20]:
+        text = vtc_text(q.get("q"), 120) if isinstance(q, dict) else ""
+        if text and text.lower() not in seen:
+            seen.add(text.lower())
+            qs.append({"q": text, "type": "yesno" if q.get("type") == "yesno" else "text"})
+    out["questions"] = qs[:5]
+    return out
+
+
+def vtc_question_id(text):
+    """The form field for a question. Made from its words, so an answer can't land on a question edited meanwhile."""
+    return "q_" + hashlib.sha256(text.encode("utf-8")).hexdigest()[:10]
+
+
 def vtuple(s):
     """Compare version strings like '1.3', '1.4', '1.4.2' as tuples of ints."""
     out = []
@@ -218,6 +317,11 @@ class Store:
                 CREATE INDEX IF NOT EXISTS ix_apps_code ON applications(code);
                 CREATE TABLE IF NOT EXISTS leaderboard(key TEXT PRIMARY KEY, pid TEXT UNIQUE NOT NULL, company TEXT,
                   currency TEXT DEFAULT '', stats TEXT NOT NULL, drivers TEXT DEFAULT '{}', updated TEXT);
+                CREATE TABLE IF NOT EXISTS vtc_profiles(key TEXT PRIMARY KEY, listed INTEGER DEFAULT 0,
+                  hidden INTEGER DEFAULT 0, data TEXT NOT NULL, created TEXT, updated TEXT);
+                CREATE TABLE IF NOT EXISTS vtc_reports(id INTEGER PRIMARY KEY, code TEXT NOT NULL, reason TEXT,
+                  note TEXT DEFAULT '', created TEXT);
+                CREATE INDEX IF NOT EXISTS ix_vtc_reports_code ON vtc_reports(code);
             """)
             self._never_reuse_application_ids()
             for table, col, decl in (("purchases", "revoked", "TEXT"), ("activations", "last_seen", "TEXT"),
@@ -331,7 +435,7 @@ class Store:
     APP_FIELDS = {"name": 80, "contact": 120, "age": 3, "country": 60, "games": 20, "experience": 400, "message": 1500}
     MAX_PENDING = 300
 
-    def recruit_sync(self, key, machine, product, company, intro, is_open, ack, ip=""):
+    def recruit_sync(self, key, machine, product, company, intro, is_open, ack, ip="", profile=None):
         with self.lock:
             p, _act = self.check(key, machine, ip, product)          # only an activated PC of the purchase
             row = self.db.execute("SELECT code FROM recruit WHERE key=?", (p["key"],)).fetchone()
@@ -349,10 +453,157 @@ class Store:
             ids = [int(i) for i in (ack or []) if isinstance(i, int) or str(i).isdigit()][:500]
             if ids:
                 self.db.execute(f"DELETE FROM applications WHERE code=? AND id IN ({','.join('?' * len(ids))})", [code] + ids)  # nosec B608  # table/column names are fixed in the code; every value is a ? parameter
+            if profile is not None:
+                self._vtc_store(p["key"], profile)
             self.db.commit()
+            self._vtc_cache = None
             pending = [dict(id=r[0], created=r[1], **json.loads(r[2])) for r in self.db.execute(
                 "SELECT id, created, data FROM applications WHERE code=? ORDER BY id LIMIT 100", (code,))]
             return code, pending
+
+    # ---- VTC Finder: the company's public profile (its address is /vtc/<the recruit code>)
+    VTC_STALE_DAYS = 30               # a company that hasn't synced for this long isn't shown
+    VTC_CACHE = 60                    # seconds the search list is kept (cleared at once by any change)
+    VTC_REPORTS_PER_CODE, VTC_REPORTS_MAX = 50, 2000
+    _vtc_cache = None
+
+    def _vtc_store(self, key, profile):
+        """Keep this company's profile. Not listed = only its Apply questions are kept. The hide switch survives edits."""
+        listed = isinstance(profile, dict) and profile.get("listed") is True
+        data = vtc_clean(profile)
+        if not listed:
+            data = vtc_clean({"questions": data["questions"]})
+        row = self.db.execute("SELECT hidden FROM vtc_profiles WHERE key=?", (key,)).fetchone()
+        if not listed and not data["questions"] and not (row and row["hidden"]):
+            self.db.execute("DELETE FROM vtc_profiles WHERE key=?", (key,))
+            return
+        # 'created' is when it was (last) put in the finder, for the Newest order
+        self.db.execute("INSERT INTO vtc_profiles(key, listed, data, created, updated) VALUES(?,?,?,?,?) "
+                        "ON CONFLICT(key) DO UPDATE SET created=CASE WHEN excluded.listed AND NOT vtc_profiles.listed "
+                        "THEN excluded.created ELSE vtc_profiles.created END, listed=excluded.listed, "
+                        "data=excluded.data, updated=excluded.updated",
+                        (key, 1 if listed else 0, json.dumps(data, separators=(",", ":")), iso(now()), iso(now())))
+
+    def vtc_status(self, key):
+        """What the app shows its owner: listed, hidden by the server's owner, and whether the page can be seen."""
+        with self.lock:
+            r = self.db.execute("SELECT v.listed, v.hidden, v.data, c.company FROM vtc_profiles v "
+                                "JOIN recruit c ON c.key=v.key WHERE v.key=?", (key,)).fetchone()
+        if not r:
+            return {"stored": False, "listed": False, "hidden": False, "visible": False}
+        full = bool((r["company"] or "").strip() and json.loads(r["data"])["about"])
+        return {"stored": True, "listed": bool(r["listed"]), "hidden": bool(r["hidden"]),
+                "visible": bool(r["listed"] and not r["hidden"] and full)}
+
+    def vtc_all(self):
+        """Every company that can be seen: listed, not hidden, not revoked, synced lately, with a name and a description."""
+        t = time.monotonic()
+        with self.lock:
+            hit = self._vtc_cache
+            if hit and t - hit[0] < self.VTC_CACHE:
+                return hit[1]
+            cutoff = iso(now() - dt.timedelta(days=self.VTC_STALE_DAYS))
+            rows = self.db.execute(
+                "SELECT c.code, c.company, c.open, v.data, v.created, c.updated, l.stats, l.updated lb_updated "
+                "FROM vtc_profiles v JOIN recruit c ON c.key=v.key JOIN purchases p ON p.key=v.key "
+                "LEFT JOIN leaderboard l ON l.key=v.key AND l.updated>=? "
+                "WHERE v.listed=1 AND v.hidden=0 AND p.revoked IS NULL AND c.updated>=?", (cutoff, cutoff)).fetchall()
+            out = []
+            for r in rows:
+                d = json.loads(r["data"])
+                name = vtc_text(r["company"], 64)
+                if not name or not d["about"]:
+                    continue
+                stats = json.loads(r["stats"]) if r["stats"] else None
+                month = ((stats or {}).get("month") or {}).get("all")
+                out.append(dict(d, code=r["code"], company=name, open=bool(r["open"]), created=r["created"] or "",
+                                updated=r["updated"] or "", stats=stats, month_km=month[0] if month else 0,
+                                _name=name.lower(), _tag=d["tag"].lower(),
+                                _text=" ".join((name, d["tag"], d["motto"], d["about"])).lower()))
+            self._vtc_cache = (t, out)
+            return out
+
+    def vtc_page(self, code):
+        if not re.fullmatch(r"[a-z2-9]{8}", code or ""):
+            return None
+        return next((c for c in self.vtc_all() if c["code"] == code), None)
+
+    def vtc_search(self, words="", game="", is_open=True, lang="", region="", style="", plays="", size="", sort="match"):
+        """The companies that fit, in order. Unknown filter values are ignored."""
+        words = vtc_text(words, 60).lower()
+        parts = words.split()
+        out = []
+        for c in self.vtc_all():
+            if is_open and not c["open"]:
+                continue
+            if game in VTC_GAMES and not (c["games"] in (game, "both") if game != "both" else c["games"] == "both"):
+                continue
+            if lang in VTC_LANGS and lang not in c["languages"]:
+                continue
+            if region in VTC_REGIONS and c["region"] not in (region, "world"):
+                continue
+            if style in VTC_STYLES and style not in c["styles"]:
+                continue
+            if plays in VTC_PLAYS and plays not in c["plays"]:
+                continue
+            if size in VTC_SIZES and not VTC_SIZES[size][1] <= c["drivers"] <= VTC_SIZES[size][2]:
+                continue
+            if not all(w in c["_text"] for w in parts):
+                continue
+            rank = 0 if not parts or words in c["_name"] else 1 if all(w in c["_name"] for w in parts) else \
+                2 if any(w in c["_tag"] for w in parts) else 3
+            out.append((rank, c))
+        # each sort keeps the order of the one before for ties, so the least important goes first
+        out.sort(key=lambda rc: rc[1]["_name"])
+        if sort != "name":
+            out.sort(key=lambda rc: rc[1]["updated"][:10], reverse=True)
+            out.sort(key=lambda rc: not rc[1]["open"])
+            if sort == "active":
+                out.sort(key=lambda rc: -rc[1]["month_km"])
+            elif sort == "new":
+                out.sort(key=lambda rc: rc[1]["created"], reverse=True)
+            else:
+                out.sort(key=lambda rc: rc[0])
+        return [c for _r, c in out]
+
+    def vtc_report(self, code, reason, note):
+        if not self.vtc_page(code):
+            raise LicenceError("not_found", "That company isn't listed.", 404)
+        with self.lock:
+            n = self.db.execute("SELECT COUNT(*) FROM vtc_reports WHERE code=?", (code,)).fetchone()[0]
+            total = self.db.execute("SELECT COUNT(*) FROM vtc_reports").fetchone()[0]
+            if n < self.VTC_REPORTS_PER_CODE and total < self.VTC_REPORTS_MAX:
+                self.db.execute("INSERT INTO vtc_reports(code, reason, note, created) VALUES(?,?,?,?)",
+                                (code, reason if reason in VTC_REASONS else "other", vtc_text(note, 300), iso(now())))
+                self.db.commit()
+
+    def vtc_admin_list(self):
+        """Listings (and hidden ones) with their reports, most reported first."""
+        with self.lock:
+            rows = self.db.execute("SELECT v.key, c.code, c.company, v.listed, v.hidden, v.updated FROM vtc_profiles v "
+                                   "JOIN recruit c ON c.key=v.key WHERE v.listed=1 OR v.hidden=1").fetchall()
+            reps = {}
+            for r in self.db.execute("SELECT code, reason, note, created FROM vtc_reports ORDER BY id DESC"):
+                reps.setdefault(r["code"], []).append({"reason": r["reason"], "note": r["note"], "created": r["created"]})
+        out = [dict(dict(r), listed=bool(r["listed"]), hidden=bool(r["hidden"]), reports=reps.get(r["code"], [])) for r in rows]
+        out.sort(key=lambda r: (-len(r["reports"]), (r["company"] or "").lower()))
+        return out
+
+    def vtc_hide(self, key, hidden):
+        key = str(key or "").strip().upper()
+        with self.lock:
+            n = self.db.execute("UPDATE vtc_profiles SET hidden=? WHERE key=?", (1 if hidden else 0, key)).rowcount
+            self.db.commit()
+            self._vtc_cache = None
+        if not n:
+            raise LicenceError("not_found", "That purchase has no VTC Finder listing.", 404)
+
+    def vtc_clear_reports(self, key):
+        key = str(key or "").strip().upper()
+        with self.lock:
+            n = self.db.execute("DELETE FROM vtc_reports WHERE code IN (SELECT code FROM recruit WHERE key=?)", (key,)).rowcount
+            self.db.commit()
+            return n
 
     # ---- global leaderboard (Fleet Manager Pro): every company's totals in one ranking
     LB_PERIODS = ("week", "month", "year", "all")
@@ -410,8 +661,10 @@ class Store:
             if not join or not company or not clean:
                 self.db.execute("DELETE FROM leaderboard WHERE key=?", (p["key"],))
                 self.db.commit()
+                self._vtc_cache = None
                 return None
             pid = row[0] if row else secrets.token_hex(6)
+            self._vtc_cache = None
             self.db.execute("INSERT INTO leaderboard(key, pid, company, currency, stats, drivers, updated) "
                             "VALUES(?,?,?,?,?,?,?) ON CONFLICT(key) DO UPDATE SET company=excluded.company, "
                             "currency=excluded.currency, stats=excluded.stats, drivers=excluded.drivers, "
@@ -462,9 +715,13 @@ class Store:
     def recruit_page(self, code):
         if not re.fullmatch(r"[a-z2-9]{8}", code or ""):
             return None
-        r = self.db.execute("SELECT r.company, r.intro, r.open, p.revoked FROM recruit r JOIN purchases p ON p.key=r.key "
-                            "WHERE r.code=?", (code,)).fetchone()
-        return dict(r) if r and not r["revoked"] else None
+        r = self.db.execute("SELECT r.company, r.intro, r.open, p.revoked, v.data FROM recruit r JOIN purchases p ON p.key=r.key "
+                            "LEFT JOIN vtc_profiles v ON v.key=r.key WHERE r.code=?", (code,)).fetchone()
+        if not r or r["revoked"]:
+            return None
+        d = dict(r)
+        d["questions"] = json.loads(d.pop("data") or "{}").get("questions") or []
+        return d
 
     def add_application(self, code, form):
         page = self.recruit_page(code)
@@ -474,7 +731,17 @@ class Store:
         if not data["name"] or not data["contact"]:
             raise LicenceError("missing", "Please fill in your name and how to contact you.")
         data["games"] = data["games"] if data["games"] in ("ats", "ets2", "both") else ""
-        data["age"] = data["age"] if data["age"].isdigit() else ""
+        data["age"] = data["age"] if data["age"].isdecimal() else ""
+        data["via"] = "finder" if form.get("via") == "finder" else "link"
+        answers = []
+        for q in page["questions"]:
+            a = vtc_text(form.get(vtc_question_id(q["q"])), 300)
+            if q["type"] == "yesno":
+                a = {"yes": "Yes", "no": "No"}.get(a.lower(), "")
+            if a:
+                answers.append([q["q"], a])
+        if answers:
+            data["answers"] = answers
         with self.lock:
             n = self.db.execute("SELECT COUNT(*) FROM applications WHERE code=?", (code,)).fetchone()[0]
             if n >= self.MAX_PENDING:
@@ -522,6 +789,7 @@ class Store:
             self.purchase(key)
             self.db.execute("UPDATE purchases SET revoked=? WHERE key=?", (iso(now()) if revoked else None, key))
             self.db.commit()
+            self._vtc_cache = None
 
     def delete_purchase(self, key):
         """Delete a purchase for good: its PCs, its recruitment page and waiting applications go too. Copies that use the
@@ -541,9 +809,12 @@ class Store:
             if rec:
                 self.db.execute("DELETE FROM applications WHERE code=?", (rec["code"],))
                 self.db.execute("DELETE FROM recruit WHERE key=?", (key,))
+                self.db.execute("DELETE FROM vtc_reports WHERE code=?", (rec["code"],))
+            self.db.execute("DELETE FROM vtc_profiles WHERE key=?", (key,))
             self.db.execute("DELETE FROM leaderboard WHERE key=?", (key,))
             self.db.execute("DELETE FROM purchases WHERE key=?", (key,))
             self.db.commit()
+            self._vtc_cache = None
             return {"key": key, "name": p["name"], "pcs": len([a for a in acts if not a["released"]]),
                     "was_revoked": bool(p.get("revoked"))}
 
@@ -594,6 +865,14 @@ table{{width:100%;border-collapse:collapse;font-size:14px}} th,td{{text-align:le
 th{{color:#93a7c6;font-size:12px;text-transform:uppercase}} .n{{text-align:right}}
 .seg{{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}} .seg a{{padding:5px 10px;border-radius:8px;background:#071327;
 color:#c7d4ea;text-decoration:none;font-size:13px;border:1px solid #1d3a66}}
+.badge{{display:inline-grid;place-items:center;min-width:46px;height:46px;padding:0 6px;box-sizing:border-box;border-radius:11px;
+font-weight:800;font-size:13px;flex:none}} .vtc{{display:flex;gap:13px;align-items:flex-start;padding:13px 0;border-bottom:1px solid #1d3a66}}
+.vtc>div{{min-width:0;overflow-wrap:anywhere}} .vtc b a{{color:#fff;text-decoration:none;font-size:16px}} .vtc b a:hover{{text-decoration:underline}}
+.chip{{display:inline-block;padding:2px 8px;border-radius:999px;background:#071327;border:1px solid #1d3a66;font-size:12px;
+color:#c7d4ea;margin:3px 4px 0 0}} .chip.on{{background:#14532d;border-color:#1f7a44;color:#d6f5e2}}
+.grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0 12px}} .nums b{{display:block;font-size:20px;color:#fff}}
+.btn{{display:inline-block;padding:11px 18px;border-radius:10px;background:#c8102e;color:#fff;font-weight:700;text-decoration:none;margin-top:8px}}
+.wrap{{overflow-wrap:anywhere}} summary{{cursor:pointer;color:#93a7c6;font-size:13px}} .err{{color:#ffb4c0}}
 button{{margin-top:18px;width:100%;padding:11px;border:0;border-radius:10px;background:#c8102e;color:#fff;font-weight:700;font-size:15px}}
 </style></head><body><main><h1>{html.escape(title)}</h1>{body}
 <p class="small" style="margin-top:18px">Fleet Manager Pro{(' · ' + company) if company else ''}</p></main></body></html>"""
@@ -793,7 +1072,154 @@ class Server:
             q.append(t)
             return True
 
-    def apply_page(self, method, path, raw, ip):
+    # ---- VTC Finder pages: plain forms and links, no scripts, every word escaped
+    def _base(self):
+        return self.cfg["apply_base_url"].rstrip("/")
+
+    @staticmethod
+    def _badge(c):
+        navy, accent = c["colours"]
+        r, g, b = (int(navy[i:i + 2], 16) for i in (1, 3, 5))
+        ink = "#fff" if 0.299 * r + 0.587 * g + 0.114 * b < 150 else "#111"
+        text = html.escape((c["tag"] or "".join(w[0] for w in c["company"].split()[:3])).upper()[:8])
+        return (f'<span class="badge" style="background:{navy};color:{ink};border:2px solid {accent}">{text}</span>')
+
+    @staticmethod
+    def _chips(c):
+        names = ([VTC_GAMES[c["games"]], VTC_REGIONS[c["region"]]] + [VTC_LANGS[x] for x in c["languages"]]
+                 + [VTC_STYLES[x] for x in c["styles"]] + [VTC_PLAYS[x] for x in c["plays"]])
+        state = '<span class="chip on">Open to drivers</span>' if c["open"] else '<span class="chip">Closed</span>'
+        return state + "".join(f'<span class="chip">{html.escape(n)}</span>' for n in names)
+
+    @staticmethod
+    def _seen(when):
+        try:
+            days = (now() - dt.datetime.fromisoformat(when.replace("Z", "+00:00"))).days
+        except ValueError:
+            return ""
+        return "Active today" if days < 1 else "Active yesterday" if days < 2 else f"Active {days} days ago"
+
+    def finder_page(self, query):
+        """(status, html) for the VTC Finder search page."""
+        q = {}
+        for k, v in urllib.parse.parse_qs(query or "", max_num_fields=20).items():
+            q[k] = v[0]
+        known = {"game": VTC_GAMES, "lang": VTC_LANGS, "region": VTC_REGIONS, "style": VTC_STYLES, "plays": VTC_PLAYS,
+                 "size": VTC_SIZES, "sort": VTC_SORTS}
+        f = {k: (q.get(k) if q.get(k) in opts else "") for k, opts in known.items()}
+        f["sort"] = f["sort"] or "match"
+        f["q"] = vtc_text(q.get("q"), 60)
+        everyone = q.get("open") == "all"
+        rows = self.store.vtc_search(f["q"], f["game"], not everyone, f["lang"], f["region"], f["style"], f["plays"],
+                                     f["size"], f["sort"])
+        pages = max(1, (len(rows) + VTC_PER_PAGE - 1) // VTC_PER_PAGE)
+        raw_p = q.get("p") or ""
+        p = min(pages, max(1, int(raw_p))) if raw_p.isascii() and raw_p.isdecimal() and len(raw_p) < 6 else 1
+        esc = html.escape
+
+        def link(**change):
+            args = {k: v for k, v in dict(f, open="all" if everyone else "", p="").items() if v}
+            args.update(change)
+            return "/vtcs?" + esc(urllib.parse.urlencode({k: v for k, v in args.items() if v and (k, v) != ("sort", "match")}))
+
+        def pick(name, label, first, opts):
+            sel = "".join(f'<option value="{k}"{" selected" if f[name] == k else ""}>{esc(t)}</option>' for k, t in opts.items())
+            return f'<label>{label}<select name="{name}">' + (f'<option value="">{first}</option>' if first else "") + sel + "</select></label>"
+
+        body = f"""<p>Find a virtual trucking company to drive for, read its profile and apply.</p>
+<form method="get" action="/vtcs"><label>Search<input name="q" maxlength="60" value="{esc(f['q'])}" placeholder="Name, tag or a word from the description"></label>
+<div class="grid">{pick("game", "Game", "Any", VTC_GAMES)}
+<label>Recruiting<select name="open"><option value="">Open now</option><option value="all"{" selected" if everyone else ""}>Everyone</option></select></label>
+{pick("lang", "Language", "Any", VTC_LANGS)}{pick("region", "Region", "Any", VTC_REGIONS)}{pick("style", "Style", "Any", VTC_STYLES)}
+{pick("plays", "Plays on", "Any", VTC_PLAYS)}{pick("size", "Size", "Any", {k: v[0] for k, v in VTC_SIZES.items()})}{pick("sort", "Sort by", "", VTC_SORTS)}</div>
+<button>Search</button></form>"""  # nosec B608  # HTML page, not SQL
+        n = len(rows)
+        filtered = any(v for k, v in f.items() if k != "sort")
+        body += f'<h2>{n:,} compan{"y" if n == 1 else "ies"}</h2>'
+        for c in rows[(p - 1) * VTC_PER_PAGE:p * VTC_PER_PAGE]:
+            motto = f'<br>{esc(c["motto"])}' if c["motto"] else ""
+            body += (f'<div class="vtc">{self._badge(c)}<div><b><a href="/vtc/{c["code"]}">{esc(c["company"])}</a></b>{motto}'
+                     f'<br>{self._chips(c)}<br><small>{c["drivers"]:,} driver{"" if c["drivers"] == 1 else "s"} &middot; '
+                     f'{self._seen(c["updated"])}</small></div></div>')
+        if not n:
+            body += "<p>No company matches that search.</p><p>"
+            if not everyone:
+                body += f'<a href="{link(open="all")}">Show companies that aren&#39;t recruiting</a><br>'
+            if filtered:
+                body += '<a href="/vtcs">Clear filters</a>'
+            body += "</p>"
+        if pages > 1:
+            body += '<p class="seg">' + (f'<a href="{link(p=p - 1)}">Previous</a>' if p > 1 else "") + \
+                f"<small>Page {p} of {pages}</small>" + (f'<a href="{link(p=p + 1)}">Next</a>' if p < pages else "") + "</p>"
+        body += ('<p><small>Run a company in Fleet Manager Pro? List it in the app under Company, VTC Profile. '
+                 '<a href="/leaderboard">Global Leaderboard</a></small></p>')
+        return 200, _page("VTC Finder", body).replace("<main>", '<main class="wide">', 1)
+
+    def vtc_profile_page(self, method, path, raw, ip):
+        """(status, html) for a company's profile, and the report form on it."""
+        rest = path[len("/vtc/"):].strip("/")
+        code, _sep, action = rest.partition("/")
+        c = self.store.vtc_page(code)
+        back = '<p><a href="/vtcs">Back to the VTC Finder</a></p>'
+        if not c or action not in ("", "report"):
+            return 404, _page("Not found", "<p>That company isn't listed in the VTC Finder.</p>" + back)
+        esc = html.escape
+        if method == "POST":
+            if action != "report":
+                return 404, _page("Not found", back)
+            form = {k: v[0] for k, v in urllib.parse.parse_qs(raw.decode("utf-8", "replace"), max_num_fields=10).items()}
+            if not form.get(HONEYPOT):
+                if form.get("reason") not in VTC_REASONS:
+                    return 400, _page("Not sent", f'<p>Pick a reason first.</p><p><a href="/vtc/{code}">Back</a></p>')
+                if not self.apply_rate_ok("report:" + ip, limit=3):
+                    return 429, _page("Slow down", "<p>Too many reports from your connection. Try again in an hour.</p>" + back)
+                self.store.vtc_report(code, form["reason"], form.get("note"))
+                self.log.info("VTC report: %s about %s", form["reason"], code)
+            return 200, _page("Thank you", "<p>Your report was sent. It will be looked at.</p>" + back)
+        if action:
+            return 404, _page("Not found", back)
+
+        def para(t):
+            return esc(t).replace("\n", "<br>")
+
+        body = (f'<div class="vtc" style="border:0;padding:0">{self._badge(c)}<div>'
+                + (f"<b>{esc(c['motto'])}</b><br>" if c["motto"] else "") + f"{self._chips(c)}</div></div>"
+                f'<h2>About</h2><p class="wrap">{para(c["about"])}</p>')
+        a = c["asks"]
+        asks = ([f"At least {a['age']} years old"] if a["age"] else []) + \
+            ([f"{a['km_week']:,} km ({a['km_week'] / 1.609344:,.0f} mi) a week"] if a["km_week"] else []) + \
+            (["A microphone"] if a["mic"] else []) + ([f"DLC: {esc(a['dlc'])}"] if a["dlc"] else []) + \
+            ([f"Trial period: {esc(a['trial'])}"] if a["trial"] else [])
+        if asks or a["text"]:
+            body += "<h2>What we ask for</h2>" + ("<ul>" + "".join(f"<li>{x}</li>" for x in asks) + "</ul>" if asks else "") + \
+                (f'<p class="wrap">{para(a["text"])}</p>' if a["text"] else "")
+        if c["offers"]:
+            body += '<h2>What we offer</h2><ul class="wrap">' + "".join(f"<li>{esc(x)}</li>" for x in c["offers"]) + "</ul>"
+        m = ((c["stats"] or {}).get("month") or {}).get("all")
+        t = ((c["stats"] or {}).get("all") or {}).get("all")
+        body += "<h2>Activity</h2>"
+        if m and t:
+            cells = ((f"{m[2]:,}", "deliveries this month"), (f"{m[0]:,} km", "this month"), (f"{t[2]:,}", "deliveries in all"),
+                     (f"{t[0]:,} km", "in all"), (f"{t[4]:.0f} / 100", "average driving score"))
+            body += f'<div class="grid nums"><div><b>{c["drivers"]:,}</b>drivers</div>' + \
+                "".join(f"<div><b>{n}</b>{x}</div>" for n, x in cells) + "</div><p><small>Reported by the company.</small></p>"
+        else:
+            body += f'<p>{c["drivers"]:,} driver{"" if c["drivers"] == 1 else "s"}. <small>Reported by the company.</small></p>'
+        names = {"discord": "Discord", "website": "Website", "truckersmp": "TruckersMP"}
+        links = [f'<a href="{esc(u)}" target="_blank" rel="nofollow noopener noreferrer">{names[k]}</a>' for k, u in c["links"].items() if u]
+        if links:
+            body += "<h2>Links</h2><p>" + " &middot; ".join(links) + "<br><small>These go to other websites, chosen by the company.</small></p>"
+        body += (f'<p><a class="btn" href="/apply/{code}?via=finder">Apply to {esc(c["company"])}</a></p>' if c["open"]
+                 else "<p><b>Not taking applications right now.</b></p>")
+        reasons = "".join(f'<option value="{k}">{esc(v)}</option>' for k, v in VTC_REASONS.items())
+        body += f"""{back}<details><summary>Report this company</summary><form method="post" action="/vtc/{code}/report">
+<label>What is wrong?<select name="reason" required><option value="">Choose...</option>{reasons}</select></label>
+<label>Anything to add?<textarea name="note" maxlength="300" rows="3"></textarea></label>
+<div class="hp" aria-hidden="true"><label>Leave this box empty<input name="{HONEYPOT}" tabindex="-1" autocomplete="off"
+ data-lpignore="true" data-1p-ignore data-form-type="other"></label></div><button>Send report</button></form></details>"""
+        return 200, _page(c["company"], body, esc(c["company"])).replace("<main>", '<main class="wide">', 1)
+
+    def apply_page(self, method, path, raw, ip, query=""):
         """(status, html) for the public application form."""
         code = path[len("/apply/"):].strip("/")
         page = self.store.recruit_page(code)
@@ -814,10 +1240,19 @@ class Server:
             except LicenceError as e:
                 return e.status, _page("Not sent", f"<p>{html.escape(e.msg)}</p><p><a href=\"\">Back</a></p>")
             return 200, _page("Thank you", f"<p>Your application to <b>{company}</b> was sent. The company will "
-                                           "contact you using the details you gave.</p>")
+                                           "contact you using the details you gave.</p>"
+                              + ('<p><a href="/vtcs">Back to the VTC Finder</a></p>' if form.get("via") == "finder" else ""))
         if not page["open"]:
             return 200, _page(name, f"<p><b>{company}</b> isn't taking applications right now.</p>", company)
         intro = html.escape(page["intro"] or "").replace("\n", "<br>")
+        via = "finder" if urllib.parse.parse_qs(query or "", max_num_fields=10).get("via") == ["finder"] else "link"
+        extra = ""
+        for item in page["questions"]:
+            fid, text = vtc_question_id(item["q"]), html.escape(item["q"])
+            extra += f"<label>{text}" + (
+                f'<select name="{fid}"><option value="">Choose...</option><option value="yes">Yes</option>'
+                '<option value="no">No</option></select></label>' if item["type"] == "yesno"
+                else f'<input name="{fid}" maxlength="300"></label>')
         return 200, _page(f"Apply to {name}", f"""
 <p>{intro or f"Want to drive for <b>{company}</b>? Tell us about yourself."}</p>
 <form method="post" autocomplete="on">
@@ -829,6 +1264,7 @@ class Server:
     <option value="ets2">Euro Truck Simulator 2</option><option value="both">Both</option></select></label>
   <label>Experience<textarea name="experience" maxlength="400" rows="3" placeholder="Hours driven, other VTCs..."></textarea></label>
   <label>Message<textarea name="message" maxlength="1500" rows="4"></textarea></label>
+  {extra}<input type="hidden" name="via" value="{via}">
   <div class="hp" aria-hidden="true"><label>Leave this box empty<input name="{HONEYPOT}" tabindex="-1" autocomplete="off"
     data-lpignore="true" data-1p-ignore data-form-type="other"></label></div>
   <button>Send application</button>
@@ -896,7 +1332,7 @@ class Server:
             raise LicenceError("rate_limited", "Too many requests, try again in a minute.", 429)
         if path == "/v1/health":
             return {"ok": True, "product": PRODUCT, "products": list(PRODUCTS), "public_key": self.public}
-        if method != "POST" and not path.startswith("/v1/admin/list"):
+        if method != "POST" and not path.startswith("/v1/admin/list") and path != "/v1/admin/vtc":
             raise LicenceError("not_found", "Unknown endpoint", 404)
         if path in ("/v1/activate", "/v1/check", "/v1/deactivate") and body.get("product") != PRODUCT:
             raise LicenceError("bad_product", "This licence server only licenses Fleet Manager Pro.")
@@ -915,9 +1351,11 @@ class Server:
                 raise LicenceError("bad_product", "Recruitment is a Fleet Manager Pro feature.")
             code, pending = self.store.recruit_sync(body.get("key"), body.get("machine"), body.get("product"),
                                                     body.get("company"), body.get("intro"), bool(body.get("open", True)),
-                                                    body.get("ack") if isinstance(body.get("ack"), list) else [], ip)
-            return {"ok": True, "code": code, "apply_url": f"{self.cfg['apply_base_url'].rstrip('/')}/apply/{code}",
-                    "applications": pending}
+                                                    body.get("ack") if isinstance(body.get("ack"), list) else [], ip,
+                                                    body.get("profile") if isinstance(body.get("profile"), dict) else None)
+            return {"ok": True, "code": code, "apply_url": f"{self._base()}/apply/{code}", "applications": pending,
+                    "profile_url": f"{self._base()}/vtc/{code}", "finder_url": f"{self._base()}/vtcs",
+                    "profile": self.store.vtc_status(str(body.get("key") or "").strip().upper())}
         if path == "/v1/leaderboard":
             if body.get("product") != "Fleet Manager Pro":
                 raise LicenceError("bad_product", "The global leaderboard is a Fleet Manager Pro feature.")
@@ -966,6 +1404,13 @@ class Server:
                             o = self.store.whose(self.master, a["build"])
                             a["build_owner"] = o if o == "STOCK" else (f"{o['key']} ({o['name']})" if o else "an unknown copy")
                 return {"ok": True, "purchases": rows}
+            if path == "/v1/admin/vtc":
+                return {"ok": True, "listings": self.store.vtc_admin_list(), "url": f"{self._base()}/vtcs"}
+            if path == "/v1/admin/vtc_hide":
+                self.store.vtc_hide(body.get("key"), body.get("hidden") is not False)
+                return {"ok": True}
+            if path == "/v1/admin/vtc_clear":
+                return {"ok": True, "cleared": self.store.vtc_clear_reports(body.get("key"))}
             if path == "/v1/admin/delete":
                 if body.get("all_revoked") is True:
                     return {"ok": True, "deleted": self.store.delete_revoked()}
@@ -1001,7 +1446,7 @@ class Server:
                         n = -1
                     if n < 0:
                         raise LicenceError("bad_request", "Bad Content-Length")
-                    if n > 10_000:
+                    if n > (64_000 if path == "/v1/recruit" else 10_000):     # a company profile in any alphabet fits
                         raise LicenceError("bad_request", "Request too large", 413)
                     try:
                         body = json.loads(self.rfile.read(n) or b"{}") if n else {}
@@ -1031,9 +1476,15 @@ class Server:
                             if n < 0 or n > 10_000:
                                 raise ValueError("size")
                             raw = self.rfile.read(n)
-                        status, page = srv.apply_page(method, self.path.split("?")[0], raw, ip)
+                        url = urllib.parse.urlsplit(self.path)
+                        if url.path in ("/vtcs", "/vtcs/"):
+                            status, page = srv.finder_page(url.query)
+                        elif url.path.startswith("/vtc/"):
+                            status, page = srv.vtc_profile_page(method, url.path, raw, ip)
+                        else:
+                            status, page = srv.apply_page(method, url.path, raw, ip, url.query)
                 except ValueError:
-                    status, page = 413, _page("Too long", "<p>That application is too long.</p>")
+                    status, page = 413, _page("Too long", "<p>That is too long to send.</p>")
                 except Exception as e:  # never leak a traceback
                     srv.log.error("apply-form error: %r", e)
                     status, page = 500, _page("Error", "<p>Something went wrong. Try again later.</p>")
@@ -1102,10 +1553,14 @@ class Server:
                     return self._download()
                 if self.path.split("?")[0] in ("/leaderboard", "/leaderboard/"):
                     return self._board()
+                if self.path.split("?")[0] in ("/vtcs", "/vtcs/") or self.path.startswith("/vtc/"):
+                    return self._apply("GET")
                 self._go("GET")
 
             def do_POST(self):
                 if self.path.startswith("/apply/"):
+                    return self._apply("POST")
+                if self.path.startswith("/vtc/"):
                     return self._apply("POST")
                 self._go("POST")
 

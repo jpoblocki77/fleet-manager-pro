@@ -245,7 +245,8 @@ def notifications():
     rows = db.q("SELECT * FROM notifications WHERE user_id=? ORDER BY created_at DESC LIMIT 15", (uid,))
     unread = db.val("SELECT COUNT(*) FROM notifications WHERE user_id=? AND read=0", (uid,), 0)
     msgs = db.val("SELECT COUNT(*) FROM messages WHERE to_id=? AND read=0", (uid,), 0)
-    return jsonify(items=rows, unread=unread, messages=msgs)
+    from . import recruit
+    return jsonify(items=rows, unread=unread, messages=msgs, applications=recruit.waiting(user()))
 
 
 @bp.route("/export/jobs.csv")

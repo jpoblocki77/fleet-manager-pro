@@ -38,8 +38,10 @@
       <a href="/performance" class="{{ 'active' if ep == 'ops.performance' }}">{{ icon('trophy') }}Driver Performance<span class="nav-ok" title="Complete and working (0.02 Alpha)">✓</span></a>
       <a href="/insights" class="{{ 'active' if ep == 'insights.page' }}">{{ icon('chart') }}Insights<span class="nav-ok" title="Complete and working">✓</span></a>
       <a href="/planner" class="{{ 'active' if ep == 'insights.planner' }}">{{ icon('route') }}Route Planner<span class="nav-ok" title="Complete and working">✓</span></a>
-      {% if can('admin') %}<a href="/recruitment" class="{{ 'active' if ep == 'pages.recruitment' }}">{{ icon('apply') }}Recruitment<span class="nav-ok" title="Complete and working">✓</span></a>{% endif %}
+      {% if can('admin') %}<a href="/recruitment" class="{{ 'active' if ep == 'pages.recruitment' }}">{{ icon('apply') }}Recruitment<span class="nav-ok" title="Complete and working">✓</span> <span class="pill" id="nav-app-pill"{% if not NEW_APPS %} style="display:none"{% endif %}>{{ NEW_APPS.n if NEW_APPS else 0 }}</span></a>{% endif %}
+      {% if can('admin') %}<a href="/vtc-profile" class="{{ 'active' if ep == 'vtc.page' }}">{{ icon('shield') }}VTC Profile<span class="nav-ok" title="Complete and working">✓</span></a>{% endif %}
       <div class="nav-sec">Community</div>
+      <a href="/find-vtc" class="{{ 'active' if ep == 'vtc.find' }}">{{ icon('users') }}Find a VTC<span class="nav-ok" title="Complete and working">✓</span></a>
       <a href="/events" class="{{ 'active' if ep.startswith('pages.event') }}">{{ icon('cal') }}Events &amp; Convoys<span class="nav-ok" title="Complete and working">✓</span></a>
       <a href="/leaderboard" class="{{ 'active' if ep == 'pages.leaderboard' }}">{{ icon('trophy') }}Leaderboard<span class="nav-ok" title="Complete and working">✓</span></a>
       <a href="/achievements" class="{{ 'active' if ep == 'pages.achievements' }}">{{ icon('medal') }}Achievements<span class="nav-ok" title="Complete and working">✓</span></a>
@@ -98,6 +100,18 @@
             <input type="hidden" name="action" value="install">
             <button class="btn sm primary" data-confirm="Download and install Fleet Manager Pro {{ UPDATE.version }} now? The app will close and reopen automatically.">Update now</button>
           </form></span>{% endif %}
+      </div>
+      {% endif %}
+      {% if can('admin') %}
+      <div class="update-banner app-banner" id="app-banner" role="status" data-upto="{{ NEW_APPS.upto if NEW_APPS }}"{% if not NEW_APPS or ep == 'pages.recruitment' %} hidden{% endif %}{% if ep == 'pages.recruitment' %} data-off="1"{% endif %}>
+        <span class="ub-tag">{{ icon('apply') }}New application</span>
+        <span class="ub-text" id="app-banner-text">{% if NEW_APPS %}{% if NEW_APPS.n == 1 %}<b>{{ NEW_APPS.name }}</b> has applied to drive for you.{% else %}<b>{{ NEW_APPS.n }} drivers</b> have applied to drive for you. Newest: {{ NEW_APPS.name }}.{% endif %}{% endif %}</span>
+        <span class="ub-actions">
+          <form method="post" action="/recruitment/banner/hide" class="inline" id="app-banner-hide">
+            <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+            <input type="hidden" name="upto" value="{{ NEW_APPS.upto if NEW_APPS }}">
+            <button class="btn sm ghost" title="Hide this until another driver applies">Hide</button></form>
+          <a class="btn sm primary" href="/recruitment">Review</a></span>
       </div>
       {% endif %}
       {% set guide = howto() %}{% if guide %}

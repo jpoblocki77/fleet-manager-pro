@@ -212,6 +212,7 @@ DEFAULT_SETTINGS = {
     "discord_webhook": "", "webhook_on_delivery": "1", "webhook_on_event": "1",
     "webhook_applications": "", "webhook_on_application": "1",   # new driver applications: own channel optional
     "recruitment_open": "1", "recruitment_text": "We're hiring professional, friendly drivers!",
+    "vtc_listed": "0", "vtc_profile": "",               # VTC Finder: off until a manager ticks it
     "global_board": "1", "global_board_drivers": "0",   # the global leaderboard: join it / share driver names
     "starting_balance": str(STARTING_CAPITAL), "initialized": "0",
     # compliance (ELD / Hours of Service, DVIR, roadside inspections)
@@ -242,6 +243,9 @@ def init(path):
                              ("garages", "city_id", "TEXT DEFAULT ''"), ("garages", "notes", "TEXT DEFAULT ''"),
                              ("applications", "remote_id", "INTEGER"), ("applications", "source", "TEXT DEFAULT 'local'"),
                              ("event_rsvps", "xp_awarded", "INTEGER DEFAULT 0"),
+                             # 1.5.22: the new-application banner (hidden up to this time), VTC Finder applications
+                             ("users", "apps_seen", "REAL DEFAULT 0"), ("applications", "answers", "TEXT DEFAULT ''"),
+                             ("applications", "found_via", "TEXT DEFAULT ''"),
                              # 1.4.4: a simulated rest (minutes) - a zero-length marker line the HOS clocks count as rest
                              ("hos_logs", "sim_rest", "INTEGER DEFAULT 0")):
         if col not in {r[1] for r in c.execute(f"PRAGMA table_info({table})")}:
