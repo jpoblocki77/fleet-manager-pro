@@ -187,7 +187,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
     created_at REAL NOT NULL);
 """
 
-STARTING_CAPITAL = 275000          # every new company starts with this; it can't be changed
+STARTING_CAPITAL = 300000          # every new company starts with this; it can't be changed
 
 DEFAULT_SETTINGS = {
     "company_name": "", "company_tag": "", "company_motto": "", "company_color": "#c8102e", "theme_navy": "", "theme_accent": "",

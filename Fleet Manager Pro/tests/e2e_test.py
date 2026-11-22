@@ -157,8 +157,8 @@ def main():
     check(r.status_code == 302, "setup creates company")
     check(db.setting("initialized") == "1", "initialized flag set")
     cap = db.q("SELECT amount FROM ledger WHERE category='capital'")
-    check([x["amount"] for x in cap] == [275000.0] and db.setting("starting_balance") == "275000",
-          f"starting capital is locked at 275,000 (the form asked for 5,000,000; got {[x['amount'] for x in cap]})")
+    check([x["amount"] for x in cap] == [300000.0] and db.setting("starting_balance") == "300000",
+          f"starting capital is locked at 300,000 (the form asked for 5,000,000; got {[x['amount'] for x in cap]})")
     check('name="starting_balance"' not in c.get("/").get_data(as_text=True), "nothing on the pages can set the starting capital")
     db.insert("ledger", account="company", category="capital", amount=4725000.0, description="Test top-up", created_at=0)
     r = c.post("/announcements", data={"title": "x", "body": "y"})
@@ -2739,7 +2739,7 @@ def main():
     led = db.q("SELECT category, amount FROM ledger")
     check(len(led) == 1 and led[0]["category"] == "capital" and led[0]["amount"] == float(db.setting("starting_balance")),
           f"the books restart with the starting capital ({led})")
-    check(led[0]["amount"] == 275000.0, "a data reset restarts with the locked 275,000")
+    check(led[0]["amount"] == 300000.0, "a data reset restarts with the locked 300,000")
     check(db.val("SELECT COUNT(*) FROM users", (), 0) == members and db.val("SELECT MAX(xp) FROM users", (), 0) == 0,
           "members kept, XP back to 0")
     check(c.get("/").status_code == 200 and db.setting("initialized") == "1", "the Owner stays signed in, settings kept")

@@ -177,7 +177,7 @@ def build():
             [2.5 * inch, 4.4 * inch]))
 
     A(Paragraph("3. Create your company", H1))
-    A(steps(["Enter your company name, tag and motto, pick your main game and units. Every company starts with $275,000 capital (fixed).",
+    A(steps(["Enter your company name, tag and motto, pick your main game and units. Every company starts with $300,000 capital (fixed).",
              "Create the <b>owner account</b>: a username and a password of at least 8 characters. Keep this password safe: "
              "the owner is the only account that can do everything.",
              "Click <b>Create company</b>. You are signed in and see the Dashboard."]))
