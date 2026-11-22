@@ -9,6 +9,7 @@ import socket
 import sys
 import tempfile
 import time
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
@@ -180,8 +181,32 @@ def main():
     tok = db.val("SELECT agent_token FROM users WHERE id=?", (boss_id,))
     check(mgr.post(f"/drivers/{boss_id}/token").status_code == 403 and
           db.val("SELECT agent_token FROM users WHERE id=?", (boss_id,)) == tok, "manager can't reset the owner's agent token")
+    # the connection line (with the token) is only on the page while other PCs are let in: check it open, then closed
+    drv_tok = db.val("SELECT agent_token FROM users WHERE id=?", (drv_id,))
+    had_lan, had_addr = app.config.get("LAN"), db.setting("public_address", "") or ""
+    app.config["LAN"] = {"scheme": "https", "port": 8760}
+    db.set_setting("public_address", "vtc.example.com")
+    line = b"https://vtc.example.com:8760 --token "
     check(tok.encode() not in mgr.get(f"/drivers/{boss_id}").data, "manager can't see the owner's agent token")
-    check(tok.encode() in boss.get(f"/drivers/{boss_id}").data, "owner sees their own token")
+    check(tok.encode() not in drv.get(f"/drivers/{boss_id}").data, "driver can't see the owner's agent token")
+    check(line + tok.encode() in boss.get(f"/drivers/{boss_id}").data, "owner sees their own token")
+    check(line + drv_tok.encode() in mgr.get(f"/drivers/{drv_id}").data, "manager sees a driver's connection line")
+    check(line + drv_tok.encode() in drv.get(f"/drivers/{drv_id}").data, "driver sees their own connection line")
+    check(b"/drivers/connect" not in drv.get(f"/drivers/{drv_id}").data, "driver gets no Connect a Driver link (internet line)")
+    db.set_setting("public_address", "")
+    with mock.patch("fmpro.tablet.lan_addresses", return_value=["192.168.1.5"]):
+        pg = drv.get(f"/drivers/{drv_id}").data
+        check(b"https://192.168.1.5:8760 --token " + drv_tok.encode() in pg and b"/drivers/connect" not in pg,
+              "driver gets no Connect a Driver link (home line)")
+        check(b"/drivers/connect" in mgr.get(f"/drivers/{drv_id}").data, "manager gets the Connect a Driver link")
+    app.config["LAN"] = None
+    pg = drv.get(f"/drivers/{drv_id}").data
+    check(drv_tok.encode() not in pg.replace(b"/overlay?key=" + drv_tok.encode(), b"") and b"--token" not in pg
+          and b"/drivers/connect" not in pg, "closed: driver gets no line and no Connect a Driver link")
+    check(b"/drivers/connect" in boss.get(f"/drivers/{drv_id}").data and drv.get("/drivers/connect").status_code == 403,
+          "closed: owner gets the link, and drivers are refused at that page")
+    app.config["LAN"] = had_lan
+    db.set_setting("public_address", had_addr)
     check(mgr.post(f"/drivers/{boss_id}/remove").status_code == 403, "manager can't remove the owner")
     check(mgr.post(f"/drivers/{boss_id}/fire", {"confirm": "Boss"}).status_code == 403, "manager can't fire the owner")
     m3 = create_user("mgr3", "Manager Three", "managerpw3", role="admin")
