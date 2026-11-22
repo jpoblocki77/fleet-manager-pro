@@ -643,8 +643,9 @@ class LocalSampler(threading.Thread):
                 if time.time() - last_upkeep > 300:
                     last_upkeep = time.time()
                     economy.process_loans()
-                    from .. import leasing
+                    from .. import leasing, trailer_leasing
                     leasing.process()
+                    trailer_leasing.process()
                     economy.process_upkeep()
                 from .. import licensing
                 if not licensing.licensed():

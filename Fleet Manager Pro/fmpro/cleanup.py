@@ -54,7 +54,7 @@ def delete_trucks(ids):
 
 
 def delete_trailers(ids):
-    ids = [r["id"] for r in db.q("SELECT id FROM trailers WHERE status='sold' AND id IN (%s)" % ",".join("?" * len(ids)),  # nosec B608  # table/column names are fixed in the code; every value is a ? parameter
+    ids = [r["id"] for r in db.q("SELECT id FROM trailers WHERE status IN ('sold','returned') AND id IN (%s)" % ",".join("?" * len(ids)),  # nosec B608  # table/column names are fixed in the code; every value is a ? parameter
                                  tuple(ids))] if ids else []
     if ids:
         c = db.conn()
@@ -126,8 +126,8 @@ def truck_delete(tid):
 @login_required(role="admin")
 def trailer_delete(tid):
     t = db.one("SELECT * FROM trailers WHERE id=?", (tid,)) or abort(404)
-    if t["status"] != "sold":
-        flash("Only sold trailers can be deleted from the list. Sell it first.", "error")
+    if t["status"] not in ("sold", "returned"):
+        flash("Only sold or returned trailers can be deleted from the list. Sell it first.", "error")
         return redirect(url_for("pages.fleet"))
     delete_trailers([tid])
     db.audit(user()["id"], "trailer deleted", f"#{tid} {t['name']}")
@@ -139,7 +139,7 @@ def trailer_delete(tid):
 @login_required(role="admin")
 def clear_sold():
     trucks = delete_trucks([r["id"] for r in db.q("SELECT id FROM trucks WHERE status IN ('sold','returned')")])
-    trailers = delete_trailers([r["id"] for r in db.q("SELECT id FROM trailers WHERE status='sold'")])
+    trailers = delete_trailers([r["id"] for r in db.q("SELECT id FROM trailers WHERE status IN ('sold','returned')")])
     db.audit(user()["id"], "sold items cleared", f"{trucks} truck(s), {trailers} trailer(s)")
     flash(f"Deleted {trucks} sold/returned truck(s) and {trailers} sold trailer(s) from the lists. "
           "Their jobs and ledger lines are kept.", "success")

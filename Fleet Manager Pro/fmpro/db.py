@@ -212,6 +212,7 @@ DEFAULT_SETTINGS = {
     "discord_webhook": "", "webhook_on_delivery": "1", "webhook_on_event": "1",
     "webhook_applications": "", "webhook_on_application": "1",   # new driver applications: own channel optional
     "recruitment_open": "1", "recruitment_text": "We're hiring professional, friendly drivers!",
+    "global_board": "1", "global_board_drivers": "0",   # the global leaderboard: join it / share driver names
     "starting_balance": str(STARTING_CAPITAL), "initialized": "0",
     # compliance (ELD / Hours of Service, DVIR, roadside inspections)
     "hos_enabled": "1", "hos_rules_ats": "us70", "hos_rules_ets2": "eu",
@@ -256,8 +257,9 @@ def init(path):
     c.commit()
     backfill_map()
     backfill_deductions()
-    from . import leasing
+    from . import leasing, trailer_leasing
     leasing.init()
+    trailer_leasing.init()
     if setting("repair_cost_lowered") != "1":            # 0.02: 180 per 1% wear made repairs cost far too much
         if setting("repair_cost_per_pct") == "180":
             set_setting("repair_cost_per_pct", "40")

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf %}
+{% block title %}Global Leaderboard{% endblock %}
+{% block content %}
+{% macro fmtv(r) -%}
+{%- if metric == 'km' or metric == 'realism' -%}{{ r.value|dist }}{%- elif metric == 'revenue' -%}{{ r.currency or '' }}{{ "{:,.0f}".format(r.value) }}{%- elif metric == 'mass' -%}{{ (r.value * 1000)|mass }}{%- elif metric == 'score' -%}{{ '%.1f'|format(r.value or 0) }}{%- else -%}{{ "{:,}".format((r.value or 0)|int) }}{%- endif -%}
+{%- endmacro %}
+{% set q = '&view=global' %}
+<div class="page-head">
+  <div><h1>Global Leaderboard</h1><p>Every Fleet Manager Pro company, ranked by {{ metrics[metric][0]|lower }}{% if metric == 'realism' %} (distance weighted by driving score² and cargo condition){% endif %}.</p></div>
+  <div class="actions">
+    <span class="seg"><a href="/leaderboard?metric={{ metric }}&amp;period={{ period }}&amp;game={{ game }}">Your company</a><a class="on" href="?metric={{ metric }}&amp;period={{ period }}&amp;game={{ game }}{{ q }}">Global</a></span>
+    <span class="seg">{% for k, m in metrics.items() %}<a class="{{ 'on' if k == metric }}" href="?metric={{ k }}&amp;period={{ period }}&amp;game={{ game }}{{ q }}">{{ m[0] }}</a>{% endfor %}</span>
+    <span class="seg">{% for p, l in [('week','Week'),('month','Month'),('year','Year'),('all','All')] %}<a class="{{ 'on' if p == period }}" href="?metric={{ metric }}&amp;period={{ p }}&amp;game={{ game }}{{ q }}">{{ l }}</a>{% endfor %}</span>
+    {% if not game_scope() %}<span class="seg">{% for g, l in [('','Both'),('ats','ATS'),('ets2','ETS2')] %}<a class="{{ 'on' if g == game }}" href="?metric={{ metric }}&amp;period={{ period }}&amp;game={{ g }}{{ q }}">{{ l }}</a>{% endfor %}</span>{% endif %}
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:16px">
+  <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+    <div style="flex:1;min-width:240px">
+      {% if joined %}<b>Your company is on the global board.</b>{% else %}<b>Your company isn't on the global board</b> — you can still see everyone else.{% endif %}
+      <div class="small muted">{% if synced %}Updated {{ synced|ago }}{% else %}Not updated yet{% endif %} · updates every 10 minutes{% if page_url %} · <a href="{{ page_url }}" target="_blank" rel="noopener">public page</a> to share{% endif %}</div>
+    </div>
+    <form method="post" action="/leaderboard/global/sync">{{ csrf() }}<button class="btn">Update now</button></form>
+  </div>
+  {% if error %}<div class="flash error" style="margin-top:10px">Last update failed: {{ error }}</div>{% endif %}
+  {% if can('admin') %}
+  <form method="post" action="/leaderboard/global/settings" style="margin-top:12px;display:flex;gap:18px;flex-wrap:wrap;align-items:center">{{ csrf() }}
+    <label class="check" style="margin:0"><input type="checkbox" name="global_board" value="1" {{ 'checked' if joined }}> Show my company on the global leaderboard</label>
+    <label class="check" style="margin:0"><input type="checkbox" name="global_board_drivers" value="1" {{ 'checked' if share }}> Show my drivers' names too</label>
+    <button class="btn">Save</button>
+    <p class="hint" style="flex-basis:100%;margin:0">Only your company name and its totals are shared (and, if you tick it, the names and totals of your 10 best drivers). Test drives from the simulator don't count. Unticking the first box removes your company from the board straight away.</p>
+  </form>
+  {% endif %}
+</div>
+
+<div class="grid g2">
+<div class="card flush"><div class="card-head" style="padding:16px 18px 0"><h2>Companies</h2></div>
+<div class="table-wrap"><table>
+  <thead><tr><th>#</th><th>Company</th><th class="num">Drivers</th><th class="num">Jobs</th><th class="num">{{ metrics[metric][0] }}</th></tr></thead>
+  <tbody>{% for r in companies %}<tr{% if r.you %} style="background:color-mix(in srgb, var(--accent) 14%, transparent)"{% endif %}>
+    <td><b>{{ ['🥇','🥈','🥉'][loop.index0] if loop.index <= 3 else loop.index }}</b></td>
+    <td><b>{{ r.company }}</b>{% if r.you %} <span class="small faint">(you)</span>{% endif %}</td>
+    <td class="num">{{ r.drivers }}</td><td class="num">{{ "{:,}".format(r.jobs) }}</td><td class="num"><b>{{ fmtv(r) }}</b></td></tr>
+  {% else %}<tr><td colspan="5" class="empty">{% if synced %}No company has deliveries in this period yet.{% else %}The global board hasn't been fetched yet — press Update now.{% endif %}</td></tr>{% endfor %}</tbody>
+</table></div></div>
+
+<div class="card flush"><div class="card-head" style="padding:16px 18px 0"><h2>Top drivers</h2></div>
+<div class="table-wrap"><table>
+  <thead><tr><th>#</th><th>Driver</th><th class="num">Jobs</th><th class="num">{{ metrics[metric][0] }}</th></tr></thead>
+  <tbody>{% for r in drivers %}<tr{% if r.you %} style="background:color-mix(in srgb, var(--accent) 14%, transparent)"{% endif %}>
+    <td><b>{{ loop.index }}</b></td><td><b>{{ r.name }}</b><div class="small muted">{{ r.company }}</div></td>
+    <td class="num">{{ "{:,}".format(r.jobs) }}</td><td class="num"><b>{{ fmtv(r) }}</b></td></tr>
+  {% else %}<tr><td colspan="4" class="empty">{% if game %}Drivers are ranked across both games only.{% else %}No company shares its drivers' names for this period yet.{% endif %}</td></tr>{% endfor %}</tbody>
+</table></div></div>
+</div>
+<p class="small muted" style="margin-top:10px">Revenue is each company's own in-game money. Companies that haven't updated for 30 days drop off.</p>
+{% endblock %}

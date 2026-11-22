@@ -101,6 +101,16 @@ GUIDES = {
         "This page shows one lease: what it costs, what ending it today would cost, and every payment so far.",
         "Use Buy it to own the truck outright, or Renew when the term ends.",
     ],
+    "trailer_leasing": [
+        "Lease a trailer instead of buying it: pick a plan in Compare trailer lease plans and press Lease on.",
+        "Trailer leases have no mileage limit; you pay a fixed amount every week and decide at the end.",
+        "Your trailer leases shows what you are paying now; click a lease to buy it out, end it or renew it.",
+        ("admin", "Add or edit trailer lease plans with New plan."),
+    ],
+    "trailer_lease": [
+        "This page shows one trailer lease: what it costs, what ending it today would cost, and every payment so far.",
+        "Use Buy it to own the trailer outright, or Renew when the term ends.",
+    ],
     "finance": [
         "The company ledger: freight income, fuel, tolls, fines, repairs, payroll, garages and loans.",
         "Entry records money in or out by hand; Take a loan borrows cash and Pay off now clears a loan early.",
@@ -145,6 +155,8 @@ GUIDES = {
     "leaderboard": [
         "Pick what to rank by (distance, revenue, deliveries, tonnage, score, XP or realism) and the period.",
         "Realism rewards careful driving: distance weighted by driving score and cargo condition.",
+        "Press Global to see every Fleet Manager Pro company ranked together; it updates every 10 minutes.",
+        "Admins choose there whether the company is on the global board and whether its drivers' names are shown.",
     ],
     "achievements": [
         "Achievements unlock by themselves as you drive; each one is worth +250 XP.",

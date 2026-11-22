@@ -8,12 +8,13 @@
     <button class="btn" data-open="dlg-garage">{{ icon('plus') }}Garage</button>
     <button class="btn" data-open="dlg-trailer">{{ icon('plus') }}Trailer</button>
     <a class="btn" href="/leasing">{{ icon('plus') }}Lease a truck</a>
+    <a class="btn" href="/trailer-leasing">{{ icon('plus') }}Lease a trailer</a>
     <button class="btn primary" data-open="dlg-truck">{{ icon('plus') }}Truck</button></div>{% endif %}
 </div>
 
 <div class="card flush" style="margin-bottom:16px"><div class="card-head" style="padding:16px 18px 0"><h2>Trucks</h2><span class="right badge">{{ trucks|rejectattr('status','in',['sold','returned'])|list|length }} active</span>
-  {% set gone = (trucks|selectattr('status','in',['sold','returned'])|list|length) + (trailers|selectattr('status','equalto','sold')|list|length) %}
-  {% if can('admin') and gone %}<form method="post" action="/fleet/clear-sold" style="margin-left:8px">{{ csrf() }}<button class="btn sm danger" title="Remove sold and returned trucks and sold trailers from the lists" data-confirm="Delete {{ gone }} sold / returned truck(s) and trailer(s) from the lists for good? Their jobs, maintenance and ledger lines stay. This can't be undone.">Delete sold ({{ gone }})</button></form>{% endif %}</div>
+  {% set gone = (trucks|selectattr('status','in',['sold','returned'])|list|length) + (trailers|selectattr('status','in',['sold','returned'])|list|length) %}
+  {% if can('admin') and gone %}<form method="post" action="/fleet/clear-sold" style="margin-left:8px">{{ csrf() }}<button class="btn sm danger" title="Remove sold and returned trucks and trailers from the lists" data-confirm="Delete {{ gone }} sold / returned truck(s) and trailer(s) from the lists for good? Their jobs, maintenance and ledger lines stay. This can't be undone.">Delete sold ({{ gone }})</button></form>{% endif %}</div>
 <div class="table-wrap"><table>
   <thead><tr><th>Truck</th><th>Plate</th><th>Driver</th><th>Garage</th><th class="num">Odometer</th><th>Condition</th><th class="num">Jobs</th><th>Status</th></tr></thead>
   <tbody>{% for t in trucks %}
@@ -42,9 +43,9 @@
 
   <div class="card flush"><div class="card-head" style="padding:16px 18px 0"><h2>Trailers</h2></div>
   <div class="table-wrap"><table><thead><tr><th>Trailer</th><th>Type</th><th>Plate</th><th>Garage</th><th class="num">Bought for</th><th>Status</th>{% if can('admin') %}<th></th>{% endif %}</tr></thead><tbody>
-  {% for t in trailers %}<tr><td><b>{{ t.name }}</b> <span class="small faint">{{ t.brand }}</span></td><td>{{ t.body_type }}</td><td>{{ t.plate }}</td><td>{{ t.garage or '—' }}</td>
+  {% for t in trailers %}<tr><td><b>{{ t.name }}</b> <span class="small faint">{{ t.brand }}</span>{% if t.lease_id %} <a class="badge leased" href="/fleet/trailer-lease/{{ t.lease_id }}" title="On a lease - see Trailer Leasing">leased</a>{% endif %}</td><td>{{ t.body_type }}</td><td>{{ t.plate }}</td><td>{{ t.garage or '—' }}</td>
     <td class="num">{{ t.purchase_price|money }}</td><td>{{ status(t.status) }}</td>
-    {% if can('admin') %}<td class="num">{% if t.status != 'sold' %}<button type="button" class="btn sm danger" data-trailer-sell="{{ t.id }}" data-name="{{ t.name }}" data-paid="{{ t.purchase_price|int }}">Sell</button>{% else %}<form method="post" action="/fleet/trailer/{{ t.id }}/delete" style="display:inline">{{ csrf() }}<button class="btn sm" data-confirm="Delete sold trailer {{ t.name }} from the list for good? Its sale stays in the ledger.">Delete</button></form>{% endif %}</td>{% endif %}</tr>
+    {% if can('admin') %}<td class="num">{% if t.lease_id %}<a class="btn sm" href="/fleet/trailer-lease/{{ t.lease_id }}">Lease</a>{% elif t.status not in ('sold', 'returned') %}<button type="button" class="btn sm danger" data-trailer-sell="{{ t.id }}" data-name="{{ t.name }}" data-paid="{{ t.purchase_price|int }}">Sell</button>{% else %}<form method="post" action="/fleet/trailer/{{ t.id }}/delete" style="display:inline">{{ csrf() }}<button class="btn sm" data-confirm="Delete {{ t.status }} trailer {{ t.name }} from the list for good? Its ledger lines stay.">Delete</button></form>{% endif %}</td>{% endif %}</tr>
   {% else %}<tr><td colspan="7" class="empty">No company trailers.</td></tr>{% endfor %}</tbody></table></div></div>
 </div>
 

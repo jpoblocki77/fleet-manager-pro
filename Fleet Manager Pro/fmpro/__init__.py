@@ -92,6 +92,8 @@ def create_app(data_dir=None, start_telemetry=True, check_licence=True):
         licensing.LICENCE.start()
         from . import recruit
         recruit.start()
+        from . import global_board
+        global_board.start()
         from . import updater
         updater.start()
 
@@ -115,7 +117,7 @@ def create_app(data_dir=None, start_telemetry=True, check_licence=True):
     app.register_blueprint(pages.bp)
     app.register_blueprint(api.bp)
     app.register_blueprint(compliance_views.bp)
-    from . import ops, leasing_views, cleanup, insights
+    from . import ops, leasing_views, trailer_leasing_views, cleanup, insights
     app.register_blueprint(ops.bp)
     app.register_blueprint(insights.bp)
     from . import tablet
@@ -124,6 +126,7 @@ def create_app(data_dir=None, start_telemetry=True, check_licence=True):
     app.register_blueprint(fluids_views.bp)
     app.register_blueprint(cleanup.bp)
     app.register_blueprint(leasing_views.bp)
+    app.register_blueprint(trailer_leasing_views.bp)
     auth.install(app)
     _filters(app)
     _logging_hooks(app)

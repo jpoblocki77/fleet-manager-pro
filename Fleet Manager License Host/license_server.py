@@ -16,11 +16,15 @@ Public API (used by Fleet Manager and Fleet Manager Pro):
   POST /v1/deactivate  {key, machine}   free this PC's slot (moving to a new PC)
   POST /v1/recruit     {key, machine, product, company, intro, open, ack: [ids]}   (Fleet Manager Pro)
                        publishes the company's Apply page and hands over new applications; acked ones are deleted
+  POST /v1/leaderboard {key, machine, product, join, company, currency, stats, drivers}   (Fleet Manager Pro)
+                       posts this company's totals to the global leaderboard (join=false leaves it) and returns
+                       every company on it, plus the best drivers of companies that share driver names
   POST /v1/update      {product, build, version}   newest build for this copy -> Ed25519-signed manifest
                        (version, sha256, file) or {update: false}. Packages live in  updates/<BUILD TAG>/ .
   GET  /v1/update/file?build=<tag>&name=<zip>   download a package (its SHA-256 is pinned by the signed manifest)
 Public pages (no key):
   GET/POST /apply/<code>   the company's application form (rate-limited, honeypot, length limits)
+  GET  /leaderboard?metric=km&period=month&game=all   the global leaderboard of every Fleet Manager Pro company
 Admin API (Authorization: Bearer <admin_token>), used by License Manager:
   POST /v1/admin/purchase {name, email}   GET /v1/admin/list
   POST /v1/admin/release  {key, machine}  POST /v1/admin/revoke {key, revoked: true|false}
@@ -212,6 +216,8 @@ class Store:
                 CREATE TABLE IF NOT EXISTS applications(id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL,
                   created TEXT, data TEXT NOT NULL);
                 CREATE INDEX IF NOT EXISTS ix_apps_code ON applications(code);
+                CREATE TABLE IF NOT EXISTS leaderboard(key TEXT PRIMARY KEY, pid TEXT UNIQUE NOT NULL, company TEXT,
+                  currency TEXT DEFAULT '', stats TEXT NOT NULL, drivers TEXT DEFAULT '{}', updated TEXT);
             """)
             self._never_reuse_application_ids()
             for table, col, decl in (("purchases", "revoked", "TEXT"), ("activations", "last_seen", "TEXT"),
@@ -348,6 +354,111 @@ class Store:
                 "SELECT id, created, data FROM applications WHERE code=? ORDER BY id LIMIT 100", (code,))]
             return code, pending
 
+    # ---- global leaderboard (Fleet Manager Pro): every company's totals in one ranking
+    LB_PERIODS = ("week", "month", "year", "all")
+    LB_GAMES = ("all", "ats", "ets2")
+    # per period and game, a list of numbers in this order (drivers = how many drivers delivered)
+    LB_METRICS = ("km", "revenue", "jobs", "mass", "score", "xp", "realism", "drivers")
+    LB_DRIVERS = 10                   # best drivers per company and period (only when the company shares names)
+    LB_STALE_DAYS = 30                # a company that hasn't synced for this long drops off the board
+    LB_MAX = 500
+
+    @classmethod
+    def _lb_numbers(cls, vals):
+        if not isinstance(vals, list):
+            return None
+        out = []
+        for i, m in enumerate(cls.LB_METRICS):
+            v = vals[i] if i < len(vals) else 0
+            if isinstance(v, bool) or not isinstance(v, (int, float)) or v != v or v in (float("inf"), float("-inf")):
+                v = 0
+            v = max(0.0, min(100.0 if m == "score" else 1e12, float(v)))
+            out.append(round(v, 1) if m in ("score", "mass") else int(v))
+        return out
+
+    @classmethod
+    def lb_clean(cls, stats, drivers):
+        """Only the expected shape and plain, bounded numbers are kept - nothing else a client sends is stored."""
+        clean = {}
+        for per in cls.LB_PERIODS:
+            row = stats.get(per) if isinstance(stats, dict) else None
+            if isinstance(row, dict):
+                clean[per] = {g: cls._lb_numbers(row.get(g)) or cls._lb_numbers([]) for g in cls.LB_GAMES}
+        drv = {}
+        for per in cls.LB_PERIODS:
+            rows = drivers.get(per) if isinstance(drivers, dict) else None
+            if not isinstance(rows, list):
+                continue
+            out = []
+            for d in rows[:cls.LB_DRIVERS]:
+                if isinstance(d, dict):
+                    name = " ".join(str(d.get("name") or "").split())[:40]
+                    nums = cls._lb_numbers(d.get("v"))
+                    if name and nums:
+                        out.append({"name": name, "v": nums})
+            if out:
+                drv[per] = out
+        return clean, drv
+
+    def leaderboard_sync(self, key, machine, product, join, company, currency, stats, drivers, ip=""):
+        """Store (or, when leaving, delete) this company's totals. Returns its public board id, or None."""
+        with self.lock:
+            p, _act = self.check(key, machine, ip, product)          # only an activated PC of the purchase
+            row = self.db.execute("SELECT pid FROM leaderboard WHERE key=?", (p["key"],)).fetchone()
+            clean, drv = self.lb_clean(stats, drivers)
+            company = " ".join(str(company or "").split())[:60]
+            if not join or not company or not clean:
+                self.db.execute("DELETE FROM leaderboard WHERE key=?", (p["key"],))
+                self.db.commit()
+                return None
+            pid = row[0] if row else secrets.token_hex(6)
+            self.db.execute("INSERT INTO leaderboard(key, pid, company, currency, stats, drivers, updated) "
+                            "VALUES(?,?,?,?,?,?,?) ON CONFLICT(key) DO UPDATE SET company=excluded.company, "
+                            "currency=excluded.currency, stats=excluded.stats, drivers=excluded.drivers, "
+                            "updated=excluded.updated",
+                            (p["key"], pid, company, str(currency or "")[:3], json.dumps(clean, separators=(",", ":")),
+                             json.dumps(drv, separators=(",", ":")), iso(now())))
+            self.db.commit()
+            return pid
+
+    def leaderboard(self):
+        """Every company on the board (synced lately, not revoked) and the best shared drivers."""
+        cutoff = iso(now() - dt.timedelta(days=self.LB_STALE_DAYS))
+        with self.lock:
+            rows = self.db.execute("SELECT l.pid, l.company, l.currency, l.stats, l.drivers, l.updated FROM leaderboard l "
+                                   "JOIN purchases p ON p.key=l.key WHERE p.revoked IS NULL AND l.updated>=? "
+                                   "ORDER BY l.updated DESC LIMIT ?", (cutoff, self.LB_MAX)).fetchall()
+        companies, drivers = [], {}
+        for r in rows:
+            companies.append({"id": r["pid"], "company": r["company"], "currency": r["currency"] or "",
+                              "stats": json.loads(r["stats"]), "updated": r["updated"]})
+            for per, lst in json.loads(r["drivers"] or "{}").items():
+                drivers.setdefault(per, []).extend(dict(d, company=r["company"], id=r["pid"], currency=r["currency"] or "")
+                                                   for d in lst)
+        top = {}                          # only the best 25 drivers for each measure go back, so the answer stays small
+        for per, lst in drivers.items():
+            keep = {}
+            for i in range(len(self.LB_METRICS) - 1):
+                for d in sorted(lst, key=lambda d, i=i: -d["v"][i])[:25]:
+                    keep[(d["id"], d["name"])] = d
+            top[per] = list(keep.values())
+        return companies, top
+
+    def board_rows(self, metric="km", period="month", game="all", limit=50):
+        """Companies (and shared drivers) ranked by one measure, for the public page."""
+        mi = self.LB_METRICS.index(metric) if metric in self.LB_METRICS else 0
+        period = period if period in self.LB_PERIODS else "month"
+        game = game if game in self.LB_GAMES else "all"
+        companies, top = self.leaderboard()
+        rows = []
+        for c in companies:
+            v = (c["stats"].get(period) or {}).get(game)
+            if v and v[2]:                                   # at least one delivery
+                rows.append(dict(c, v=v))
+        rows.sort(key=lambda r: -r["v"][mi])
+        drivers = sorted(top.get(period, []), key=lambda d: -d["v"][mi])[:limit] if game == "all" else []
+        return rows[:limit], drivers
+
     def recruit_page(self, code):
         if not re.fullmatch(r"[a-z2-9]{8}", code or ""):
             return None
@@ -430,6 +541,7 @@ class Store:
             if rec:
                 self.db.execute("DELETE FROM applications WHERE code=?", (rec["code"],))
                 self.db.execute("DELETE FROM recruit WHERE key=?", (key,))
+            self.db.execute("DELETE FROM leaderboard WHERE key=?", (key,))
             self.db.execute("DELETE FROM purchases WHERE key=?", (key,))
             self.db.commit()
             return {"key": key, "name": p["name"], "pcs": len([a for a in acts if not a["released"]]),
@@ -477,6 +589,11 @@ label{{display:block;margin:12px 0 0;font-weight:600;font-size:13px;color:#c7d4e
 input,select,textarea{{display:block;width:100%;box-sizing:border-box;margin-top:5px;padding:9px 11px;border-radius:9px;
 border:1px solid #1d3a66;background:#071327;color:#e8eef8;font:inherit}}
 .two{{display:grid;grid-template-columns:1fr 1fr;gap:12px}} .hp{{position:absolute;left:-9999px}}
+main.wide{{width:min(860px,100%)}} h2{{font-size:17px;margin:22px 0 8px}}
+table{{width:100%;border-collapse:collapse;font-size:14px}} th,td{{text-align:left;padding:7px 8px;border-bottom:1px solid #1d3a66}}
+th{{color:#93a7c6;font-size:12px;text-transform:uppercase}} .n{{text-align:right}}
+.seg{{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}} .seg a{{padding:5px 10px;border-radius:8px;background:#071327;
+color:#c7d4ea;text-decoration:none;font-size:13px;border:1px solid #1d3a66}}
 button{{margin-top:18px;width:100%;padding:11px;border:0;border-radius:10px;background:#c8102e;color:#fff;font-weight:700;font-size:15px}}
 </style></head><body><main><h1>{html.escape(title)}</h1>{body}
 <p class="small" style="margin-top:18px">Fleet Manager Pro{(' · ' + company) if company else ''}</p></main></body></html>"""
@@ -552,7 +669,7 @@ class Server:
         if path == "/v1/update":
             m = (result or {}).get("manifest") or {}
             return f"  build={body.get('build') or '-'} has={body.get('version')} offer={m.get('version') or 'none'}"
-        if path == "/v1/recruit":
+        if path in ("/v1/recruit", "/v1/leaderboard"):
             return f"  key={body.get('key')}"
         if path.startswith("/v1/admin/"):
             return f"  {path.rsplit('/', 1)[-1]} key={body.get('key') or '-'}"
@@ -719,6 +836,61 @@ class Server:
   has received them.</p>
 </form>""", company)  # nosec B608  # HTML page, not SQL; company name is html-escaped
 
+    BOARD_LABELS = {"km": "Distance", "revenue": "Revenue", "jobs": "Deliveries", "mass": "Tonnage",
+                    "score": "Avg. score", "xp": "XP earned", "realism": "Realism"}
+
+    def board_page(self, query):
+        """(status, html) for the public global leaderboard. Plain links only - no scripts, no forms."""
+        q = urllib.parse.parse_qs(query or "", max_num_fields=5)
+        metric = q.get("metric", ["km"])[0]
+        metric = metric if metric in self.BOARD_LABELS else "km"
+        period = q.get("period", ["month"])[0]
+        period = period if period in Store.LB_PERIODS else "month"
+        game = q.get("game", ["all"])[0]
+        game = game if game in Store.LB_GAMES else "all"
+        rows, drivers = self.store.board_rows(metric, period, game)
+        mi = Store.LB_METRICS.index(metric)
+        esc = html.escape
+
+        def fmt(v, cur=""):
+            if metric in ("km", "realism"):
+                return f"{v[mi]:,.0f} km"
+            if metric == "revenue":
+                return f"{esc(cur)}{v[mi]:,.0f}"
+            if metric == "mass":
+                return f"{v[mi]:,.1f} t"
+            if metric == "score":
+                return f"{v[mi]:.1f}"
+            return f"{v[mi]:,.0f}"
+
+        def seg(name, opts, cur):
+            links = []
+            for val, label in opts:
+                args = {"metric": metric, "period": period, "game": game, name: val}
+                style = ' style="background:#c8102e;color:#fff"' if val == cur else ""
+                links.append(f'<a href="?{esc(urllib.parse.urlencode(args))}"{style}>{esc(label)}</a>')
+            return '<p class="seg">' + "".join(links) + "</p>"
+
+        body = (seg("metric", list(self.BOARD_LABELS.items()), metric)
+                + seg("period", [("week", "Week"), ("month", "Month"), ("year", "Year"), ("all", "All time")], period)
+                + seg("game", [("all", "Both games"), ("ats", "ATS"), ("ets2", "ETS2")], game))
+        trs = "".join(f"<tr><td>{i}</td><td><b>{esc(r['company'])}</b></td><td class=n>{r['v'][7]:,}</td>"
+                      f"<td class=n>{r['v'][2]:,}</td><td class=n><b>{fmt(r['v'], r['currency'])}</b></td></tr>"
+                      for i, r in enumerate(rows, 1))
+        body += ("<h2>Companies</h2><table><tr><th>#</th><th>Company</th><th class=n>Drivers</th><th class=n>Jobs</th>"
+                 f"<th class=n>{esc(self.BOARD_LABELS[metric])}</th></tr>"
+                 + (trs or '<tr><td colspan="5"><small>No deliveries in this period yet.</small></td></tr>') + "</table>")
+        if drivers:
+            trs = "".join(f"<tr><td>{i}</td><td><b>{esc(d['name'])}</b><br><small>{esc(d['company'])}</small></td>"
+                          f"<td class=n>{d['v'][2]:,}</td><td class=n><b>{fmt(d['v'], d.get('currency', ''))}</b></td></tr>"
+                          for i, d in enumerate(drivers[:25], 1))
+            body += ("<h2>Drivers</h2><table><tr><th>#</th><th>Driver</th><th class=n>Jobs</th>"
+                     f"<th class=n>{esc(self.BOARD_LABELS[metric])}</th></tr>{trs}</table>"
+                     "<p><small>Only companies that chose to share their drivers' names are listed here.</small></p>")
+        body += ("<p><small>Every Fleet Manager Pro company that has joined, updated every 10 minutes. Revenue is "
+                 "in each company's own in-game money.</small></p>")
+        return 200, _page("Global Leaderboard", body).replace("<main>", '<main class="wide">', 1)
+
     def handle(self, method, path, body, headers, ip, peer=None):
         if not self.rate_ok(ip):
             raise LicenceError("rate_limited", "Too many requests, try again in a minute.", 429)
@@ -746,6 +918,15 @@ class Server:
                                                     body.get("ack") if isinstance(body.get("ack"), list) else [], ip)
             return {"ok": True, "code": code, "apply_url": f"{self.cfg['apply_base_url'].rstrip('/')}/apply/{code}",
                     "applications": pending}
+        if path == "/v1/leaderboard":
+            if body.get("product") != "Fleet Manager Pro":
+                raise LicenceError("bad_product", "The global leaderboard is a Fleet Manager Pro feature.")
+            me = self.store.leaderboard_sync(body.get("key"), body.get("machine"), body.get("product"),
+                                             body.get("join") is True, body.get("company"), body.get("currency"),
+                                             body.get("stats"), body.get("drivers"), ip)
+            companies, drivers = self.store.leaderboard()
+            return {"ok": True, "you": me, "companies": companies, "drivers": drivers,
+                    "page_url": f"{self.cfg['apply_base_url'].rstrip('/')}/leaderboard"}
         if path == "/v1/update":
             if body.get("product") != PRODUCT:
                 raise LicenceError("bad_product", "This licence server only serves Fleet Manager Pro updates.")
@@ -867,6 +1048,26 @@ class Server:
                 self.end_headers()
                 self.wfile.write(data)
 
+            def _board(self):
+                ip = client_ip(self.client_address[0], self.headers.get("X-Forwarded-For"))
+                status, page = 429, _page("Slow down", "<p>Too many requests. Try again in a minute.</p>")
+                try:
+                    if srv.rate_ok(ip):
+                        status, page = srv.board_page(urllib.parse.urlsplit(self.path).query)
+                except Exception as e:  # never leak a traceback
+                    srv.log.error("leaderboard page error: %r", e)
+                    status, page = 500, _page("Error", "<p>Something went wrong. Try again later.</p>")
+                data = page.encode("utf-8")
+                self.send_response(status)
+                for k, v in (("Content-Type", "text/html; charset=utf-8"), ("Content-Length", str(len(data))),
+                             ("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; "
+                                                         "frame-ancestors 'none'; base-uri 'none'; form-action 'none'"),
+                             ("X-Content-Type-Options", "nosniff"), ("X-Frame-Options", "DENY"),
+                             ("Referrer-Policy", "no-referrer"), ("Cache-Control", "no-store")):
+                    self.send_header(k, v)
+                self.end_headers()
+                self.wfile.write(data)
+
             def _download(self):
                 ip = client_ip(self.client_address[0], self.headers.get("X-Forwarded-For"))
                 if not srv.rate_ok(ip, limit=30):
@@ -899,6 +1100,8 @@ class Server:
                     return self._apply("GET")
                 if self.path.split("?")[0] == "/v1/update/file":
                     return self._download()
+                if self.path.split("?")[0] in ("/leaderboard", "/leaderboard/"):
+                    return self._board()
                 self._go("GET")
 
             def do_POST(self):

@@ -8,6 +8,7 @@
 <div class="page-head">
   <div><h1>Leaderboard</h1><p>{{ metrics[metric][0] }}{% if metric == 'realism' %} — distance weighted by driving score² and cargo condition, so careful beats fast{% endif %}.</p></div>
   <div class="actions">
+    <span class="seg"><a class="on" href="?metric={{ metric }}&amp;period={{ period }}&amp;game={{ game }}">Your company</a><a href="?metric={{ metric }}&amp;period={{ period }}&amp;game={{ game }}&amp;view=global">Global</a></span>
     <span class="seg">{% for k, m in metrics.items() %}<a class="{{ 'on' if k == metric }}" href="?metric={{ k }}&amp;period={{ period }}&amp;game={{ game }}">{{ m[0] }}</a>{% endfor %}</span>
     <span class="seg">{% for p, l in [('week','Week'),('month','Month'),('year','Year'),('all','All')] %}<a class="{{ 'on' if p == period }}" href="?metric={{ metric }}&amp;period={{ p }}&amp;game={{ game }}">{{ l }}</a>{% endfor %}</span>
     {% if not game_scope() %}<span class="seg">{% for g, l in [('','Both'),('ats','ATS'),('ets2','ETS2')] %}<a class="{{ 'on' if g == game }}" href="?metric={{ metric }}&amp;period={{ period }}&amp;game={{ g }}">{{ l }}</a>{% endfor %}</span>{% endif %}

@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, stat, status, csrf %}
+{% block title %}Trailer Leasing{% endblock %}
+{% block content %}
+<div class="page-head banner banner-fleet" title="Photo: Nigel Tadyanehondo / Unsplash">
+  <div><h1>Trailer Leasing</h1><p>Lease trailers instead of buying them: a small down payment and a fixed weekly payment, with no mileage limit. Every cost is shown before you sign.</p></div>
+  {% if can('admin') %}<div class="actions"><a class="btn primary" href="#calc">{{ icon('plus') }}Lease a trailer</a></div>{% endif %}
+</div>
+
+<div class="grid g4" style="margin-bottom:16px">
+  {{ stat('Trailers on lease', active|length, (active|selectattr('status','eq','matured')|list|length ~ ' waiting for a decision') if active|selectattr('status','eq','matured')|list else 'active leases') }}
+  {{ stat('Weekly lease bill', weekly|money(2), 'taken from the company account every week') }}
+  {{ stat('Spent on trailer leasing', spent|money, 'down payments, payments, fees, buyouts') }}
+  {{ stat('Company account', balance|money, 'down payments must fit in this') }}
+</div>
+
+{% if active %}
+<div class="card flush" style="margin-bottom:16px"><div class="card-head" style="padding:16px 18px 0"><h2>Your trailer leases</h2></div>
+<div class="table-wrap"><table>
+  <thead><tr><th>Trailer</th><th>Plan</th><th class="num">Weekly</th><th style="min-width:180px">Payments</th><th class="num">Buy it for</th><th>Next payment</th><th>Status</th></tr></thead>
+  <tbody>{% for l in active %}
+  <tr class="clickable" data-href="/fleet/trailer-lease/{{ l.id }}">
+    <td><b>{{ l.name or 'trailer' }}</b><div class="small faint">{{ l.body_type }}{% if l.body_type and l.plate %} · {% endif %}{{ l.plate }}</div></td>
+    <td>{{ l.plan_name }}<div class="small faint">{{ l.weeks }} weeks · {{ l.apr }}% APR</div></td>
+    <td class="num"><b>{{ l.payment|money(2) }}</b></td>
+    <td><div class="bar ok"><i style="width:{{ l.st.pct_paid }}%"></i></div><span class="small">{{ l.payments_made }} / {{ l.weeks }} · {{ l.st.balance_left|money }} still to pay</span></td>
+    <td class="num">{{ l.residual|money }}</td>
+    <td class="small">{{ l.next_due|ago if l.status == 'active' else '—' }}</td>
+    <td>{{ status('pending' if l.status == 'matured' else 'active') }}{% if l.status == 'matured' %} <span class="small">decide: buy, return or renew</span>{% endif %}</td>
+  </tr>{% endfor %}</tbody>
+</table></div></div>
+{% endif %}
+
+<div class="card" id="calc" style="margin-bottom:16px">
+  <div class="card-head"><h2>Compare trailer lease plans</h2><span class="right small muted">pick a trailer to see exactly what each plan costs</span></div>
+  <form method="post" action="/trailer-leasing/new" id="lease-form">{{ csrf() }}
+  <div class="fields">
+    <div class="field"><label>Trailer</label><select name="source" id="lf-source"><option value="new">A new trailer from the dealer</option>{% if own_trailers %}<option value="existing">One of my trailers</option>{% endif %}</select></div>
+    <div class="field" id="lf-game-f"><label>Game</label><select name="game" id="lf-game"><option value="ats" {{ 'selected' if form_game == 'ats' }}>ATS</option><option value="ets2" {{ 'selected' if form_game == 'ets2' }}>ETS2</option></select></div>
+    <div class="field" id="lf-model-f" style="grid-column:span 2"><label>Model (dealer price from)</label><select id="lf-model"></select></div>
+    <div class="field" id="lf-own-f" style="display:none;grid-column:span 2"><label>Your trailer</label><select name="trailer_id" id="lf-own">{% for t in own_trailers %}<option value="{{ t.id }}" data-price="{{ t.purchase_price|int }}">{{ t.name }}{% if t.plate %} · {{ t.plate }}{% endif %}</option>{% endfor %}</select></div>
+    <div class="field"><label>Trailer price</label><input name="price" id="lf-price" type="number" min="1000" step="100" required></div>
+    <input type="hidden" name="brand" id="lf-brand"><input type="hidden" name="model" id="lf-mdl">
+    <div class="field" id="lf-type-f"><label>Type</label><select name="body_type" id="lf-type"></select></div>
+    <div class="field" id="lf-plate-f"><label>Plate (optional)</label><input name="plate" maxlength="32"></div>
+  </div>
+  <div class="table-wrap" style="margin-top:10px"><table id="lf-table">
+    <thead><tr><th>Cost</th>{% for p in plans if p.active %}<th class="num">{{ p.name }}</th>{% endfor %}</tr></thead>
+    <tbody>
+      <tr><td>Length</td>{% for p in plans if p.active %}<td class="num">{{ p.weeks }} weeks</td>{% endfor %}</tr>
+      <tr><td>Interest rate (APR)</td>{% for p in plans if p.active %}<td class="num">{{ p.apr }}%</td>{% endfor %}</tr>
+      <tr><td><b>Down payment</b> <span class="small faint">today</span></td>{% for p in plans if p.active %}<td class="num" data-k="down" data-p="{{ p.id }}"></td>{% endfor %}</tr>
+      <tr><td><b>Weekly payment</b></td>{% for p in plans if p.active %}<td class="num" data-k="payment" data-p="{{ p.id }}" style="font-weight:700;color:var(--text)"></td>{% endfor %}</tr>
+      <tr><td class="small muted">&nbsp;&nbsp;of which trailer value used</td>{% for p in plans if p.active %}<td class="num small muted" data-k="depreciation" data-p="{{ p.id }}"></td>{% endfor %}</tr>
+      <tr><td class="small muted">&nbsp;&nbsp;of which interest</td>{% for p in plans if p.active %}<td class="num small muted" data-k="finance" data-p="{{ p.id }}"></td>{% endfor %}</tr>
+      <tr><td>Total you pay over the lease</td>{% for p in plans if p.active %}<td class="num" data-k="total_payments" data-p="{{ p.id }}"></td>{% endfor %}</tr>
+      <tr><td>Total interest</td>{% for p in plans if p.active %}<td class="num" data-k="interest" data-p="{{ p.id }}"></td>{% endfor %}</tr>
+      <tr><td>Buy it at the end for</td>{% for p in plans if p.active %}<td class="num" data-k="residual" data-p="{{ p.id }}"></td>{% endfor %}</tr>
+      <tr><td>Mileage</td>{% for p in plans if p.active %}<td class="num small">no limit</td>{% endfor %}</tr>
+      <tr><td>Ending early costs</td>{% for p in plans if p.active %}<td class="num small">{{ p.early_fee_pct|int }}% of payments left</td>{% endfor %}</tr>
+      {% if can('admin') %}<tr><td></td>{% for p in plans if p.active %}<td class="num"><button class="btn sm primary" name="plan_id" value="{{ p.id }}" data-confirm-lease="{{ p.name }}">Lease on {{ p.name }}</button></td>{% endfor %}</tr>{% endif %}
+    </tbody>
+  </table></div>
+  <p class="hint">Weekly payment = the trailer value you use up (price − down payment − end value, spread over the weeks) + interest on the money tied up.
+    Payments are taken every week. The game doesn't report trailer mileage, so trailer leases have no mileage limit. Company account: <b>{{ balance|money }}</b>.</p>
+  </form>
+</div>
+
+<div class="card flush" id="plans" style="margin-bottom:16px"><div class="card-head" style="padding:16px 18px 0"><h2>Trailer lease plans</h2>
+  {% if can('admin') %}<div class="right"><button class="btn sm" data-open="dlg-plan" data-plan-new>{{ icon('plus') }}New plan</button></div>{% endif %}</div>
+<div class="table-wrap"><table><thead><tr><th>Plan</th><th class="num">Length</th><th class="num">Down</th><th class="num">APR</th><th class="num">End value</th><th class="num">Early end fee</th>{% if can('admin') %}<th></th>{% endif %}</tr></thead><tbody>
+{% for p in plans %}<tr class="{{ '' if p.active else 'muted' }}"><td><b>{{ p.name }}</b>{% if not p.active %} <span class="badge">hidden</span>{% endif %}</td>
+  <td class="num">{{ p.weeks }} weeks</td><td class="num">{{ p.down_pct|round(1) }}%</td><td class="num">{{ p.apr }}%</td>
+  <td class="num">{{ p.residual_pct|round(1) }}%</td><td class="num">{{ p.early_fee_pct|int }}%</td>
+  {% if can('admin') %}<td class="num" style="white-space:nowrap"><button type="button" class="btn sm" data-plan='{{ {"id": p.id, "name": p.name, "weeks": p.weeks, "down_pct": p.down_pct, "apr": p.apr, "residual_pct": p.residual_pct, "early_fee_pct": p.early_fee_pct}|tojson|forceescape }}'>Edit</button>
+    <form method="post" action="/trailer-leasing/plans/{{ p.id }}/toggle" style="display:inline">{{ csrf() }}<button class="btn sm">{{ 'Hide' if p.active else 'Offer' }}</button></form></td>{% endif %}</tr>
+{% endfor %}</tbody></table></div></div>
+
+{% if history %}
+<div class="card flush"><div class="card-head" style="padding:16px 18px 0"><h2>Past trailer leases</h2></div>
+<div class="table-wrap"><table><thead><tr><th>Trailer</th><th>Plan</th><th>Ended</th><th>How</th><th class="num">Cost at the end</th></tr></thead><tbody>
+{% for l in history %}<tr class="clickable" data-href="/fleet/trailer-lease/{{ l.id }}"><td>{{ l.name or 'trailer' }} <span class="small faint">{{ l.plate }}</span></td><td>{{ l.plan_name }}</td>
+  <td class="small">{{ l.ended_at|dt('%b %d, %Y') if l.ended_at else '—' }}</td><td>{{ (l.end_reason or l.status)|replace('_',' ') }}</td><td class="num">{{ l.end_cost|money(2) }}</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endif %}
+
+{% if can('admin') %}
+<dialog id="dlg-plan"><form method="post" action="/trailer-leasing/plans/save" id="plan-form">{{ csrf() }}<input type="hidden" name="id">
+  <div class="dhead"><h2 id="plan-title">New trailer lease plan</h2><button class="btn ghost sm" data-close>✕</button></div>
+  <div class="dbody"><div class="fields">
+    <div class="field"><label>Name</label><input name="name" maxlength="40" required></div>
+    <div class="field"><label>Length (weeks)</label><input name="weeks" type="number" min="1" max="520" required></div>
+    <div class="field"><label>Down payment %</label><input name="down_pct" type="number" min="0" max="90" step="0.5" required></div>
+    <div class="field"><label>Interest rate (APR %)</label><input name="apr" type="number" min="0" max="60" step="0.1" required></div>
+    <div class="field"><label>End value % (buyout price)</label><input name="residual_pct" type="number" min="0" max="95" step="1" required></div>
+    <div class="field"><label>Early end fee (% of payments left)</label><input name="early_fee_pct" type="number" min="0" max="100" step="1" value="30" required></div>
+  </div><p class="hint">Changes apply to new leases; leases already signed keep their terms.</p></div>
+  <div class="dfoot"><button class="btn ghost" data-close>Cancel</button><button class="btn primary">Save plan</button></div>
+</form></dialog>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const PLANS = {{ plans|selectattr('active')|list|tojson }}, VEH = {{ vehicles|tojson }}, CUR = {{ (S.currency or '$')|tojson }};
+  const money = (v) => CUR + Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const $ = (id) => document.getElementById(id);
+  const src = $("lf-source"), game = $("lf-game"), model = $("lf-model"), own = $("lf-own"), price = $("lf-price"), type = $("lf-type");
+  function quote(p, plan) {            // same maths as the server (fmpro/leasing.py quote)
+    const down = p * plan.down_pct / 100, cap = p - down, residual = p * plan.residual_pct / 100, w = Math.max(1, plan.weeks);
+    const dep = Math.max(0, cap - residual) / w, fin = (cap + residual) * plan.apr / 100 / 52 / 2, pay = dep + fin;
+    return { down, payment: pay, depreciation: dep, finance: fin, total_payments: down + pay * w, interest: fin * w, residual };
+  }
+  function redraw() {
+    const p = +price.value || 0;
+    PLANS.forEach((plan) => { const q = quote(p, plan);
+      document.querySelectorAll('[data-p="' + plan.id + '"]').forEach((td) => td.textContent = p ? money(q[td.dataset.k]) : "—"); });
+  }
+  function fillModels() {
+    const g = VEH[game.value] || {}, list = g.trailers || [];
+    model.innerHTML = "";
+    list.forEach((v, i) => { const o = document.createElement("option"); o.value = i; o.textContent = v.brand + " " + v.model + " - from " + CUR + (v.price || v.from).toLocaleString(); model.appendChild(o); });
+    type.innerHTML = "";
+    [["", "—"]].concat(g.trailer_types || []).forEach(([id, label]) => { const o = document.createElement("option"); o.value = id; o.textContent = label; type.appendChild(o); });
+    pickModel();
+  }
+  function pickModel() {
+    const v = ((VEH[game.value] || {}).trailers || [])[model.value];
+    if (v) { price.value = v.price || v.from; $("lf-brand").value = v.brand; $("lf-mdl").value = v.model; }
+    redraw();
+  }
+  function pickSource() {
+    const ex = src.value === "existing";
+    ["lf-game-f", "lf-model-f", "lf-plate-f", "lf-type-f"].forEach((id) => $(id).style.display = ex ? "none" : "");
+    $("lf-own-f").style.display = ex ? "" : "none";
+    if (ex && own.selectedOptions[0]) price.value = +own.selectedOptions[0].dataset.price || "";
+    else pickModel();
+    redraw();
+  }
+  src.addEventListener("change", pickSource); game.addEventListener("change", fillModels); model.addEventListener("change", pickModel);
+  if (own) own.addEventListener("change", pickSource);
+  price.addEventListener("input", redraw);
+  document.querySelectorAll("[data-confirm-lease]").forEach((b) => b.addEventListener("click", (e) => {
+    const plan = PLANS.find((x) => String(x.id) === b.value), q = quote(+price.value || 0, plan);
+    if (!confirm("Lease this trailer on the " + plan.name + " plan?\n\nDown payment today: " + money(q.down) + "\nThen " + money(q.payment) +
+                 " every week for " + plan.weeks + " weeks\nTotal over the lease: " + money(q.total_payments) + "\nBuy it at the end for: " + money(q.residual)))
+      e.preventDefault();
+  }));
+  const pf = $("plan-form");
+  if (pf) {
+    document.querySelector("[data-plan-new]").addEventListener("click", () => { pf.reset(); pf.elements["id"].value = ""; $("plan-title").textContent = "New trailer lease plan"; });
+    document.querySelectorAll("[data-plan]").forEach((b) => b.addEventListener("click", () => {
+      const p = JSON.parse(b.dataset.plan); pf.reset();
+      for (const k in p) if (pf.elements[k]) pf.elements[k].value = p[k];
+      $("plan-title").textContent = "Edit " + p.name; $("dlg-plan").showModal();
+    }));
+  }
+  fillModels(); pickSource();
+})();
+</script>
+{% endblock %}

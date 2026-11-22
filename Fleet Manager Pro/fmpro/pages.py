@@ -598,7 +598,10 @@ def fleet():
                      FROM trucks t LEFT JOIN users u ON u.id=t.assigned_user_id LEFT JOIN garages g ON g.id=t.garage_id
                      WHERE 1=1""" + truck_sql("t.game")[0] + """ ORDER BY t.status IN ('sold','returned'), t.brand, t.model""", truck_sql()[1])  # nosec B608  # table/column names are fixed in the code; every value is a ? parameter
     trailers = db.q("""SELECT tr.*, g.city garage FROM trailers tr LEFT JOIN garages g ON g.id=tr.garage_id
-                       ORDER BY tr.status='sold', tr.name""")
+                       ORDER BY tr.status IN ('sold','returned'), tr.name""")
+    tleases = {r["trailer_id"]: r["id"] for r in db.q("SELECT id, trailer_id FROM trailer_leases WHERE status IN ('active','matured')")}
+    for tr in trailers:
+        tr["lease_id"] = tleases.get(tr["id"])
     garages = db.q("""SELECT g.*, (SELECT COUNT(*) FROM trucks WHERE garage_id=g.id AND status NOT IN ('sold','returned')) used
                       FROM garages g WHERE 1=1""" + game_sql("g.game")[0] + """ ORDER BY city""", game_sql()[1])  # nosec B608  # table/column names are fixed in the code; every value is a ? parameter
     maint = db.q("""SELECT m.*, t.brand, t.model, t.plate, u.display_name FROM maintenance m
@@ -1431,7 +1434,44 @@ def leaderboard():
                     GROUP BY u.id ORDER BY value DESC LIMIT 50""", tuple(args))  # nosec B608  # table/column names are fixed in the code; every value is a ? parameter
     for r in rows:
         r["prog"] = economy.progress(r["xp"])
+    if request.args.get("view") == "global":
+        from . import global_board
+        companies, drivers = global_board.board(metric, period, game or "all")
+        synced = float(db.setting("global_board_synced", "0") or 0)
+        return render_template("leaderboard_global.html", companies=companies, drivers=drivers, metric=metric,
+                               metrics=METRICS, period=period, game=game, synced=synced or None,
+                               error=db.setting("global_board_error", ""), joined=global_board.joined(),
+                               share=db.setting("global_board_drivers", "0") == "1",
+                               page_url=db.setting("global_board_url", ""))
     return render_template("leaderboard.html", rows=rows, metric=metric, metrics=METRICS, period=period, game=game)
+
+
+@bp.route("/leaderboard/global/sync", methods=["POST"])
+@login_required
+def leaderboard_global_sync():
+    from . import global_board
+    err = global_board.sync()
+    flash(f"Couldn't update the global leaderboard: {err}" if err else "Global leaderboard updated.",
+          "error" if err else "success")
+    return redirect(url_for("pages.leaderboard", view="global"))
+
+
+@bp.route("/leaderboard/global/settings", methods=["POST"])
+@login_required(role="admin")
+def leaderboard_global_settings():
+    from . import global_board
+    join = request.form.get("global_board") == "1"
+    share = join and request.form.get("global_board_drivers") == "1"
+    db.set_setting("global_board", "1" if join else "0")
+    db.set_setting("global_board_drivers", "1" if share else "0")
+    db.audit(user()["id"], "global leaderboard", f"joined={join} drivers={share}")
+    err = global_board.sync()        # leaving deletes the company's entry on the server straight away
+    if err:
+        flash(f"Saved, but the licence server couldn't be reached ({err}). It is tried again every 10 minutes.", "error")
+    else:
+        flash("Your company is on the global leaderboard." if join else "Your company has left the global leaderboard.",
+              "success")
+    return redirect(url_for("pages.leaderboard", view="global"))
 
 
 @bp.route("/achievements")

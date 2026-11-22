@@ -295,7 +295,7 @@ CLEAR_CONFIRM = "DELETE ALL DATA"
 CLEAR_TABLES = [("job_points", "route points"), ("job_events", "job events"), ("ledger", "ledger entries"),
                 ("hos_violations", "HOS violations"), ("hos_logs", "logbook lines"), ("dvirs", "DVIRs"),
                 ("inspections", "roadside inspections"), ("maintenance", "maintenance records"),
-                ("leases", "truck leases"), ("jobs", "jobs"), ("contracts", "contracts"), ("loans", "loans"), ("trucks", "trucks"),
+                ("leases", "truck leases"), ("trailer_leases", "trailer leases"), ("jobs", "jobs"), ("contracts", "contracts"), ("loans", "loans"), ("trucks", "trucks"),
                 ("trailers", "trailers"), ("garages", "garages"), ("event_rsvps", "event sign-ups"),
                 ("events", "events"), ("announcements", "announcements"), ("messages", "messages"),
                 ("user_achievements", "achievements"), ("notifications", "notifications"),
@@ -543,9 +543,12 @@ def dealer_price(brand, model, kind="trucks"):
 @bp.route("/fleet/trailer/<int:tid>/sell", methods=["POST"])
 @login_required(role="admin")
 def trailer_sell(tid):
-    t = db.one("SELECT * FROM trailers WHERE id=? AND status!='sold'", (tid,))
+    t = db.one("SELECT * FROM trailers WHERE id=? AND status NOT IN ('sold','returned')", (tid,))
     if not t:
         abort(404)
+    if t.get("leased"):
+        flash("A leased trailer can't be sold - end its lease on Trailer Leasing first.", "error")
+        return redirect(url_for("pages.fleet"))
     price = _num("price", 0, 1e8) or 0
     db.update("trailers", tid, status="sold", garage_id=None)
     if price:

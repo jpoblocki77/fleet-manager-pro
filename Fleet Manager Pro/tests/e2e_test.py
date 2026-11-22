@@ -855,6 +855,101 @@ def main():
           "hide a lease plan")
     post("/leasing/new", {"plan_id": str(lh["id"]), "price": "99999999", "source": "new", "brand": "X", "model": "Y"})
     check(db.val("SELECT COUNT(*) FROM leases") == 3, "can't lease a truck when the down payment doesn't fit")
+
+    print("Trailer leasing")
+    from fmpro import trailer_leasing as _tl
+    tplans = {p["name"]: p for p in _tl.plans()}
+    check(len(tplans) == 4 and len({(p["weeks"], p["apr"]) for p in tplans.values()}) == 4,
+          "four default trailer lease plans with different lengths and interest")
+    an = tplans["Annual"]
+    tq = _tl.quote(40000, an)
+    check(tq["down"] == 4000 and tq["residual"] == 18000 and abs(tq["payment"] - ((36000 - 18000) / 52 + (36000 + 18000) * 5.9 / 100 / 104)) < 0.02,
+          "trailer lease quote: down payment, end value, value used + interest")
+    page = c.get("/trailer-leasing").get_data(as_text=True)
+    check("Compare trailer lease plans" in page and "Long Term" in page and "no limit" in page and "Buy it at the end for" in page
+          and "Lease on Annual" in page, "trailer leasing page shows plans and every cost, with no mileage limit")
+    check('href="/trailer-leasing"' in page and "Trailer Leasing" in page, "Trailer Leasing is in the sidebar")
+    balt = db.val("SELECT SUM(amount) FROM ledger WHERE account='company'")
+    r = post("/trailer-leasing/new", {"plan_id": str(an["id"]), "price": "40000", "source": "new", "brand": "Great Dane",
+                                       "model": "Everest", "body_type": "reefer", "plate": "TRL1", "game": "ats"})
+    tlid = db.val("SELECT MAX(id) FROM trailer_leases")
+    tlease = db.one("SELECT * FROM trailer_leases WHERE id=?", (tlid,))
+    ttid = tlease and tlease["trailer_id"]
+    trow = db.one("SELECT * FROM trailers WHERE id=?", (ttid,)) if ttid else None
+    check(r.status_code == 302 and tlease and tlease["payment"] == tq["payment"] and tlease["status"] == "active"
+          and trow and trow["name"] == "Great Dane Everest" and trow["leased"] == 1 and trow["plate"] == "TRL1",
+          "lease a new trailer: it joins the fleet as leased")
+    check(abs(db.val("SELECT SUM(amount) FROM ledger WHERE account='company'") - (balt - 4000)) < 0.01, "trailer down payment taken")
+    fp = c.get("/fleet").get_data(as_text=True)
+    check(f"/fleet/trailer-lease/{tlid}" in fp and f'data-trailer-sell="{ttid}"' not in fp, "fleet page links the trailer's lease and hides Sell")
+    post(f"/fleet/trailer/{ttid}/sell", {"price": "1"})
+    check(db.val("SELECT status FROM trailers WHERE id=?", (ttid,)) == "active", "a leased trailer can't be sold")
+    dp = c.get(f"/fleet/trailer-lease/{tlid}").get_data(as_text=True)
+    check("If you end it today" in dp and "Total interest" in dp and "trailer value used each week" in dp, "trailer lease page shows the cost breakdown")
+    _tl.process(now=_lt.time() + 8 * 86400)
+    check(db.val("SELECT payments_made FROM trailer_leases WHERE id=?", (tlid,)) == 1
+          and db.val("SELECT COUNT(*) FROM ledger WHERE category='trailer lease payment'") == 1, "weekly trailer lease payment taken")
+    _tl.process(now=_lt.time() + 8 * 86400)
+    check(db.val("SELECT payments_made FROM trailer_leases WHERE id=?", (tlid,)) == 1, "a trailer payment is only taken once a week")
+    check(not db.q("SELECT 1 FROM ledger WHERE description LIKE ? AND description LIKE 'Trailer%'", (f"Lease #{tlid} %",))
+          and db.val("SELECT COUNT(*) FROM ledger WHERE description LIKE ?", (f"Trailer lease #{tlid} %",)) == 2,
+          "a truck lease page never picks up trailer lease lines with the same number")
+    tlease = db.one("SELECT * FROM trailer_leases WHERE id=?", (tlid,))
+    tst = _tl.status(tlease)
+    check(abs(tst["early_fee"] - 51 * tlease["payment"] * 0.30) < 0.02, "trailer early-return fee = 30% of payments left")
+    bal3 = db.val("SELECT SUM(amount) FROM ledger WHERE account='company'")
+    post(f"/fleet/trailer-lease/{tlid}/end", {"action": "return"})
+    tl2 = db.one("SELECT * FROM trailer_leases WHERE id=?", (tlid,))
+    check(tl2["status"] == "returned" and tl2["end_reason"] == "early return" and abs(tl2["end_cost"] - tst["early_fee"]) < 0.02
+          and abs(db.val("SELECT SUM(amount) FROM ledger WHERE account='company'") - (bal3 - tl2["end_cost"])) < 0.02,
+          "early trailer return charges only the fee (no mileage)")
+    check(db.one("SELECT status, leased FROM trailers WHERE id=?", (ttid,)) == {"status": "returned", "leased": 0},
+          "the returned trailer leaves the fleet")
+    own_tr = db.insert("trailers", name="My Flatbed", brand="Fontaine", plate="OWNTR", purchase_price=30000, created_at=1)
+    st_ = tplans["Short Term"]
+    post("/trailer-leasing/new", {"plan_id": str(st_["id"]), "price": "30000", "source": "existing", "trailer_id": str(own_tr)})
+    tlid2 = db.val("SELECT id FROM trailer_leases WHERE trailer_id=? AND status='active'", (own_tr,))
+    check(bool(tlid2), "lease one of my own trailers")
+    for w in range(12):
+        _tl.process(now=_lt.time() + (w + 1) * 7 * 86400 + 3600)
+    check(db.val("SELECT status FROM trailer_leases WHERE id=?", (tlid2,)) == "matured", "trailer lease matures after the last payment")
+    check(db.val("SELECT COUNT(*) FROM notifications WHERE link=?", (f"/fleet/trailer-lease/{tlid2}",), 0) >= 1,
+          "managers told the trailer lease has ended")
+    post(f"/fleet/trailer-lease/{tlid2}/end", {"action": "renew", "plan_id": str(tplans["Seasonal"]["id"])})
+    tlid3 = db.val("SELECT id FROM trailer_leases WHERE trailer_id=? AND status='active'", (own_tr,))
+    check(db.val("SELECT status FROM trailer_leases WHERE id=?", (tlid2,)) == "renewed" and tlid3
+          and db.val("SELECT price FROM trailer_leases WHERE id=?", (tlid3,)) == 22500, "renew leases the trailer again at its end value")
+    tl3 = db.one("SELECT * FROM trailer_leases WHERE id=?", (tlid3,))
+    bal4 = db.val("SELECT SUM(amount) FROM ledger WHERE account='company'")
+    post(f"/fleet/trailer-lease/{tlid3}/end", {"action": "buyout"})
+    check(db.val("SELECT status FROM trailer_leases WHERE id=?", (tlid3,)) == "bought"
+          and db.val("SELECT leased FROM trailers WHERE id=?", (own_tr,)) == 0
+          and abs(db.val("SELECT SUM(amount) FROM ledger WHERE account='company'") - (bal4 - tl3["payment"] * tl3["weeks"] - tl3["residual"])) < 0.05,
+          "buy out a trailer lease early: payments left + end value, and the trailer is ours")
+    check(post(f"/fleet/trailer-lease/{tlid3}/end", {"action": "buyout"}).status_code == 404, "an ended trailer lease can't be ended again")
+    lone_ = db.insert("trailers", name="Lone", plate="L1", purchase_price=0, created_at=1)
+    lone_lease = _tl.start(lone_, st_, 30000, uid)
+    check(post(f"/fleet/trailer-lease/{lone_lease}/end", {"action": "renew", "plan_id": str(st_["id"])}).status_code == 302
+          and db.val("SELECT status FROM trailer_leases WHERE id=?", (lone_lease,)) == "active", "a trailer lease can't be renewed before it ends")
+    check(post(f"/fleet/trailer-lease/{lone_lease}/end", {"action": "steal"}).status_code == 400, "unknown end actions are refused")
+    post("/trailer-leasing/plans/save", {"name": "Trailer Test", "weeks": "6", "down_pct": "0", "apr": "3.5", "residual_pct": "85",
+                                         "early_fee_pct": "10"})
+    ttp = db.one("SELECT * FROM trailer_lease_plans WHERE name='Trailer Test'")
+    check(ttp and ttp["weeks"] == 6 and ttp["apr"] == 3.5 and ttp["residual_pct"] == 85, "add a trailer lease plan")
+    post(f"/trailer-leasing/plans/{ttp['id']}/toggle")
+    check("Trailer Test" not in [p["name"] for p in _tl.plans()], "hide a trailer lease plan")
+    check(post("/trailer-leasing/plans/save", {"name": "", "weeks": "x"}).status_code == 302
+          and db.val("SELECT COUNT(*) FROM trailer_lease_plans") == 5, "an incomplete trailer plan is refused")
+    n_tl = db.val("SELECT COUNT(*) FROM trailer_leases")
+    post("/trailer-leasing/new", {"plan_id": str(an["id"]), "price": "99999999", "source": "new", "brand": "X", "model": "Y"})
+    post("/trailer-leasing/new", {"plan_id": str(an["id"]), "price": "40000", "source": "existing", "trailer_id": str(lone_)})
+    check(db.val("SELECT COUNT(*) FROM trailer_leases") == n_tl, "can't lease a trailer twice or when the down payment doesn't fit")
+    post(f"/fleet/trailer-lease/{lone_lease}/end", {"action": "return"})
+    from fmpro import cleanup as _cl
+    check(_cl.delete_trailers([ttid]) == 1 and db.val("SELECT trailer_id FROM trailer_leases WHERE id=?", (tlid,)) is None
+          and db.val("SELECT status FROM trailer_leases WHERE id=?", (tlid,)) == "returned",
+          "deleting a returned trailer keeps its lease history, unlinked")
+    check(c.get(f"/fleet/trailer-lease/{tlid}").status_code == 200, "an unlinked trailer lease page still opens")
     post("/events/save", {"title": "Friday convoy", "start_at": "2030-01-01T20:00", "departure": "LA", "destination": "Vegas", "xp_reward": "500"})
     eid = db.val("SELECT id FROM events")
     post(f"/events/{eid}/rsvp", {"status": "going"})
@@ -1992,6 +2087,13 @@ def main():
     check(c.get(f"/fleet/lease/{lid}").status_code == 200 and post("/leasing/new", {"plan_id": "1", "price": "100000"}).status_code == 403
           and post(f"/fleet/lease/{lid3}/end", {"action": "return"}).status_code == 403
           and post("/leasing/plans/save", {"name": "x"}).status_code == 403, "drivers can't start, end or change leases")
+    tlp = c.get("/trailer-leasing").get_data(as_text=True)
+    check("Weekly payment" in tlp and "Lease on Annual" not in tlp and c.get(f"/fleet/trailer-lease/{tlid}").status_code == 200,
+          "drivers see trailer lease costs but can't lease")
+    check(post("/trailer-leasing/new", {"plan_id": "1", "price": "40000"}).status_code == 403
+          and post(f"/fleet/trailer-lease/{tlid}/end", {"action": "return"}).status_code == 403
+          and post("/trailer-leasing/plans/save", {"name": "x"}).status_code == 403
+          and post("/trailer-leasing/plans/1/toggle").status_code == 403, "drivers can't start, end or change trailer leases")
     check(post("/expenses/save", {"amount": "10", "category": "other"}).status_code == 403
           and post("/compliance/reset", {"driver": "all", "game": "both", "logbook": "1", "confirm": "RESET"}).status_code == 403
           and post("/fleet/garage/1/delete").status_code == 403 and c.get("/expenses.csv").status_code == 403,
@@ -2230,6 +2332,109 @@ def main():
     except Exception as e:
         check(getattr(e, "code", "") == "unknown_key", f"collecting needs a real activated key ({getattr(e, 'code', e)})")
     recruit.sync()
+
+    print("Global leaderboard (every company on the licence server)")
+    from fmpro import global_board
+    with srv.hits_lock:
+        srv.hits.clear()
+    import json as _gj
+    store_ = srv.store
+    lbrow = lambda: store_.db.execute("SELECT * FROM leaderboard WHERE key=?", (lic.key,)).fetchone()  # noqa: E731
+    check(db.setting("global_board") == "1" and db.setting("global_board_drivers") == "0",
+          "a company joins the global board by default, without its drivers' names")
+    err = global_board.sync()
+    row_ = lbrow()
+    check(err is None and row_ is not None and row_["company"] == "Crimson <Line> & Co", "the company's totals reach the server")
+    st_ = _gj.loads(row_["stats"])
+    real_jobs = db.val("SELECT COUNT(*) FROM jobs j JOIN users u ON u.id=j.user_id WHERE j.status='delivered' "
+                       "AND u.status!='removed' AND (j.flags IS NULL OR j.flags NOT LIKE '%demo%')")
+    all_jobs = db.val("SELECT COUNT(*) FROM jobs WHERE status='delivered'")
+    check(st_["all"]["all"][2] == real_jobs and set(st_) == {"week", "month", "year", "all"}
+          and set(st_["all"]) == {"all", "ats", "ets2"} and len(st_["all"]["all"]) == 8,
+          f"all-time deliveries match this company's ({real_jobs} counted)")
+    check(db.val("SELECT COUNT(*) FROM jobs WHERE status='delivered' AND flags LIKE '%demo%'") == 0
+          or real_jobs < all_jobs, "simulator test drives don't count on the global board")
+    check(_gj.loads(row_["drivers"]) == {}, "driver names aren't sent unless the company shares them")
+    # a second company, sending junk the server must clean
+    k_g = store_.new_purchase("Global Rival", "", product="Fleet Manager Pro")
+    store_.activate(k_g, "FMID-GGGG-GGGG-GGGG-GGGG", "", "Fleet Manager Pro")
+    junk = {"week": {"all": [1e30, -5, "x", None, 500, True]}, "month": {"all": [999999, 5000, 40, 300.55, 88.88, 70, 1, 3]},
+            "all": {"all": [999999, 5000, 40, 300, 88, 70, 1, 3], "ats": "nope"}, "evil": {"all": [1]}, "year": []}
+    pid_g = store_.leaderboard_sync(k_g, "FMID-GGGG-GGGG-GGGG-GGGG", "Fleet Manager Pro", True,
+                                    "<b>Rival</b>   Haulage", "€€€€", junk,
+                                    {"month": [{"name": "<i>Speedy</i>", "v": [5000, 1, 2, 3, 99, 5, 6, 1]}] * 30,
+                                     "all": "bad"})
+    rg = store_.db.execute("SELECT * FROM leaderboard WHERE key=?", (k_g,)).fetchone()
+    sg, dg = _gj.loads(rg["stats"]), _gj.loads(rg["drivers"])
+    check(pid_g and set(sg) == {"week", "month", "all"} and sg["week"]["all"] == [1e12, 0, 0, 0, 100, 0, 0, 0]
+          and sg["all"]["ats"] == [0] * 8 and rg["company"] == "<b>Rival</b> Haulage" and rg["currency"] == "€€€",
+          "the server keeps only bounded numbers in the expected shape")
+    check(list(dg) == ["month"] and len(dg["month"]) == 10, "at most 10 drivers per company and period are kept")
+    err = global_board.sync()
+    comps, drvs = global_board.board("km", "month", "all")
+    check(err is None and [r["company"] for r in comps][:1] == ["<b>Rival</b> Haulage"]
+          and any(r["you"] and r["company"] == "Crimson <Line> & Co" for r in comps) or real_jobs == 0,
+          "the app gets every company back, ranked, and knows which one is itself")
+    check(drvs and drvs[0]["name"] == "<i>Speedy</i>" and drvs[0]["company"] == "<b>Rival</b> Haulage",
+          "shared drivers of other companies are listed")
+    page = c.get("/leaderboard?view=global&metric=km&period=month").get_data(as_text=True)
+    check("Global Leaderboard" in page and "&lt;b&gt;Rival&lt;/b&gt; Haulage" in page and "<b>Rival</b>" not in page
+          and "&lt;i&gt;Speedy&lt;/i&gt;" in page and "Show my drivers" in page,
+          "the Global view lists companies and drivers, escaped, with the admin switches")
+    check('href="?metric=km&amp;period=month&amp;game=&amp;view=global"' in c.get("/leaderboard").get_data(as_text=True),
+          "the company leaderboard links to the Global view")
+    st, pub = web("/leaderboard?metric=km&period=month&game=all")
+    check(st == 200 and "&lt;b&gt;Rival&lt;/b&gt; Haulage" in pub and "<b>Rival</b>" not in pub and "<script" not in pub,
+          "the public leaderboard page on the server works and escapes names")
+    st, _p = web("/leaderboard?metric=%3Cx%3E&period=zz&game=../../")
+    check(st == 200, "odd page settings fall back to defaults")
+    with _ur.urlopen(base + "/leaderboard", timeout=10) as r_:
+        csp_ = r_.headers.get("Content-Security-Policy", "")
+    check("default-src 'none'" in csp_ and "script" not in csp_, "the public page allows no scripts")
+    # sharing driver names, then leaving
+    r = post("/leaderboard/global/settings", {"global_board": "1", "global_board_drivers": "1"})
+    row_ = lbrow()
+    check(r.status_code == 302 and db.setting("global_board_drivers") == "1"
+          and (_gj.loads(row_["drivers"]) or real_jobs == 0), "sharing driver names sends the best drivers")
+    r = post("/leaderboard/global/settings", {})
+    check(r.status_code == 302 and lbrow() is None and db.setting("global_board") == "0"
+          and db.setting("global_board_drivers") == "0", "leaving removes the company from the server straight away")
+    comps, _d = global_board.board("km", "month", "all")
+    check(comps and not any(r["you"] for r in comps), "a company that left still sees the others")
+    check("isn't on the global board" in c.get("/leaderboard?view=global").get_data(as_text=True),
+          "the page says the company isn't on the board")
+    store_.revoke(k_g, True)
+    check(store_.leaderboard() == ([], {}), "revoked purchases drop off the board")
+    store_.revoke(k_g, False)
+    store_.db.execute("UPDATE leaderboard SET updated='2000-01-01T00:00:00Z' WHERE key=?", (k_g,))
+    store_.db.commit()
+    check(store_.leaderboard()[0] == [], "companies that stop updating drop off after 30 days")
+    try:
+        srv.handle("POST", "/v1/leaderboard", {"key": "FMP-AAAA-AAAA-AAAA-AAAA", "machine": lic.machine,
+                                               "product": "Fleet Manager Pro", "join": True}, {}, "9.9.9.9")
+        check(False, "the leaderboard needs a real activated key")
+    except Exception as e:
+        check(getattr(e, "code", "") == "unknown_key", "the leaderboard needs a real activated key")
+    store_.delete_purchase(k_g)
+    check(store_.db.execute("SELECT COUNT(*) FROM leaderboard WHERE key=?", (k_g,)).fetchone()[0] == 0,
+          "deleting a purchase removes its leaderboard entry")
+    post("/leaderboard/global/settings", {"global_board": "1"})
+    check(lbrow() is not None, "joining again puts the company back")
+    post("/logout")
+    db.ex("DELETE FROM login_failures")    # earlier wrong-password tests throttled this driver
+    c.get("/login")
+    post("/login", {"username": "rookie", "password": "driver12"})
+    check(c.get("/leaderboard").status_code == 200, "(signed in as a driver)")
+    r = post("/leaderboard/global/settings", {})
+    check(r.status_code in (302, 403) and lbrow() is not None and db.setting("global_board") == "1",
+          "drivers can't take the company off the global board")
+    check(c.get("/leaderboard?view=global").status_code == 200, "drivers can see the global board")
+    post("/logout")
+    c.get("/login")
+    post("/login", {"username": "boss", "password": "secret12"})
+    c.get("/")
+    with srv.hits_lock:
+        srv.hits.clear()
 
     print("Recruitment: reviewing and hiring")
     rid_ = ra["id"]
