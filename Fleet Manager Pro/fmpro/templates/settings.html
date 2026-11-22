@@ -77,6 +77,7 @@
     <div class="field"><label>{{ uf.speeding_tolerance_kmh.label }}</label><input name="speeding_tolerance_kmh" type="number" step="any" min="0" max="{{ 31 if current_units() == 'imperial' else 50 }}" value="{{ uf.speeding_tolerance_kmh.value }}"></div>
   </div>
   {{ check('auto_charge_repairs', 'Charge in-game repairs to the company account') }}
+  {{ check('drivers_pay_fines', 'Drivers pay their own fines', "Game fines, Hours of Service, inspection report and roadside inspection fines come out of the driver's bank account. Off: the company pays them.") }}
   {{ check('require_manual_approval', 'Manual jobs from drivers need manager approval') }}
   <button class="btn primary">Save</button></form>
 
@@ -141,6 +142,15 @@
   <div class="fields">
     <div class="field"><label>Chance per load (%)</label><input name="inspection_chance_pct" type="number" min="0" max="100" step="1" value="{{ S.inspection_chance_pct }}"></div>
     <div class="field"><label>Out-of-service fine</label><input name="oos_fine" type="number" min="0" step="100" value="{{ S.oos_fine }}"></div>
+  </div>
+  <h2 style="margin-top:8px">Driver's licences</h2>
+  {{ check('licence_enabled', "Drivers need a driver's licence", 'Drivers pass a two in-game-hour drivers test and get 12 points. Offences cost points; at zero the licence is suspended. Nobody has a licence until they pass the test, or you issue one on the CDL page.') }}
+  {{ check('licence_block', 'Hold back drivers without a licence', "They can't claim contracts, and loads they start are held until a manager approves the pay.") }}
+  {{ check('licence_tickets', 'Drivers pay a traffic ticket for every offence', "Taken from the driver's own bank account. An offence the driver already paid a fine for gets no extra ticket.") }}
+  <div class="fields">
+    <div class="field"><label>Fine to clear all points</label><input name="licence_fine" type="number" min="0" step="100" value="{{ S.licence_fine }}"></div>
+    <div class="field"><label>Real minutes of speeding per point</label><input name="licence_speed_min" type="number" min="1" max="120" step="1" value="{{ S.licence_speed_min }}"></div>
+    <div class="field"><label>Hours to wait after a failed test</label><input name="licence_retest_hours" type="number" min="0" max="720" step="1" value="{{ S.licence_retest_hours }}"></div>
   </div>
   <button class="btn primary">Save</button></form>
 

@@ -74,6 +74,18 @@ GUIDES = {
         "You'll see what that lane has really paid your company, what it costs and how long it takes, from your own loads.",
         "Best next legs suggests where to head after you arrive; Most profitable lanes shows your best routes overall.",
     ],
+    "bank": [
+        "Your own bank account, separate from the company account. Your pay is deposited every Friday at noon.",
+        "Next payday shows what you have earned so far and the loads it comes from.",
+        "The statement lists every deposit, traffic ticket and fine; Pay slips lists the loads in each payday.",
+        ("admin", "Driver accounts at the bottom opens any driver's account you manage."),
+    ],
+    "cdl": [
+        "Take the drivers test to get your licence: two in-game hours, in your own truck, with the game running.",
+        "A licence has 12 points. Accidents, red lights, fines and every few real minutes of speeding cost points and a ticket.",
+        "One point comes back every real day. At zero your licence is suspended: wait, or pay the fine, then retake the test.",
+        ("admin", "Turn licences on in Settings, Compliance tab. Issue, suspend or clear a driver's licence in the table here."),
+    ],
     "compliance": [
         "The logbook records your duty status on in-game time: driving, on duty, off duty and sleeper berth.",
         "Use Change duty status when you stop or start work; driving is recorded by itself from telemetry.",
@@ -112,9 +124,9 @@ GUIDES = {
         "Use Buy it to own the trailer outright, or Renew when the term ends.",
     ],
     "finance": [
-        "The company ledger: freight income, fuel, tolls, fines, repairs, payroll, garages and loans.",
+        "The company ledger: freight income, fuel, tolls, repairs, payroll, garages and loans. Fines are here only when the company pays them (Settings, Economy tab).",
         "Entry records money in or out by hand; Take a loan borrows cash and Pay off now clears a loan early.",
-        "Driver earnings shows what each driver has been paid.",
+        "Driver earnings shows what each driver has earned; it reaches their own bank account on Friday at noon.",
     ],
     "expenses": [
         "Every cost the company has paid, including fuel, tolls, fines, repairs and payroll.",

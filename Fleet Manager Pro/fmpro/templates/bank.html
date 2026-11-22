@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, stat, avatar %}
+{% block title %}Bank{% endblock %}
+{% block head %}<style>
+.bank-card{background:linear-gradient(135deg,var(--navy-600),var(--crimson-600));color:#fff;border-radius:16px;padding:22px 24px;min-height:190px;display:flex;flex-direction:column;justify-content:space-between;max-width:420px}
+.bank-card .big{font-size:32px;font-weight:750;font-variant-numeric:tabular-nums}.bank-card .num{letter-spacing:.14em;text-align:left;font-variant-numeric:tabular-nums}
+.bank-card .lbl{font-size:12px;opacity:.85}
+</style>{% endblock %}
+{% macro job(r) %}{% if r.job_id %} <a class="small" href="/jobs/{{ r.job_id }}">#{{ r.job_id }}</a>{% endif %}{% endmacro %}
+{% block content %}
+<div class="page-head"><div><h1>{{ 'Bank' if mine else who.display_name ~ ': bank account' }}</h1><p>A driver's own money, separate from the company account. Pay is deposited every Friday at noon.</p></div>
+  {% if not mine %}<div class="actions"><a class="btn" href="/bank">My account</a></div>{% endif %}</div>
+
+<div class="grid g2" style="margin-bottom:16px">
+  <div class="card"><div class="bank-card">
+    <div class="between"><b>Drivers Bank</b><span class="lbl">Checking</span></div>
+    <div><div class="lbl">{{ 'Overdrawn' if balance < 0 else 'Available balance' }}</div><div class="big">{{ balance|money(2) }}</div></div>
+    <div class="between" style="flex-wrap:wrap;gap:4px"><span class="num">{{ number }}</span><span>{{ who.display_name }}</span></div>
+  </div></div>
+  <div class="card">
+    <h2>Next payday</h2>
+    <div style="font-size:26px;font-weight:750">{{ pending|money(2) }}</div>
+    <p class="muted">{{ payday|dt('%A, %b %d at %H:%M') }} · {{ payday|ago }}</p>
+    {% if waiting %}<ul class="feed">{% for r in waiting[:6] %}<li><span>{{ r.description }}{{ job(r) }}</span><span style="margin-left:auto">{{ r.amount|money(2) }}</span></li>{% endfor %}</ul>
+    {% if waiting|length > 6 %}<p class="small muted">and {{ waiting|length - 6 }} more</p>{% endif %}
+    {% else %}<p class="small muted">No pay waiting yet. Pay for each delivered load shows here until Friday.</p>{% endif %}
+    {% if pending < 0 %}<p class="small muted">Below zero because paid loads were removed later; it comes off the next pay.</p>{% endif %}
+  </div>
+</div>
+
+<div class="card flush" style="margin-bottom:16px"><div class="card-head" style="padding:16px 18px 0"><h2>Statement</h2></div>
+<div class="table-wrap"><table><thead><tr><th>Date</th><th>Details</th><th class="num">Amount</th><th class="num">Balance</th></tr></thead><tbody>
+{% for r in rows %}<tr><td class="small muted">{{ r.created_at|dt('%b %d, %Y %H:%M') }}</td><td>{{ r.description or r.category|capitalize }}{{ job(r) }}<div class="small faint">{{ {'earnings': 'pay'}.get(r.category, r.category) }}</div></td>
+<td class="num {{ 'pos' if r.amount > 0 else 'neg' }}">{{ r.amount|money(2) }}</td><td class="num">{{ r.after|money(2) }}</td></tr>
+{% else %}<tr><td colspan="4" class="empty">Nothing yet. The first payday opens the statement.</td></tr>{% endfor %}</tbody></table></div></div>
+
+{% if stubs %}<div class="card" style="margin-bottom:16px"><h2>Pay slips</h2>
+{% for s in stubs %}<details style="padding:8px 0;border-bottom:1px solid var(--line-soft)"><summary><b>{{ s.created_at|dt('%b %d, %Y') }}</b> · {{ s.paid|money(2) }} · {{ s.loads|length }} load{{ 's' if s.loads|length != 1 }}</summary>
+<ul class="feed">{% for r in s.loads %}<li><span>{{ r.description }}{{ job(r) }}</span><span style="margin-left:auto">{{ r.amount|money(2) }}</span></li>{% endfor %}</ul></details>{% endfor %}</div>{% endif %}
+
+{% if people %}<div class="card flush"><div class="card-head" style="padding:16px 18px 0"><h2>Driver accounts</h2></div>
+<div class="table-wrap"><table><thead><tr><th>Driver</th><th class="num">Next pay</th><th class="num">Bank balance</th></tr></thead><tbody>
+{% for p in people %}<tr class="clickable" data-href="/bank?driver={{ p.id }}"><td>{{ avatar(p.display_name, p.color) }} <a href="/bank?driver={{ p.id }}">{{ p.display_name }}</a></td><td class="num">{{ p.pending|money(2) }}</td><td class="num {{ 'neg' if p.balance < 0 }}">{{ p.balance|money(2) }}</td></tr>{% endfor %}
+</tbody></table></div></div>{% endif %}
+{% endblock %}

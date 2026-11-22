@@ -81,6 +81,18 @@ Rebuild after a game update or new DLC (writes `fmpro/cargo_list.json`):
 * **Dispatch holds** — drivers who are out of hours or whose truck is on hold can't claim contracts; the Drivers page
   shows each driver's hours left.
 
+* **Driver bank accounts (My Bank)** — each driver's own account, separate from the company account. Pay leaves the
+  company account when a load is delivered, waits as the week's pay, and is deposited every Friday at noon (the clock of
+  the PC running the program; made up later if it was closed). Statement, pay slips, next pay. Fines (game, Hours of
+  Service, DVIR, roadside inspections), traffic tickets and licence fines come out of it; Settings → Economy can make
+  the company pay the fines instead. One offence is never paid twice. Private: only the driver and managers who outrank them see it.
+* **Driver's licences (CDL & Points)** — off until turned on. A driver passes a drivers test of two in-game hours
+  (pre-trip, control skills, road, park), marked from live telemetry; 80 of 100 marks pass. The licence has 12 points.
+  Accidents, red lights, fines and every 5 real minutes of speeding cost points and a ticket from the driver's bank account.
+  One point comes back every real day. At zero the licence is suspended: wait for the points or pay the fine (5,000),
+  then retake the test. Without a licence a driver can't claim contracts and new loads are held for a manager.
+  The simulator never counts.
+
 Settings → Compliance turns each part on/off and sets the rules and fines.
 
 ## Start
@@ -142,6 +154,10 @@ fmpro/EULA.txt            the licence agreement buyers agree to when they activa
 fmpro/pages.py            pages and forms: dashboard, logbook, dispatch, fleet, finance, drivers, events, settings...
 fmpro/compliance.py       Hours of Service rules and clocks, DVIR, roadside inspections, dispatch holds
 fmpro/compliance_views.py the ELD & Compliance pages
+fmpro/bank.py             drivers' bank accounts and the Friday payday (bank_views.py: the page)
+fmpro/cdl.py              driver's licences: points, tickets, suspension (not the program's own licence: licensing.py)
+fmpro/cdl_test.py         the drivers test: marks one telemetry frame at a time
+fmpro/cdl_views.py        the CDL & Points page
 fmpro/economy.py          XP/levels/ranks, scoring, ledger, loans, upkeep, achievements, Discord webhook
 fmpro/api.py              JSON API: live telemetry, remote agents (sanitised), map layers, overlay, CSV exports
 fmpro/network.py          "Let other PCs in" switch (the network door on a normal start)

@@ -139,6 +139,9 @@ def create_app(data_dir=None, start_telemetry=True, check_licence=True):
     app.register_blueprint(vtc_profile.bp)
     app.register_blueprint(leasing_views.bp)
     app.register_blueprint(trailer_leasing_views.bp)
+    from . import bank_views, cdl_views
+    app.register_blueprint(bank_views.bp)
+    app.register_blueprint(cdl_views.bp)
     auth.install(app)
     _filters(app)
     _logging_hooks(app)

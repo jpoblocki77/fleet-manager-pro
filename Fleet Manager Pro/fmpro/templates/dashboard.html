@@ -62,7 +62,8 @@
         <dt>Active drivers</dt><dd>{{ counts.drivers }}</dd>
         <dt>Drivers on the road</dt><dd>{{ counts.live }}</dd>
         <dt>Trucks</dt><dd>{{ counts.trucks }}</dd>
-        <dt>My wallet</dt><dd>{{ my_balance|money }}</dd>
+        <dt>My bank account</dt><dd><a href="/bank">{{ my_balance|money }}</a></dd>
+        <dt>Next pay (Friday noon)</dt><dd>{{ my_pending|money }}</dd>
         <dt>My deliveries</dt><dd>{{ mine.jobs }} · {{ mine.km|dist }}</dd>
         {% if can('admin') %}<dt>Jobs awaiting approval</dt><dd><a href="/jobs?status=pending_review">{{ counts.pending }}</a></dd>
         <dt>New applications</dt><dd><a href="/recruitment">{{ counts.apps }}</a></dd>{% endif %}

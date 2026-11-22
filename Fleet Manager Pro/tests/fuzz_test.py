@@ -49,7 +49,7 @@ def main():
     eid = db.insert("ledger", account="company", category="insurance", amount=-50, description="x", manual=1, created_at=now)
 
     get_urls = ["/", "/live", "/map", "/telemetry", "/jobs", f"/jobs/{jid}", "/jobs/new", "/dispatch", "/compliance",
-                "/compliance?tab=dvir", "/compliance?tab=inspections", "/compliance?tab=violations", "/fleet",
+                "/compliance?tab=dvir", "/compliance?tab=inspections", "/compliance?tab=violations", "/cdl", "/cdl/test/panel", "/bank", "/fleet",
                 f"/fleet/truck/{tid}", "/finance", "/expenses", "/expenses.csv", "/performance", "/drivers",
                 f"/drivers/{uid}", "/events", "/leaderboard", "/achievements", "/announcements", "/messages",
                 "/recruitment", "/settings", "/settings?tab=data", "/settings?tab=audit", "/settings?tab=licence", "/profile",
@@ -71,6 +71,7 @@ def main():
         "/leasing/plans/save": ["id", "name", "weeks", "allowed", "excess_rate", "down_pct", "apr", "residual_pct", "early_fee_pct"],
         f"/fleet/truck/{tid}/delete": [], f"/fleet/trailer/{trl}/delete": [], "/fleet/clear-sold": [],
         "/drivers/9999/fire": ["confirm"], "/drivers/purge-former": [],
+        "/cdl/driver/%d" % uid: ["action"], "/cdl/pay": [], "/cdl/test/start": [], "/cdl/test/cancel": [], "/cdl/issue-all": [],
         "/compliance/status": ["status", "game"], "/settings": ["section", "repair_cost_per_pct", "fuel_price"],
     }
     # valid values for each form; the scan swaps one field at a time for an odd value

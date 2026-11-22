@@ -18,7 +18,7 @@
 </div>
 <div class="grid g6" style="margin-bottom:16px">
   {{ stat('Deliveries', st.jobs) }}{{ stat('Distance', st.km|dist) }}{{ stat('Revenue', st.revenue|money) }}
-  {{ stat('Avg. score', '%.0f'|format(st.score)) }}{{ stat('Tonnage', st.mass|mass) }}{{ stat('Wallet', wallet|money, 'driver earnings') }}
+  {{ stat('Avg. score', '%.0f'|format(st.score)) }}{{ stat('Tonnage', st.mass|mass) }}{% if wallet is not none %}{{ stat('Bank account', wallet|money, pending|money ~ ' more on Friday') }}{% endif %}
 </div>
 <div class="grid g3">
   <div class="card span2 flush"><div class="card-head" style="padding:16px 18px 0"><h2>Recent jobs</h2><a class="right small" href="/jobs?driver={{ p.id }}">All →</a></div>

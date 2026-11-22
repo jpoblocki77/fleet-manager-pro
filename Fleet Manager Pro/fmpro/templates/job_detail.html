@@ -11,7 +11,7 @@
 {% set real_flags = (j.flags or '').split(',')|reject('in', ['', 'joined-late', 'demo'])|list %}
 {% if can('admin') and (j.status == 'pending_review' or real_flags) %}
 <div class="card accent" style="margin-bottom:16px">
-  <div class="between"><div><b>Needs review.</b> <span class="muted">{% if j.status == 'pending_review' and j.source == 'manual' %}Manual job — approve to pay it out.{% elif j.status == 'pending_review' %}Pay is on hold{% if real_flags %} — anti-cheat flagged: {{ real_flags|join(', ') }}{% else %} (remote driver){% endif %}. Approve to pay it out.{% else %}Anti-cheat flagged: {{ real_flags|join(', ') }}.{% endif %}</span></div>
+  <div class="between"><div><b>Needs review.</b> <span class="muted">{% if j.status == 'pending_review' and j.source == 'manual' %}Manual job — approve to pay it out.{% elif j.status == 'pending_review' %}Pay is on hold{% if real_flags == ['no-licence'] %} — the driver had no valid driver's licence when this load started{% elif real_flags %} — anti-cheat flagged: {{ real_flags|join(', ') }}{% else %} (remote driver){% endif %}. Approve to pay it out.{% elif real_flags == ['no-licence'] %}The driver had no valid driver's licence when this load started.{% else %}Anti-cheat flagged: {{ real_flags|join(', ') }}.{% endif %}</span></div>
   <form method="post" action="/jobs/{{ j.id }}/review" class="row">{{ csrf() }}
     {% if j.status == 'pending_review' %}<button name="action" value="approve" class="btn primary">Approve &amp; pay</button><button name="action" value="reject" class="btn danger">Reject</button>{% endif %}
     {% if real_flags %}<button name="action" value="clear_flags" class="btn">Clear flags</button>{% endif %}
@@ -42,7 +42,7 @@
         <dd class="neg">−{{ j.deduction|money }} <span class="small faint">taken off the pay by the game</span></dd>{% endif %}
       <dt>Driver pay</dt><dd>{{ j.driver_pay|money }}</dd>
       <dt>Fuel ({{ j.fuel_used|liquid }})</dt><dd>{{ j.fuel_cost|money }}</dd>
-      <dt>Tolls</dt><dd>{{ j.tolls|money }}</dd><dt>Fines</dt><dd>{{ j.fines|money }}</dd>
+      <dt>Tolls</dt><dd>{{ j.tolls|money }}</dd><dt>Fines</dt><dd>{{ j.fines|money }}{% if j.driver_fines %} <span class="small muted">({{ j.driver_fines|money }} paid by the driver)</span>{% endif %}</dd>
       <dt>Ferry / train</dt><dd>{{ j.ferry|money }} / {{ j.train|money }}</dd>
       {% if j.penalty %}<dt>Cancellation penalty</dt><dd class="neg">{{ j.penalty|money }}</dd>{% endif %}
     </dl></div>

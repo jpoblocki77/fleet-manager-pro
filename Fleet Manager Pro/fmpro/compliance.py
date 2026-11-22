@@ -7,7 +7,7 @@ import json
 import secrets
 import time
 
-from . import db, economy
+from . import bank, cdl, db, economy
 
 _rng = secrets.SystemRandom()   # game dice; the OS generator, not the predictable random module
 
@@ -187,7 +187,7 @@ def _warn_near_limit(uid, game, key, period, text):
 
 
 def record_violation(uid, rule, period_key, game_min, detail="", fine=None, job_id=None, game="ats"):
-    """Store a violation once per period; charge the fine to the company account. Returns True if new."""
+    """Store a violation once per period; charge the fine (driver or company, see bank.fine). Returns True if new."""
     fine = db.setting_f("hos_fine", 500) if fine is None else fine
     try:
         db.ex("INSERT INTO hos_violations(user_id, rule, detail, game_min, period_key, fine, created_at, game) "
@@ -195,12 +195,14 @@ def record_violation(uid, rule, period_key, game_min, detail="", fine=None, job_
     except Exception:   # already recorded for this period
         return False
     if fine:
-        economy.post("compliance fine", -fine, f"{rule}: {detail} ({economy.user_name(uid)})", job_id=job_id)
+        bank.fine(uid, "compliance fine", fine, f"{rule}: {detail}", job_id)
     if job_id:
         db.insert("job_events", job_id=job_id, user_id=uid, kind="violation", amount=fine, detail=f"{rule}: {detail}",
                   created_at=time.time())
         db.ex("UPDATE jobs SET fines = fines + ? WHERE id=?", (fine, job_id))
     db.notify(uid, f"Compliance violation {rule}: {detail}", "/compliance?tab=violations", "error")
+    if fine:
+        cdl.company_fine(uid, "oos" if rule == "DEFECT-OOS" else "compliance", f"{rule}: {detail}", job_id, game, fine)
     return True
 
 
@@ -468,7 +470,7 @@ def inspect(uid, v, job_id=None, truck_id=None, level=None):
     iid = db.insert("inspections", user_id=uid, truck_id=truck_id, job_id=job_id, level=level, result=result,
                     findings=json.dumps(findings), fine=fine, game_min=gm, location=where, created_at=time.time())
     if fine:
-        economy.post("inspection fine", -fine, f"Roadside inspection #{iid} ({economy.user_name(uid)})", job_id=job_id)
+        bank.fine(uid, "inspection fine", fine, f"Roadside inspection #{iid}", job_id)
     if job_id:
         db.insert("job_events", job_id=job_id, user_id=uid, kind="inspection", amount=fine,
                   detail=f"Level {level} roadside inspection: {result.upper()}", x=v.get("x"), z=v.get("z"),
@@ -483,12 +485,14 @@ def inspect(uid, v, job_id=None, truck_id=None, level=None):
               "success" if result == "passed" else "error")
     economy.webhook("event", f"🚔 {economy.user_name(uid)} — Level {level} roadside inspection: **{text}**"
                              + (f" (fines {db.setting('currency', '$')}{fine:,.0f})" if fine else ""))
+    if fine:
+        cdl.company_fine(uid, "oos" if result == "oos" else "compliance", f"Roadside inspection #{iid}", job_id, game, fine)
     return iid
 
 
 def holds(uid, game="ats"):
     """Reasons a driver can't be dispatched right now."""
-    out = []
+    out = [t for t in (cdl.hold_text(uid),) if t]
     if db.setting("hos_enabled") == "1":
         c = clocks(uid, None, game)
         if c and c["out_of_hours"]:

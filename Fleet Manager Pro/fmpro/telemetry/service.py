@@ -7,7 +7,7 @@ import threading
 import time
 import urllib.request
 
-from .. import compliance, db, economy, tracelog
+from .. import bank, cdl, compliance, db, economy, tracelog
 from . import fluids, reader
 
 jlog = logging.getLogger("fmpro.jobs")
@@ -55,6 +55,7 @@ class JobTracker:
         self.truck_id = None
         self.lock = threading.Lock()
         self.hos = compliance.HosTracker(user_id)
+        self.cdl = cdl.Watcher(user_id)
         self.remote = False          # frames come from a remote agent (another PC)
         self._road = None            # last road point remembered for the map (x, z, time)
         self._road_today = 0         # road squares this driver added in the last 24 h (refreshed every 10 min)
@@ -70,6 +71,7 @@ class JobTracker:
             if frame is None:
                 self.flush()
                 self.prev, self.last_t = None, None
+                self._licence(self.cdl.reset)
                 return
             v, trailers = frame["values"], frame.get("trailers", [])
             self.remote = frame.get("source") == "agent"
@@ -107,12 +109,22 @@ class JobTracker:
             # pump screen, which can be minutes later - long after the 2-minute history forgot the low level.
             if v.get("refuel") and not (self.prev or {}).get("refuel") and v["fuel"] > 0.5:
                 self.refuel_start = (now, truck, min(f for _t, f in self.fuel_hist))
+            self._licence(self.cdl.feed, v, self.job_id, now, self.demo)
             if not first:
                 self._events(v)
             self._confirm_refuel(v, now)
             self._finish(v, now)
             self.prev = v
             self.last_t = None if v["paused"] else now
+
+    def _licence(self, fn, *args):
+        """The licence and drivers test run on the side: a fault there must never stop jobs from being tracked."""
+        try:
+            fn(*args)
+        except Exception:  # noqa: BLE001
+            if time.time() - getattr(self, "_licence_err", 0) > 60:
+                self._licence_err = time.time()
+                jlog.exception("driver #%s: licence tracking failed", self.user_id)
 
     def _job_game(self):
         if getattr(self, "_jg", (None, None))[0] != self.job_id:
@@ -200,6 +212,7 @@ class JobTracker:
         # an older unfinished job in THIS game is abandoned (a job open in the other game keeps waiting)
         db.ex("UPDATE jobs SET status='abandoned', finished_at=? WHERE user_id=? AND status='in_progress' "
               "AND COALESCE(game,'ats')=?", (now, self.user_id, v["game"]))
+        unlicensed = cdl.blocked(self.user_id) and not self.demo and not cdl.active_test(self.user_id)
         trailer = next((t for t in trailers if t.get("attached")), None)
         contract = db.one("SELECT * FROM contracts WHERE status IN ('open','assigned') AND "
                           "(assigned_user_id IS NULL OR assigned_user_id=?) "
@@ -229,7 +242,7 @@ class JobTracker:
                                                          v["wear_chassis"], v["wear_wheels"]),
             game_time_start=v["job_starting_time"] or v["game_time_abs"], game_time_deadline=v["job_delivery_time_abs"] or None,
             contract_id=contract["id"] if contract else None,
-            flags="" if self.seen_idle else "joined-late",
+            flags=",".join((["joined-late"] if not self.seen_idle else []) + (["no-licence"] if unlicensed else [])),
             started_at=now)
         jlog.info("driver #%s: job #%s STARTED in %s: %s (%.1f t) %s, %s -> %s, %s; pays %s; %.0f km planned; truck #%s; "
                   "contract %s%s", self.user_id, self.job_id, v["game"].upper(), v["cargo"], v["cargo_mass"] / 1000,
@@ -394,9 +407,15 @@ class JobTracker:
                     continue
                 db.insert("job_events", job_id=self.job_id, user_id=self.user_id, kind=kind, amount=amount,
                           detail=detail(v), x=v["x"], z=v["z"], created_at=now)
+                if kind == "fine":
+                    self._licence(self.cdl.fine, v, self.job_id, now, self.demo)
                 jlog.info("driver #%s: %s %.2f - %s (job #%s)", self.user_id, kind, amount, detail(v), self.job_id)
-                economy.post(category, -amount, f"{kind.title()}: {detail(v)} ({economy.user_name(self.user_id)})",
-                             job_id=self.job_id)
+                if kind == "fine":
+                    bank.fine(self.user_id, category, amount, f"Fine: {cdl.OFFENCES[v['fine_offence']][2]}" if v["fine_offence"] in cdl.OFFENCES else f"Fine: {detail(v)}",
+                              self.job_id)
+                else:
+                    economy.post(category, -amount, f"{kind.title()}: {detail(v)} ({economy.user_name(self.user_id)})",
+                                 job_id=self.job_id)
                 if self.job_id and kind in JOB_COL:
                     col = JOB_COL[kind]
                     db.ex(f"UPDATE jobs SET {col} = {col} + ? WHERE id=?", (amount, self.job_id))  # nosec B608  # table/column names are fixed in the code; every value is a ? parameter
@@ -637,15 +656,19 @@ class LocalSampler(threading.Thread):
         self.frames = 0
 
     def run(self):
-        last_sim, stale_since, last_upkeep = None, None, 0
+        last_sim, stale_since, last_upkeep, last_pay = None, None, 0, 0
         while not self.halt.is_set():
             try:
+                if time.time() - last_pay > 20:                 # payday: Friday noon
+                    last_pay = time.time()
+                    bank.process()
                 if time.time() - last_upkeep > 300:
                     last_upkeep = time.time()
                     economy.process_loans()
                     from .. import leasing, trailer_leasing
                     leasing.process()
                     trailer_leasing.process()
+                    cdl.process()
                     economy.process_upkeep()
                 from .. import licensing
                 if not licensing.licensed():

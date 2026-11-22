@@ -128,9 +128,10 @@ def settle_job(job_id):
     # Fuel is charged to the ledger when the driver actually refuels; fuel_cost here is the
     # job's share of fuel burnt, used for per-job profit only.
     post("driver pay", -driver_pay, f"Driver pay job #{job_id}", job_id=job_id)
-    post("earnings", driver_pay, f"Pay for {route}", account="driver", user_id=job["user_id"], job_id=job_id)
+    from . import bank
+    bank.earn(job["user_id"], driver_pay, f"Pay for {route}", job_id)      # reaches the driver's bank account on payday
 
-    profit = revenue + contract_bonus - fuel_cost - driver_pay - job["tolls"] - job["fines"] - job["ferry"] - job["train"]
+    profit = revenue + contract_bonus - fuel_cost - driver_pay - job["tolls"] - (job["fines"] - (job["driver_fines"] or 0)) - job["ferry"] - job["train"]
     score = score_job(job)
     job.update(score=score)
     xp = job_xp(job)

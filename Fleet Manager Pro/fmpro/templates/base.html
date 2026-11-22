@@ -28,6 +28,8 @@
       <a href="/jobs" class="{{ 'active' if ep.startswith('pages.job') }}">{{ icon('jobs') }}Logbook<span class="nav-ok" title="Complete and working (0.02 Alpha)">✓</span></a>
       <a href="/dispatch" class="{{ 'active' if ep.startswith('pages.dispatch') }}">{{ icon('dispatch') }}Dispatch<span class="nav-ok" title="Complete and working (0.02 Alpha)">✓</span></a>
       <a href="/compliance" class="{{ 'active' if ep.startswith('comp.') }}">{{ icon('shield') }}ELD &amp; Compliance<span class="nav-ok" title="Complete and working (0.02 Alpha)">✓</span></a>
+      {% if S.licence_enabled == '1' or can('admin') %}<a href="/cdl" class="{{ 'active' if ep.startswith('cdl.') }}">{{ icon('medal') }}CDL &amp; Points</a>{% endif %}
+      <a href="/bank" class="{{ 'active' if ep == 'bank.page' }}">{{ icon('money') }}My Bank</a>
       <div class="nav-sec">Company</div>
       <a href="/fleet" class="{{ 'active' if ep in ('pages.fleet', 'pages.truck_detail') }}">{{ icon('truck') }}Fleet &amp; Garages<span class="nav-ok" title="Complete and working">✓</span></a>
       <a href="/leasing" class="{{ 'active' if ep in ('lease.page', 'lease.detail') }}">{{ icon('truck') }}Truck Leasing<span class="nav-ok" title="Complete and working">✓</span></a>

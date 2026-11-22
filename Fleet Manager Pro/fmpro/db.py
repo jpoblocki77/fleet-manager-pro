@@ -220,6 +220,10 @@ DEFAULT_SETTINGS = {
     "hos_enabled": "1", "hos_rules_ats": "us70", "hos_rules_ets2": "eu",
     "hos_fine": "500", "dvir_required": "1", "dvir_fine": "250",
     "inspections_enabled": "1", "inspection_chance_pct": "15", "oos_fine": "1500",
+    # driver's licences (cdl.py): off until the Owner or a Manager turns them on
+    "licence_enabled": "0", "licence_block": "1", "licence_tickets": "1", "licence_fine": "5000",
+    "licence_speed_min": "5", "licence_retest_hours": "0",
+    "drivers_pay_fines": "1",                            # fines come out of the driver's bank account
 }
 
 
@@ -238,6 +242,7 @@ def init(path):
                              ("hos_logs", "game", "TEXT"), ("hos_violations", "game", "TEXT"), ("dvirs", "game", "TEXT"),
                              ("contracts", "game_slot", "TEXT DEFAULT ''"), ("contracts", "sent_at", "REAL"),
                              # 0.02: pay deductions (cargo damage / late), expenses, garages from the game's list
+                             ("jobs", "driver_fines", "REAL DEFAULT 0"),       # the part of fines the driver paid
                              ("jobs", "deduction", "REAL DEFAULT 0"), ("jobs", "deduction_reason", "TEXT DEFAULT ''"),
                              ("ledger", "truck_id", "INTEGER"), ("ledger", "driver_id", "INTEGER"),
                              ("ledger", "manual", "INTEGER DEFAULT 0"), ("ledger", "entered_by", "INTEGER"),
@@ -262,9 +267,10 @@ def init(path):
     c.commit()
     backfill_map()
     backfill_deductions()
-    from . import leasing, trailer_leasing
+    from . import cdl, leasing, trailer_leasing
     leasing.init()
     trailer_leasing.init()
+    cdl.init()
     if setting("repair_cost_lowered") != "1":            # 0.02: 180 per 1% wear made repairs cost far too much
         if setting("repair_cost_per_pct") == "180":
             set_setting("repair_cost_per_pct", "40")

@@ -1,0 +1,25 @@
+{% set order = ['pretrip', 'control', 'road', 'park'] %}
+{% set names = {'pretrip': '1 · Pre-trip', 'control': '2 · Control', 'road': '3 · Road', 'park': '4 · Park'} %}
+{% set at = order.index(test.stage) if test.stage in order else 0 %}
+<div class="between" style="flex-wrap:wrap;gap:8px"><h2>Drivers test · {{ test.stage_label }}</h2>
+  <span class="badge {{ 'ok' if live else 'warn' }}">{{ 'Receiving telemetry' if live else 'Waiting for the game' }}</span></div>
+<div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 12px">{% for s in order %}<span class="badge {{ 'ok' if loop.index0 < at else 'info' if loop.index0 == at else '' }}">{{ names[s] }}{{ ' ✓' if loop.index0 < at }}</span>{% endfor %}</div>
+<div class="grid g4">
+  <div><div class="small muted">Score (pass {{ test.pass }})</div><b style="font-size:24px">{{ test.score }}</b><span class="muted">/100</span></div>
+  <div><div class="small muted">In-game time left</div><b style="font-size:24px">{{ test.left // 60 }}:{{ '%02d'|format(test.left % 60) }}</b></div>
+  <div><div class="small muted">Driving in the road part</div><b style="font-size:24px">{{ test.moving }}</b> <span class="muted">/ 30 min</span></div>
+  <div><div class="small muted">Wheel-turning distance</div><b style="font-size:24px">{{ test.km|dist(1) }}</b></div>
+</div>
+<div class="bar" style="margin:12px 0"><i style="width:{{ [100, test.clock * 100 // test.length]|min }}%"></i></div>
+{% if test.stage == 'pretrip' %}
+<p class="muted">Parked, with the parking brake set: do each of these once. Parts 1 and 2 share the first in-game hour.</p>
+<ul class="cdl-steps">{% for s in test.pretrip %}<li class="{{ 'ok' if s.ok }}">{{ '✓' if s.ok else '○' }} {{ s.label }}</li>{% endfor %}</ul>
+{% elif test.stage == 'control' %}
+<p class="muted">Any order, in a quiet yard. The truck's own heading is measured, so use the mirrors and go slowly.</p>
+<ul class="cdl-steps">{% for s in test.control %}<li class="{{ 'ok' if s.ok }}">{{ '✓' if s.ok else '○' }} {{ s.label }}</li>{% endfor %}</ul>
+{% elif test.stage == 'road' %}
+<p class="muted">Drive on the road until the time is up. Keep to the limit, signal your turns, brake gently, lights on in the dark. Don't sleep, take a ferry or load a save.</p>
+{% else %}
+<p><b>Time is up.</b> Pull over somewhere safe, stop, set the parking brake and switch the engine off.</p>
+{% endif %}
+{% if test.marks %}<div class="small" style="margin-top:10px"><b>Marks lost</b>{% for m in test.marks %}<div class="muted">−{{ m.pts }} · {{ m.text }} <span class="faint">({{ m.at }} min)</span></div>{% endfor %}</div>{% endif %}

@@ -119,13 +119,15 @@ def main():
                    "/fleet/truck/1/sell", "/events/1/manage", "/events/1/edit", "/leasing/new", "/leasing/plans/save",
                    "/leasing/plans/1/toggle", "/fleet/lease/1/end", f"/drivers/{mgr_id}/fire",
                    "/fleet/truck/1/delete", "/fleet/trailer/1/delete", "/fleet/clear-sold", "/drivers/purge-former",
-                   "/settings/update"]
+                   "/settings/update", "/cdl/issue-all", f"/cdl/driver/{boss_id}"]
     bad = [u for u in admin_posts if drv.post(u, {"title": "x", "body": "y", "amount": "999", "plan": "standard",
                                                   "username": "evil", "password": "evilpw12", "brand": "a", "model": "b",
                                                   "city": "c", "name": "n", "destination_city": "d", "action": "delete",
                                                   "role": "owner"}).status_code not in (403, 404)]
     check(not bad, f"driver refused on {len(admin_posts)} manager actions ({bad or 'all 403'})")
-    for u in ("/settings", "/recruitment", "/api/export/ledger.csv", "/api/telemetry/raw"):
+    check("Bank account" not in drv.get(f"/drivers/{boss_id}").get_data(as_text=True) and "Driver accounts" not in drv.get("/bank").get_data(as_text=True),
+          "a driver never sees anyone else's bank account")
+    for u in (f"/bank?driver={boss_id}", "/settings", "/recruitment", "/api/export/ledger.csv", "/api/telemetry/raw"):
         check(drv.get(u).status_code == 403, f"driver can't open {u}")
     check((db.val("SELECT COUNT(*) FROM ledger"), db.val("SELECT COUNT(*) FROM users")) == before, "nothing changed by refused requests")
 
@@ -323,7 +325,7 @@ def main():
     check(any(n["text"] == XSS for n in j_["items"]), "notification text comes back as data (the dropdown escapes it)")
     jid = db.val("SELECT id FROM jobs WHERE source='manual'")
     pages = ["/leasing", f"/fleet/lease/{xlease}", "/fleet", "/", "/recruitment", "/messages", "/drivers", f"/drivers/{drv_id}", "/jobs", f"/jobs/{jid}", "/announcements",
-             "/dispatch", "/leaderboard?period=all", "/compliance", "/finance", "/settings?tab=audit",
+             "/dispatch", "/leaderboard?period=all", "/compliance", "/cdl", f"/cdl?driver={drv_id}", "/bank", f"/bank?driver={drv_id}", "/finance", "/settings?tab=audit",
              "/events", f"/events/{xev}", f"/events/{xev}?edit=1"]
     raw = [u for u in pages if XSS.encode() in boss.get(u).data]
     check(not raw, f"script text is escaped on {len(pages)} pages ({raw or 'none raw'})")

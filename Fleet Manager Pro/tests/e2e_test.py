@@ -3038,6 +3038,348 @@ def main():
     check("teleport" not in (st["flags"] or ""), "switching games is not mistaken for a teleport")
     service.time = _time
 
+    print("Driver's licences: points, tickets, suspension and the drivers test")
+    from fmpro import cdl, cdl_test
+    DAY = 86400
+    _cu2("cdluser", "Cdl User", "cdluser123", role="driver")
+    cu = db.val("SELECT id FROM users WHERE username='cdluser'")
+    check(cdl.offence(cu, "red_signal") == 0 and not compliance.holds(cu) and not cdl.blocked(cu),
+          "licences are off in a new company: no points, nobody is held")
+    check(b"turned off" in c.get("/cdl").data, "the CDL page says licences are off")
+    db.set_setting("licence_enabled", "1")
+    check(any("licence" in h for h in compliance.holds(cu)), "turned on: a driver without a licence can't be dispatched")
+    w0 = economy.balance("driver", cu)
+    check(cdl.offence(cu, "red_signal") == 0 and economy.balance("driver", cu) == w0 - 200,
+          "no licence: no points to lose, but the ticket is paid from the driver's wallet")
+    T0 = clock.t
+    check(cdl.issue(cu, "test", T0) and cdl.info(cu, T0)["left"] == 12 and not compliance.holds(cu), "a licence starts with 12 points")
+    cdl.offence(cu, "red_signal", now=T0)
+    cdl.offence(cu, "accident", now=T0 + 10)
+    cdl.offence(cu, "no such thing", now=T0 + 20)
+    check(cdl.info(cu, T0 + 30)["left"] == 6, "red light 3, accident 2, any other fine 1 (6 left)")
+    got = [cdl.info(cu, T0 + s)["left"] for s in (DAY - 1, DAY, 2 * DAY + 5, 6 * DAY)]
+    check(got == [6, 7, 8, 12], f"one point comes back every real day ({got})")
+    check(cdl.info(cu, T0 + 30 * DAY)["left"] == 12, "and it stops at 12")
+    check(cdl.band(5) == (1, 50) and cdl.band(25) == (2, 200) and cdl.band(200) == (3, 800), "speeding is priced by how far over")
+    # zero points: suspended, wait or pay, retake the test
+    T1 = T0 + 40 * DAY
+    for i in range(4):
+        cdl.offence(cu, "wrong_way", now=T1 + i)
+    inf = cdl.info(cu, T1 + 10)
+    check(inf["status"] == "suspended" and inf["left"] == 0 and not inf["can_test"], "at zero points the licence is suspended")
+    check(db.val("SELECT COUNT(*) FROM notifications WHERE user_id=? AND text LIKE '%SUSPENDED%'", (cu,), 0) == 1, "the driver is told once")
+    check(cdl.info(cu, T1 + 11 * DAY)["used"] == 1 and not cdl.info(cu, T1 + 11 * DAY)["can_test"], "11 days later one point is still on")
+    inf = cdl.info(cu, T1 + 12 * DAY)
+    check(inf["status"] == "suspended" and inf["can_test"], "after 12 days the test can be retaken; waiting alone doesn't give the licence back")
+    cdl.issue(cu, "test", T1)
+    cdl.suspend(cu, "test")
+    db.ex("DELETE FROM ledger WHERE account='driver' AND user_id=?", (cu,))
+    check(not cdl.pay_fine(cu)[0] and cdl.info(cu)["used"] == 12, "the fine needs the money in the driver's wallet")
+    economy.post("earnings", 6000, "test", account="driver", user_id=cu)
+    ok1, ok2 = cdl.pay_fine(cu)[0], cdl.pay_fine(cu)[0]
+    check(ok1 and not ok2 and economy.balance("driver", cu) == 1000 and cdl.info(cu)["can_test"] and not cdl.licensed(cu),
+          "paying 5,000 clears every point at once (once), and the test still has to be passed")
+
+    service.time = clock
+    cv = dict(clean, on_job=False, speed=0.0, parking_brake=False, game_time_abs=9 * 60, speed_limit=25.0, fuel=500.0,
+              x=0.0, z=0.0, heading=0.0)
+
+    def drive(vals, secs, t=None, **per):
+        for _i in range(secs):
+            clock.t += 1
+            cv.update(vals)
+            for k, fn in per.items():
+                cv[k] = fn(cv[k])
+            feed(t or cw, cv)
+
+    cdl.issue(cu, "test", clock.t)
+    cw = service.JobTracker(cu)
+    drive({}, 3)
+    drive({"speed": 31.0}, 298, x=lambda q: q + 31)
+    check(cdl.info(cu, clock.t)["left"] == 12, "just under 5 real minutes of speeding costs nothing yet")
+    drive({"speed": 20.0}, 30, x=lambda q: q + 20)
+    drive({"speed": 31.0}, 5, x=lambda q: q + 31)
+    check(cdl.info(cu, clock.t)["left"] == 11, "5 real minutes of speeding in total cost 1 point")
+    drive({"speed": 31.0}, 601, x=lambda q: q + 31)
+    check(cdl.info(cu, clock.t)["left"] == 9, f"and every 5 minutes after that another ({cdl.info(cu, clock.t)['left']} left)")
+    drive({"speed": 15.0}, 2, x=lambda q: q + 15)
+    cv["fine_offence"], cv["fine_amount"] = "crash", 900
+    drive({"speed": 14.0, "wear_chassis": 0.02, "fined": True}, 1)
+    drive({"fined": False, "wear_chassis": 0.03}, 2)
+    check(cdl.info(cu, clock.t)["left"] == 7, "one crash is one accident, however the game reports it (2 points)")
+    cv["fine_offence"], cv["fine_amount"] = "red_signal", 700
+    drive({"fined": True}, 1)
+    drive({"fined": False}, 1)
+    check(cdl.info(cu, clock.t)["left"] == 4, "a red light fined by the game costs 3")
+    drive({"speed": 15.0}, 30)
+    drive({"wear_chassis": 0.12}, 1)
+    check(cdl.info(cu, clock.t)["status"] == "suspended", "a serious accident costs 4: out of points, suspended")
+    n = db.val("SELECT COUNT(*) FROM licence_points WHERE user_id=?", (cu,), 0)
+    drive({"truck_id": "vehicle.other", "wear_chassis": 0.5}, 2)
+    drive({"truck_id": clean["truck_id"], "wear_chassis": 0.0}, 2)
+    sims = db.val("SELECT COUNT(*) FROM licence_points", (), 0)
+    for i in range(3):
+        clock.t += 1
+        fr = reader.parse(reader.pack(dict(cv, speed=20.0, wear_chassis=0.1 * i, x=0.0)))
+        fr["demo"] = True
+        cw.feed(fr)
+    check(db.val("SELECT COUNT(*) FROM licence_points WHERE user_id=?", (cu,), 0) == n and sims == db.val("SELECT COUNT(*) FROM licence_points", (), 0),
+          "changing truck or the simulator never costs points")
+    # a load started without a licence is held
+    lt = service.JobTracker(cu)
+    feed(lt, dict(clean, on_job=False, game_time_abs=70000))
+    clock.t += 1
+    feed(lt, dict(clean, on_job=True, cargo="Licence Load", cargo_id="liclo", job_starting_time=70000, game_time_abs=70000))
+    check("no-licence" in (db.val("SELECT flags FROM jobs WHERE cargo='Licence Load'") or ""), "a load started without a licence is flagged")
+    clock.t += 1
+    feed(lt, dict(clean, on_job=False, job_delivered=True, job_delivered_revenue=1000, job_starting_time=70000, job_finished_time=70060, cargo="Licence Load"))
+    check(db.val("SELECT status FROM jobs WHERE cargo='Licence Load'") == "pending_review", "and its pay waits for a manager")
+
+    # the drivers test
+    live = {}
+
+    def begin(gt=9 * 60):
+        cdl.cancel_test(cu)
+        cdl.clear_points(cu)
+        cv.clear()
+        cv.update(clean, on_job=False, speed=0.0, game_time_abs=gt, speed_limit=25.0, fuel=500.0, x=0.0, z=0.0, heading=0.0)
+        t = service.JobTracker(cu)
+        feed(t, cv)
+        live["v"] = reader.parse(reader.pack(cv))["values"]
+        r_ = cdl.start_test(cu, live["v"])
+        check(r_[0], f"drivers test starts ({r_[1]})") if not r_[0] else None
+        return t
+
+    def last():
+        return db.one("SELECT * FROM licence_tests WHERE user_id=? ORDER BY id DESC LIMIT 1", (cu,))
+
+    def stage():
+        return (cdl.active_test(cu) or {}).get("stage")
+
+    check(not cdl.start_test(cu, None)[0] and not cdl.start_test(cu, {"game": "ats"}, True)[0], "no game or the simulator: the test can't start")
+    cw = begin()
+    check(not cdl.start_test(cu, live["v"])[0], "only one test at a time")
+
+    def pretrip():
+        drive({"parking_brake": True, "engine_enabled": True, "lights_beam_low": True}, 3)
+        drive({"blinker_left_active": True}, 2)
+        drive({"blinker_left_active": False, "blinker_right_active": True}, 2)
+        drive({"blinker_right_active": False, "lights_hazard": True}, 2)
+        drive({"lights_hazard": False}, 2)
+        check(stage() == "pretrip", "the pre-trip isn't finished while one check is missing")
+        drive({"wipers": True}, 2)
+        check(stage() == "control", "every pre-trip check done: on to the control skills")
+
+    trailer = [{"attached": True, "id": "t", "name": "Box"}]
+
+    def tframe(**vals):
+        """One second with a trailer attached."""
+        clock.t += 1
+        cv.update(vals)
+        rt[0] += 1
+        fr = reader.parse(reader.pack(dict(cv, render_time=rt[0], simulated_time=rt[0])))
+        fr["trailers"], fr["values"]["trailers_attached"] = trailer, 1
+        cw.feed(fr)
+
+    def control():
+        tframe(parking_brake=False, wipers=False, speed=0.0)
+        for i in range(15):
+            tframe(speed=-2.0)
+        tframe(speed=0.0)
+        for i in range(10):
+            tframe(speed=-2.0, heading=0.02 * i)
+        for sp in (3, 6, 9, 7, 5, 3, 1, 0):
+            tframe(speed=float(sp))
+        check(stage() == "road", f"trailer coupled, straight and bent reverse, smooth stop: on to the road ({cdl.active_test(cu)['done']})")
+
+    pretrip()
+    control()
+    gt = cv["game_time_abs"]
+    for i in range(480):                 # 4 s of real time per in-game minute is far slower than the game ever runs
+        tframe(speed=20.0, x=cv["x"] + 20, game_time_abs=int(gt + i // 3))
+        if stage() != "road":
+            break
+    check(stage() == "park", f"two in-game hours driven: time to park ({stage()}, {last()['reason']})")
+    tframe(speed=8.0); tframe(speed=4.0); tframe(speed=0.0, parking_brake=True)
+    check(stage() == "park", "parked, but the engine is still on")
+    tframe(engine_enabled=False)
+    tst = last()
+    check(tst["status"] == "passed" and tst["score"] >= 80 and cdl.licensed(cu) and cdl.info(cu, clock.t)["left"] == 12,
+          f"passed with {tst['score']}: licensed with 12 points")
+
+    def failed(what, word):
+        tst = last()
+        check(tst["status"] == "failed" and word in tst["reason"] and not cdl.licensed(cu), f"{what} fails the test ({tst['reason']})")
+
+    cdl.suspend(cu, "test")
+    cw = begin()
+    drive({"game_time_abs": 9 * 60 + 480}, 1)
+    drive({"game_time_abs": 9 * 60 + 480}, 1)
+    failed("sleeping", "Time was skipped")
+    cw = begin()
+    drive({}, 2)
+    drive({"game_time_abs": 8 * 60}, 2)
+    failed("loading an earlier save", "earlier save")
+    cw = begin()
+    drive({}, 2)
+    drive({"truck_id": "vehicle.other"}, 2)
+    failed("another truck", "changed truck")
+    cw = begin()
+    for i in range(70):
+        drive({"game_time_abs": 9 * 60 + i}, 4)
+    failed("an hour of pre-trip", "in-game hour")
+    cw = begin()
+    drive({"speed": 1.8, "engine_enabled": True}, 3, x=lambda q: q + 2)
+    drive({"wear_chassis": 0.04}, 1)
+    failed("an accident", "accident")
+    cw = begin()
+    drive({}, 3)
+    cv["fine_offence"], cv["fine_amount"] = "red_signal", 700
+    drive({"fined": True}, 1)
+    failed("a red light", "red light")
+    n = db.val("SELECT COUNT(*) FROM licence_points WHERE user_id=?", (cu,), 0)
+    cw = begin()
+    drive({}, 3)
+    clock.t += 900
+    drive({"game_time_abs": 9 * 60 + 200}, 2)
+    check(last()["status"] == "cancelled" and not cdl.licensed(cu), "a lost connection stops the test without failing it")
+    check(db.val("SELECT COUNT(*) FROM licence_points WHERE user_id=?", (cu,), 0) == n, "mistakes in the test never cost points")
+    cw = begin()
+    drive({}, 3)
+    cw = service.JobTracker(cu)                         # the program restarts
+    drive({"parking_brake": True}, 4)
+    check("brake" in (cdl.active_test(cu) or {"done": []})["done"], "a running test carries on after a restart")
+    cdl.cancel_test(cu)
+    drive({}, 3)
+    check(last()["status"] == "cancelled" and cw.cdl.test is None, "a cancelled test stops")
+    db.set_setting("licence_retest_hours", "24")
+    db.update("licence_tests", last()["id"], status="failed", finished_at=_time.time())
+    check(not cdl.info(cu)["can_test"] and not cdl.start_test(cu, live["v"])[0], "the owner can make drivers wait after a failed test")
+    db.set_setting("licence_retest_hours", "0")
+    service.time = _time
+    # road marks, straight on the marker
+    v0 = dict(live["v"], speed=20.0, speed_kmh=72.0, speed_limit_kmh=80.0, lights_beam_low=True, engine_enabled=True)
+    for what, per, word in (("speeding", {"speed_limit_kmh": 50.0}, "Speeding"), ("the parking brake", {"parking_brake": True}, "parking brake"),
+                            ("no lights at night", {"game_time_abs": 23 * 60, "lights_beam_low": False}, "headlights")):
+        st = dict(cdl_test.new(dict(v0, **per)), stage="road")
+        prv = None
+        for i in range(12):
+            vv = dict(v0, **per)
+            cdl_test.step(st, vv, prv, 1.0, 1000.0 + i)
+            prv = vv
+        check(st["score"] < 100 and word in st["marks"][0]["text"], f"{what} loses marks ({st['marks'][0]['text']}, {st['score']})")
+    for sig, want in ((False, 98), (True, 100)):
+        st = dict(cdl_test.new(v0), stage="road")
+        prv = None
+        for i in range(8):
+            vv = dict(v0, speed=6.0, speed_kmh=21.6, heading=0.04 * i, blinker_left_active=sig)
+            cdl_test.step(st, vv, prv, 1.0, 1000.0 + i)
+            prv = vv
+        check(st["score"] == want, f"a junction turn {'with' if sig else 'without'} a signal scores {st['score']}")
+    st = dict(cdl_test.new(v0), stage="road")
+    for i in range(6):
+        cdl_test.fined(st, "no_lights", "Driving without lights")
+    check(st["stage"] == "failed" and st["score"] >= 60, "below 80 marks the test is failed")
+    # the pages
+    page = c.get("/cdl").get_data(as_text=True)
+    check("What offences cost" in page and "Issue licences to all current drivers" in page and "Cdl User" in page, "the owner sees every licence")
+    post(f"/cdl/driver/{cu}", {"action": "issue"})
+    check(cdl.licensed(cu), "the owner can issue a licence")
+    post(f"/cdl/driver/{cu}", {"action": "suspend"})
+    check(not cdl.licensed(cu), "and suspend it")
+    post("/cdl/issue-all", {})
+    check(cdl.licensed(uid) and not cdl.licensed(cu), "issue-all gives everyone without a licence one, but never lifts a suspension")
+    check(c.get(f"/cdl?driver={cu}").status_code == 200 and "Cdl User: points" in c.get(f"/cdl?driver={cu}").get_data(as_text=True)
+          and c.get("/cdl?driver=abc").status_code == 200 and c.get("/cdl/test/panel").get_json() == {"running": False}, "history and panel load")
+    check(post("/cdl/pay", {}).status_code == 302 and post("/cdl/test/start", {}).status_code == 302, "actions answer politely when there is nothing to do")
+    db.set_setting("licence_enabled", "0")
+
+    print("Drivers' bank accounts: payday every Friday at noon, fines paid from them")
+    import datetime as _dt
+    from fmpro import bank
+    _cu2("bankuser", "Bank User", "bankuser12", role="driver")
+    bu = db.val("SELECT id FROM users WHERE username='bankuser'")
+    ts = lambda *a: _dt.datetime(*a).timestamp()
+    got = [bank.last_payday(ts(2026, 11, 20, 11, 59)), bank.last_payday(ts(2026, 11, 20, 12, 0)), bank.last_payday(ts(2026, 11, 26, 23, 0))]
+    check(got == [ts(2026, 11, 13, 12), ts(2026, 11, 20, 12), ts(2026, 11, 20, 12)], "payday is Friday at noon, to the minute")
+    check(bank.next_payday(ts(2026, 11, 20, 12, 0)) == ts(2026, 11, 27, 12) and bank.next_payday(ts(2026, 10, 30, 13)) == ts(2026, 11, 6, 12),
+          "the next one is a week later, also when the clocks change")
+    co = economy.balance()
+    bj = db.insert("jobs", user_id=bu, source="manual", status="delivered", game="ats", cargo="Pay Load", source_city="A", destination_city="B",
+                   driven_km=1000, planned_km=1000, revenue=5000, income=5000, started_at=1, finished_at=2)
+    economy.settle_job(bj)
+    pay = db.val("SELECT driver_pay FROM jobs WHERE id=?", (bj,))
+    check(pay > 0 and bank.pending(bu) == pay and bank.balance(bu) == 0, f"pay for a load ({pay}) waits for payday")
+    check(abs(economy.balance() - (co + 5000 - pay)) < 0.01, "the company account has already paid it: the two accounts are separate")
+    fri = bank.next_payday()
+    db.ex("UPDATE ledger SET created_at=? WHERE account='wages' AND job_id=?", (fri - 60, bj))
+    bank.process(fri - 1)
+    check(bank.balance(bu) == 0, "a second before noon nothing is paid")
+    co = economy.balance()
+    p1, p2 = bank.process(fri), bank.process(fri + 5)
+    check(bu in p1 and bu not in p2 and bank.balance(bu) == pay and bank.pending(bu) == 0, "at noon it is deposited, once")
+    check(economy.balance() == co, "payday doesn't touch the company account")
+    check(db.val("SELECT COUNT(*) FROM notifications WHERE user_id=? AND text LIKE 'Payday%'", (bu,), 0) == 1, "the driver is told")
+    bank.earn(bu, 100, "late")
+    db.ex("UPDATE ledger SET created_at=? WHERE user_id=? AND description='late'", (fri + 1, bu))
+    bank.process(fri + 3600)
+    check(bank.pending(bu) == 100, "a load delivered after noon goes on next week's pay")
+    bank.process(fri + 20 * 86400)
+    check(bank.pending(bu) == 0 and bank.balance(bu) == pay + 100, "a payday missed while the program was closed is made up")
+    st_ = bank.statement(bu)
+    check([x["amount"] for x in st_] == [100, pay] and st_[0]["after"] == pay + 100 and st_[1]["after"] == pay, "the statement shows the running balance")
+    check([len(x["loads"]) for x in bank.stubs(bu)] == [1, 1] and bank.stubs(bu)[1]["loads"][0]["job_id"] == bj, "each pay slip lists its own loads")
+    # fines come out of the driver's account
+    b0, co = bank.balance(bu), economy.balance()
+    compliance.record_violation(bu, "HOS-11", "bankday", 10, "test", fine=500, job_id=bj, game="ats")
+    check(bank.balance(bu) == b0 - 500 and economy.balance() == co, "an Hours of Service fine is paid by the driver, not the company")
+    compliance.inspect(bu, {"game": "ats", "game_time_abs": 10, "wear_wheels": 0.2}, job_id=bj, level=2)
+    fine_ = db.val("SELECT fine FROM inspections WHERE user_id=?", (bu,))
+    check(fine_ > 0 and bank.balance(bu) == b0 - 500 - fine_ and economy.balance() == co, "so is a roadside inspection fine")
+    check(db.val("SELECT driver_fines FROM jobs WHERE id=?", (bj,)) == 500 + fine_, "the load remembers what the driver paid")
+    service.time = clock
+    bw = service.JobTracker(bu)
+    bv = dict(clean, on_job=False, speed=20.0, speed_limit=25.0, fine_offence="red_signal", fine_amount=700)
+    feed(bw, bv)
+    clock.t += 1
+    b0 = bank.balance(bu)
+    feed(bw, dict(bv, fined=True))
+    check(bank.balance(bu) == b0 - 700 and economy.balance() == co, "a game fine comes out of the driver's account")
+    db.set_setting("licence_enabled", "1")
+    cdl.issue(bu, "test", clock.t)
+    bw.cdl.on_t = 0
+    clock.t += 30
+    feed(bw, dict(bv, fined=False))
+    clock.t += 1
+    b0 = bank.balance(bu)
+    feed(bw, dict(bv, fined=True, fine_amount=701))
+    check(bank.balance(bu) == b0 - 701 and cdl.info(bu, clock.t)["left"] == 9, "with licences on: points and the fine, no ticket on top")
+    clock.t += 30
+    feed(bw, dict(bv, fined=False))
+    clock.t += 1
+    b0 = bank.balance(bu)
+    feed(bw, dict(bv, fined=False, wear_chassis=0.02))
+    check(bank.balance(bu) == b0 - 200, "an accident the game doesn't fine gets a ticket")
+    clock.t += 1
+    feed(bw, dict(bv, fined=True, fine_offence="crash", fine_amount=900, wear_chassis=0.02))
+    check(bank.balance(bu) == b0 - 900 and cdl.info(bu, clock.t)["left"] == 7, "and when the game fines it after all, only the fine is paid")
+    db.set_setting("drivers_pay_fines", "0")
+    clock.t += 30
+    feed(bw, dict(bv, fined=False, wear_chassis=0.02))
+    clock.t += 1
+    b0 = bank.balance(bu)
+    feed(bw, dict(bv, fined=True, fine_amount=702, wear_chassis=0.02))
+    check(bank.balance(bu) == b0 - 200 and economy.balance() == co - 702, "set to company pays: the fine is the company's, the ticket the driver's")
+    db.set_setting("drivers_pay_fines", "1")
+    db.set_setting("licence_enabled", "0")
+    service.time = _time
+    check(bank.balance(bu) < 0, "fines can overdraw the account")
+    page = c.get("/bank").get_data(as_text=True)
+    check("Driver accounts" in page and "Next payday" in page and "Bank User" in page, "the bank page shows the owner every account")
+    check("Overdrawn" in c.get(f"/bank?driver={bu}").get_data(as_text=True) and c.get("/bank?driver=999999").status_code == 404
+          and c.get("/bank?driver=x").status_code == 200, "a manager can open a driver's account")
+    check(c.get("/finance").status_code == 200 and "Waiting for Friday" in c.get("/finance").get_data(as_text=True), "Finance shows the payroll set aside")
+
     print("EU reduced daily rest and roadside inspection fines")
     _cu2("eurest", "EU Rest", "eurest1234", role="driver")
     eu = db.val("SELECT id FROM users WHERE username='eurest'")

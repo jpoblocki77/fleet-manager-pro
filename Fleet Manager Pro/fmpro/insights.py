@@ -37,7 +37,7 @@ def _since(period):
 
 # a delivered job's distance: what was driven, else what was planned
 KM = "COALESCE(NULLIF(j.driven_km, 0), j.planned_km, 0)"
-COST = "(j.driver_pay + j.fuel_cost + j.tolls + j.fines + j.ferry + j.train)"
+COST = "(j.driver_pay + j.fuel_cost + j.tolls + (j.fines - COALESCE(j.driver_fines, 0)) + j.ferry + j.train)"
 ON_TIME = ("SUM(CASE WHEN j.game_time_deadline IS NOT NULL AND j.game_time_end IS NOT NULL "
            "AND j.game_time_end <= j.game_time_deadline THEN 1 ELSE 0 END)")
 TIMED = "SUM(CASE WHEN j.game_time_deadline IS NOT NULL AND j.game_time_end IS NOT NULL THEN 1 ELSE 0 END)"

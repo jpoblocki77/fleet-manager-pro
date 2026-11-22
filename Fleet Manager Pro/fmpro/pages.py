@@ -8,7 +8,7 @@ import time
 
 from flask import Blueprint, current_app, abort, flash, make_response, redirect, render_template, request, url_for
 
-from . import RES, db, economy, licensing, updater
+from . import RES, bank, db, economy, licensing, updater
 from .auth import PASSWORD_RULE, ROLES, game_scope, game_sql, can, create_user, login_required, role_level, user, valid_password
 from .telemetry import layout
 from .telemetry.reader import field_count
@@ -187,7 +187,7 @@ def dashboard():
     }
     return render_template("dashboard.html", stats=stats, mine=mine, daily=daily, recent=recent, top=top,
                            news=news, upcoming=upcoming, contracts=contracts, counts=counts,
-                           balance=economy.balance(), my_balance=economy.balance("driver", u["id"]),
+                           balance=economy.balance(), my_balance=economy.balance("driver", u["id"]), my_pending=economy.balance("wages", u["id"]),
                            prog=economy.progress(u["xp"]))
 
 
@@ -350,7 +350,9 @@ def job_new():
         if request.form.get("dist_unit") == "mi":
             km = min(20000, km * KM_PER_MI)
         now = time.time()
-        needs_review = db.setting("require_manual_approval") == "1" and not can("admin")
+        from . import cdl
+        no_licence = cdl.blocked(uid)
+        needs_review = (db.setting("require_manual_approval") == "1" or no_licence) and not can("admin")
         jid = db.insert("jobs", user_id=uid, truck_id=opt_id("truck_id", "trucks"), source="manual",
                         status="pending_review" if needs_review else "delivered", game=txt("game", 8) or "ats",
                         source_city=txt("source_city", 64), source_company=txt("source_company", 64),
@@ -359,7 +361,7 @@ def job_new():
                         else num("cargo_mass_t", 0, 200) * 1000, planned_km=km,
                         driven_km=km, revenue=num("revenue", 0, 1e7), income=num("revenue", 0, 1e7),
                         fuel_used=unit_num("fuel_used", "vol", 0, 10000), tolls=num("tolls", 0, 1e5), fines=num("fines", 0, 1e6),
-                        cargo_damage=num("cargo_damage_pct", 0, 100) / 100, notes=txt("notes", 1000),
+                        cargo_damage=num("cargo_damage_pct", 0, 100) / 100, notes=txt("notes", 1000), flags="no-licence" if no_licence and needs_review else "",
                         started_at=now, finished_at=now)
         if not needs_review:
             economy.settle_job(jid)
@@ -802,11 +804,11 @@ def finance():
                     GROUP BY d ORDER BY d""", (time.time() - 30 * DAY,))
     loans = db.q("SELECT * FROM loans ORDER BY status='paid', created_at DESC")
     payroll = db.q("""SELECT u.id, u.display_name, u.color, COALESCE(SUM(l.amount),0) earned FROM users u
-                      LEFT JOIN ledger l ON l.user_id=u.id AND l.account='driver' AND l.created_at>=?
+                      LEFT JOIN ledger l ON l.user_id=u.id AND l.category='earnings' AND l.created_at>=?
                       WHERE u.status!='removed' GROUP BY u.id ORDER BY earned DESC""", (since,))
     return render_template("finance.html", cats=cats, income=income, expense=expense, entries=entries,
                            trend=trend, loans=loans, plans=economy.LOAN_PLANS, balance=economy.balance(),
-                           period=period, payroll=payroll)
+                           period=period, payroll=payroll, payroll_due=bank.payroll())
 
 
 @bp.route("/finance/entry", methods=["POST"])
@@ -894,7 +896,7 @@ def driver_profile(uid):
                      GROUP BY c ORDER BY n DESC LIMIT 5""", (uid,) + ga)  # nosec B608  # table/column names are fixed in the code; every value is a ? parameter
     recent = db.q("SELECT * FROM jobs WHERE user_id=?" + gc + " ORDER BY started_at DESC LIMIT 10", (uid,) + ga)  # nosec B608  # table/column names are fixed in the code; every value is a ? parameter
     ach = [a for a in economy.achievement_progress(uid) if a["earned_at"]]
-    can_token = _manages(p)
+    can_token = private = _manages(p)            # a bank account is private
     agent_line, agent_where = None, None
     if can_token:
         # Same line the Connect a Driver page and the downloaded file use: the saved internet address first,
@@ -905,7 +907,8 @@ def driver_profile(uid):
         elif info["local"]:
             agent_line, agent_where = agent_command(info, info["local"][0], p["agent_token"]), "home"
     return render_template("driver.html", p=p, st=st, fav=fav, cities=cities, recent=recent, ach=ach,
-                           prog=economy.progress(p["xp"]), wallet=economy.balance("driver", uid), can_token=can_token,
+                           prog=economy.progress(p["xp"]), wallet=bank.balance(uid) if private else None,
+                           pending=bank.pending(uid) if private else 0, can_token=can_token,
                            agent_line=agent_line, agent_where=agent_where,
                            divisions=db.q("SELECT * FROM divisions ORDER BY name"), live=HUB.get(uid))
 
@@ -1633,13 +1636,15 @@ SETTING_FIELDS = {
     "maint_price_inspection": ("num", (0, 1e6)), "maint_price_upgrade": ("num", (0, 1e6)), "maint_price_wash": ("num", (0, 1e6)),
     "dvir_repair_per_defect": ("num", (0, 1e6)),
     "auto_create_trucks": ("bool", None), "auto_charge_repairs": ("bool", None),
-    "require_manual_approval": ("bool", None), "agent_jobs_need_approval": ("bool", None), "telemetry_mode": ("choice", ("auto", "demo", "off")),
+    "drivers_pay_fines": ("bool", None), "require_manual_approval": ("bool", None), "agent_jobs_need_approval": ("bool", None), "telemetry_mode": ("choice", ("auto", "demo", "off")),
     "discord_webhook": ("url", 300), "webhook_on_delivery": ("bool", None), "webhook_on_event": ("bool", None),
     "webhook_applications": ("url", 300), "webhook_on_application": ("bool", None),
     "recruitment_open": ("bool", None), "recruitment_text": ("str", 1000),
     "hos_enabled": ("bool", None), "hos_rules_ats": ("choice", ("us70", "us60")), "hos_rules_ets2": ("choice", ("eu",)),
     "hos_fine": ("num", (0, 1e6)), "dvir_required": ("bool", None), "dvir_fine": ("num", (0, 1e6)),
     "fluid_alerts": ("bool", None), "inspections_enabled": ("bool", None), "inspection_chance_pct": ("num", (0, 100)), "oos_fine": ("num", (0, 1e6)),
+    "licence_enabled": ("bool", None), "licence_block": ("bool", None), "licence_tickets": ("bool", None),
+    "licence_fine": ("num", (0, 1e6)), "licence_speed_min": ("num", (1, 120)), "licence_retest_hours": ("num", (0, 720)),
     "allowed_hosts": ("hosts", 400),
 }
 
