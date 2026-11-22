@@ -216,4 +216,4 @@ def page():
 @bp.route("/find-vtc")
 @login_required
 def find():
-    return render_template("find_vtc.html", st=status(), needs_update=NEEDS_UPDATE)
+    return render_template("find_vtc.html", st=status(), needs_update=NEEDS_UPDATE, why=why_not(), listed=listed())

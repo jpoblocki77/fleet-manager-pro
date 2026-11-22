@@ -11,8 +11,19 @@
     <a class="btn primary" href="{{ st.finder }}" target="_blank" rel="noopener">Open the VTC Finder</a></div>
   {% elif st.old_server %}<p class="muted">{{ needs_update }}</p>
   {% else %}<p class="muted">The VTC Finder's address arrives with the next check of the licence server, within about 10 minutes of Fleet Manager Pro running.</p>{% endif %}
-  <p class="hint">What you send in an application goes only to the company you apply to.{% if can('admin') %} To list your own company, open <a href="/vtc-profile">VTC Profile</a>.{% endif %}</p>
+  <p class="hint">What you send in an application goes only to the company you apply to.</p>
 </div>
+{% if can('admin') %}
+<div class="card" id="own-company" style="margin-top:16px">
+  <div class="card-head"><h2>{{ S.company_name or 'Your company' }}</h2></div>
+  {% if not why %}<p>Your company is in the VTC Finder.</p>
+  <div class="row"><a class="btn" href="{{ st.url }}" target="_blank" rel="noopener">See its page</a><a class="btn" href="/vtc-profile">Edit the profile</a></div>
+  {% elif listed %}<p>Your company is listed, but drivers can't see it yet:</p><ul>{% for w in why %}<li>{{ w }}</li>{% endfor %}</ul>
+  <a class="btn primary" href="/vtc-profile">Open VTC Profile</a>
+  {% else %}<p>Your company isn't in the VTC Finder yet. Write a short profile, tick <b>List my company</b> and press <b>Save</b>; drivers can then find it and apply.</p>
+  <a class="btn primary" href="/vtc-profile">List my company</a>{% endif %}
+</div>
+{% endif %}
 {% endblock %}
 {% block scripts %}
 <script>

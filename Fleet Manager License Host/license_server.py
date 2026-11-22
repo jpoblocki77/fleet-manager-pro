@@ -596,7 +596,8 @@ class Store:
             self.db.commit()
             self._vtc_cache = None
         if not n:
-            raise LicenceError("not_found", "That purchase has no VTC Finder listing.", 404)
+            raise LicenceError("not_found", "That company hasn't listed itself, so there is nothing to hide or show. Its "
+                               "Owner or a Manager lists it in the app: Company > VTC Profile.", 404)
 
     def vtc_clear_reports(self, key):
         key = str(key or "").strip().upper()

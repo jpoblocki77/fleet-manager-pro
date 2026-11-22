@@ -169,7 +169,7 @@ def _print(admin):
 def _print_vtc(admin):
     rows = admin.vtc()
     if not rows:
-        print("  No companies in the VTC Finder yet.")
+        print("  No companies in the VTC Finder yet. A company lists itself in the app: Company > VTC Profile.")
     for v in rows:
         flag = "  ** HIDDEN **" if v["hidden"] else ""
         flag += "" if v["listed"] else "  (not listed by its owner)"
@@ -252,6 +252,8 @@ def menu():
                     print("  ! No purchase matches that tag (typo, a deleted purchase, or not one of your copies).")
             elif admin and c == "11":
                 _print_vtc(admin)
+                if not admin.vtc():
+                    continue
                 key = input("  Purchase key to change (Enter = none): ").strip().upper()
                 if not key:
                     continue

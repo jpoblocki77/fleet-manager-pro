@@ -259,7 +259,7 @@ AREAS = [
         ("findvtc", "Find a VTC", "Community &gt; Find a VTC", ALL,
          "Search every listed company by name, game, language, region, style or size, read its profile and apply. A public web page: no account or app needed.",
          ["Press <b>Open the VTC Finder</b>.", "Search, then click a company.", "Press <b>Apply</b> and fill in the form."],
-         ["Only companies open to drivers show unless you choose <b>Everyone</b>.", "Use <b>Report this company</b> on a profile if something is wrong with it."]),
+         ["Only companies open to drivers show unless you choose <b>Everyone</b>.", "Owner and Managers: the page also shows whether your own company is listed, with a <b>List my company</b> button.", "Use <b>Report this company</b> on a profile if something is wrong with it."]),
         ("leaderboard", "Leaderboard", "Community &gt; Leaderboard", ALL,
          "Ranks your drivers by distance, revenue, deliveries, tonnage, score, XP or realism.",
          ["Pick what to rank by and the period."], ["Realism rewards careful driving: distance weighted by driving score and cargo condition."]),

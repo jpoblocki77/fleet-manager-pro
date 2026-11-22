@@ -2389,6 +2389,7 @@ def main():
           "drivers can't open or change the profile")
     check("Open the VTC Finder" in dv.get("/find-vtc").get_data(as_text=True) and 'href="/vtc-profile"' not in dv.get("/find-vtc").get_data(as_text=True),
           "every member can open Find a VTC")
+    check('href="/vtc-profile">List my company</a>' in c.get("/find-vtc").get_data(as_text=True), "Find a VTC offers managers to list their company")
     page = c.get("/vtc-profile").get_data(as_text=True)
     check("Not visible yet" in page and "isn't listed" in page.replace("&#39;", "'") and 'name="listed" value="1">' in page, "the profile page says why it isn't visible; listing is off")
     db.set_setting("company_tag", "CRI")
@@ -2412,6 +2413,8 @@ def main():
     check("&lt;b&gt;carefully&lt;/b&gt;" in r.get_data(as_text=True) and db.setting("vtc_profile") == "", "Preview shows it without saving")
     post("/vtc-profile", form)
     page = c.get("/vtc-profile").get_data(as_text=True)
+    own_ = c.get("/find-vtc").get_data(as_text=True)
+    check("Your company is in the VTC Finder" in own_ and f"/vtc/{code}" in own_, "Find a VTC then shows its page")
     check("Your company is in the VTC Finder" in page and f"/vtc/{code}" in page, "saving lists the company straight away and shows its link")
     check(">500<" in page or 'value="500"' in page, "the weekly distance comes back in the units it was typed in")
     st, pub = web(f"/vtc/{code}")
