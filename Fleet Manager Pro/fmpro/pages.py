@@ -894,8 +894,19 @@ def driver_profile(uid):
                      GROUP BY c ORDER BY n DESC LIMIT 5""", (uid,) + ga)  # nosec B608  # table/column names are fixed in the code; every value is a ? parameter
     recent = db.q("SELECT * FROM jobs WHERE user_id=?" + gc + " ORDER BY started_at DESC LIMIT 10", (uid,) + ga)  # nosec B608  # table/column names are fixed in the code; every value is a ? parameter
     ach = [a for a in economy.achievement_progress(uid) if a["earned_at"]]
+    can_token = _manages(p)
+    agent_line, agent_where = None, None
+    if can_token:
+        # Same line the Connect a Driver page and the downloaded file use: the saved internet address first,
+        # this PC's home-network address otherwise. None while this PC isn't letting other PCs in.
+        info = _connect_info()
+        if info["public"]:
+            agent_line, agent_where = agent_command(info, info["public"], p["agent_token"]), "internet"
+        elif info["local"]:
+            agent_line, agent_where = agent_command(info, info["local"][0], p["agent_token"]), "home"
     return render_template("driver.html", p=p, st=st, fav=fav, cities=cities, recent=recent, ach=ach,
-                           prog=economy.progress(p["xp"]), wallet=economy.balance("driver", uid), can_token=_manages(p),
+                           prog=economy.progress(p["xp"]), wallet=economy.balance("driver", uid), can_token=can_token,
+                           agent_line=agent_line, agent_where=agent_where,
                            divisions=db.q("SELECT * FROM divisions ORDER BY name"), live=HUB.get(uid))
 
 
