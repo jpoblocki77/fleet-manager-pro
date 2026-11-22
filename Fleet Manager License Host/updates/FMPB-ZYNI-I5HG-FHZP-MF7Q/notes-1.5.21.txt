@@ -1,0 +1,1 @@
+Steadier app: one failed save no longer makes other pages wait, very large numbers in links no longer cause errors, signing in takes you back to the exact page you opened, and error pages are clearer. New READ ME - Your Data file explains where your data lives and how to move it. Help pages now mention the Start menu shortcuts.
