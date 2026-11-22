@@ -1450,6 +1450,10 @@ def leaderboard():
 @login_required
 def leaderboard_global_sync():
     from . import global_board
+    wait = global_board.manual_wait()
+    if wait:
+        flash(f"The global leaderboard was just updated. Try again in {wait} seconds.", "info")
+        return redirect(url_for("pages.leaderboard", view="global"))
     err = global_board.sync()
     flash(f"Couldn't update the global leaderboard: {err}" if err else "Global leaderboard updated.",
           "error" if err else "success")

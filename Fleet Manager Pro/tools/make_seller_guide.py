@@ -51,11 +51,11 @@ def build():
 
     A(Paragraph("1. Your folders", H1))
     A(table([["Folder", "What it is", "Share?"],
-             ["D:\\Fleet Manager Pro\\Fleet Manager Pro RC 1.5.19-beta\\Development\\Fleet Manager Pro", "Development copy: source, tests, tools. Change and test here.", "No"],
+             ["D:\\Fleet Manager Pro\\Fleet Manager Pro RC 1.5.20-beta\\Development\\Fleet Manager Pro", "Development copy: source, tests, tools. Change and test here.", "No"],
              ["...\\Fleet Manager License Host", "Licence server + License Manager WITH your signing key, admin token, purchases and certificate key.", "<b>Never</b>"],
-             ["...RC 1.5.19-beta\\Build Output\\For Buyer - FMP-....zip", "<b>What you send a buyer</b>: their sealed copy, a single "
+             ["...RC 1.5.20-beta\\Build Output\\For Buyer - FMP-....zip", "<b>What you send a buyer</b>: their sealed copy, a single "
               "Fleet Manager Pro.exe.", "Yes, to that buyer"],
-             ["...RC 1.5.19-beta\\License Host (PRIVATE - never share)", "Backup of your licence host with its secrets.", "<b>Never</b>"]],
+             ["...RC 1.5.20-beta\\License Host (PRIVATE - never share)", "Backup of your licence host with its secrets.", "<b>Never</b>"]],
             [2.6 * inch, 3.6 * inch, 0.7 * inch]))
 
     A(Paragraph("2. Making a sale", H1))

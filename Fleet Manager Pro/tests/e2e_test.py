@@ -2429,6 +2429,12 @@ def main():
     check(r.status_code in (302, 403) and lbrow() is not None and db.setting("global_board") == "1",
           "drivers can't take the company off the global board")
     check(c.get("/leaderboard?view=global").status_code == 200, "drivers can see the global board")
+    global_board._last_manual = 0.0
+    with srv.hits_lock:
+        srv.hits.clear()
+    for _ in range(5):
+        post("/leaderboard/global/sync")
+    check(sum(len(v) for v in srv.hits.values()) == 1, "repeated Update now presses reach the licence server once")
     post("/logout")
     c.get("/login")
     post("/login", {"username": "boss", "password": "secret12"})
@@ -2789,7 +2795,12 @@ def main():
         check(db.val("SELECT COUNT(*) FROM users WHERE role!='owner' AND username!='former-drivers'") == members_before,
               "dissolving needs the box ticked, DISSOLVE typed and the owner's password")
         check(db.val("SELECT COUNT(*) FROM audit_log WHERE action='dissolve refused'") >= 1, "a wrong password is recorded")
+        db.set_setting("global_board", "1")
+        global_board.sync()
+        on_board_ = lbrow() is not None
         r = post("/settings/dissolve", {"understand": "1", "confirm": "DISSOLVE", "password": "secret12", "erase": "0"})
+        check(on_board_ and lbrow() is None and db.setting("global_board") == "0",
+              "dissolving (erase=0) takes the company off the global leaderboard")
         check(r.status_code == 302 and db.val("SELECT COUNT(*) FROM users WHERE role!='owner' AND status!='removed'") == 0,
               "dissolving removes every member except the owner")
         check(db.val("SELECT COUNT(*) FROM jobs") == jobs_before and db.val("SELECT user_id FROM jobs WHERE id=?", (djob,))
@@ -2802,7 +2813,12 @@ def main():
         check(c.get("/").status_code == 200 and db.val("SELECT COUNT(*) FROM audit_log WHERE action='company dissolved'") == 1,
               "the owner carries on, and the dissolve is in the audit log")
         _cu_ds("ds_again", "Again Driver", "dsagain123", role="driver")
+        db.set_setting("global_board", "1")
+        global_board.sync()
+        on_board_ = lbrow() is not None
         r = post("/settings/dissolve", {"understand": "1", "confirm": "DISSOLVE", "password": "secret12", "erase": "1"})
+        check(on_board_ and lbrow() is None and db.setting("global_board") == "0",
+              "dissolving (erase=1) takes the company off the global leaderboard")
         check(r.status_code == 302 and db.val("SELECT COUNT(*) FROM jobs") == 0
               and db.val("SELECT COUNT(*) FROM users WHERE id!=?", (owner_["id"],)) == 0
               and db.val("SELECT COUNT(*) FROM users WHERE id=?", (owner_["id"],)) == 1, "erase also wipes the company data and keeps the owner")

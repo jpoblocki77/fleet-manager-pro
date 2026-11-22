@@ -18,7 +18,20 @@ GAMES = ("all", "ats", "ets2")
 # the order of the numbers the server stores for each period and game
 METRICS = ("km", "revenue", "jobs", "mass", "score", "xp", "realism", "drivers")
 TOP_DRIVERS = 10
+MANUAL_GAP = 30                     # seconds between "Update now" presses: the licence server's request limit is per address
 _lock = threading.Lock()
+_last_manual = 0.0
+
+
+def manual_wait(now=None):
+    """Seconds until "Update now" may be used again (0 = allowed, and the press is counted)."""
+    global _last_manual
+    now = time.monotonic() if now is None else now
+    with _lock:
+        if _last_manual and now - _last_manual < MANUAL_GAP:
+            return int(MANUAL_GAP - (now - _last_manual)) + 1
+        _last_manual = now
+        return 0
 
 _REALISM = "j.driven_km * (j.score/100.0) * (j.score/100.0) * (1 - j.cargo_damage)"
 _WHERE = ("j.status='delivered' AND j.finished_at>=? AND u.status!='removed' "
