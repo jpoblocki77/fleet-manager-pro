@@ -51,6 +51,7 @@ class JobTracker:
         self.pending_refuel = None
         self.fuel_hist = []          # (time, litres) over the last 2 minutes, same truck only
         self.fuel_truck = None
+        self.refuel_start = None     # (time, truck, litres) when the game's "refuel started" flag rose
         self.truck_id = None
         self.lock = threading.Lock()
         self.hos = compliance.HosTracker(user_id)
@@ -100,6 +101,10 @@ class JobTracker:
             if truck != self.fuel_truck:
                 self.fuel_truck, self.fuel_hist = truck, []
             self.fuel_hist = [(t, f) for t, f in self.fuel_hist if now - t < 120] + [(now, v["fuel"])]
+            # The game raises "refuel" when the pump starts and "refuel_paid" only when the driver closes the
+            # pump screen, which can be minutes later - long after the 2-minute history forgot the low level.
+            if v.get("refuel") and not (self.prev or {}).get("refuel") and v["fuel"] > 0.5:
+                self.refuel_start = (now, truck, min(f for _t, f in self.fuel_hist))
             if not first:
                 self._events(v)
             self._confirm_refuel(v, now)
@@ -376,6 +381,10 @@ class JobTracker:
                     # The game also raises this event when a job or truck is loaded, without any fuel
                     # being added. Only book it once the tank level actually rises.
                     base = min(f for _t, f in self.fuel_hist)
+                    rs = self.refuel_start
+                    if rs and rs[1] == (v["truck_id"], v["license_plate"]) and now - rs[0] < 1800:
+                        base = min(base, rs[2])
+                    self.refuel_start = None
                     self.pending_refuel = {"t": now, "litres": amount, "base": base, "detail": detail(v),
                                            "truck": (v["truck_id"], v["license_plate"]), "x": v["x"], "z": v["z"],
                                            "job_id": self.job_id}

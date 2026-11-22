@@ -285,6 +285,27 @@ def main():
     clock.t += 1
     feed(t5, dict(roam, fuel=520.0, refuel_paid=True, refuel_amount=120.0))
     check(db.val("SELECT COUNT(*) FROM ledger WHERE category='fuel'", (), 0) == fuel_before + 1, "real refuel booked")
+    # real game timing: "refuel" when the pump starts, "refuel_paid" minutes later when the screen closes
+    clock.t += 300
+    feed(t5, dict(roam, fuel=356.0))
+    clock.t += 1
+    feed(t5, dict(roam, fuel=356.0, refuel=True))
+    for f in [372.0, 520.0, 700.0, 830.0]:
+        clock.t += 2
+        feed(t5, dict(roam, fuel=f, refuel=True))
+    for i in range(18):                                                         # driver sits on the pump screen
+        clock.t += 10
+        feed(t5, dict(roam, fuel=830.0))
+    feed(t5, dict(roam, fuel=830.0, refuel_paid=True, refuel_amount=474.0))
+    check(db.val("SELECT COUNT(*) FROM ledger WHERE category='fuel'", (), 0) == fuel_before + 2,
+          "a refuel paid minutes after the tank filled is still booked")
+    clock.t += 600                                                              # game load: flag without a rise
+    feed(t5, dict(roam, fuel=830.0, refuel_paid=False, refuel_amount=50.0))
+    feed(t5, dict(roam, fuel=830.0, refuel_paid=True, refuel_amount=50.0))
+    clock.t += 130
+    feed(t5, dict(roam, fuel=830.0))
+    check(db.val("SELECT COUNT(*) FROM ledger WHERE category='fuel'", (), 0) == fuel_before + 2,
+          "a later phantom refuel isn't matched to the old pump start")
     service.time = _time
 
     print("Compliance (ELD / HOS, DVIR, roadside inspections)")
