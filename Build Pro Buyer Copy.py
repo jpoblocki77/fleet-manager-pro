@@ -179,8 +179,8 @@ def main():
 4. **Settings → Telemetry → Game plugin → Install** (or copy `plugin\\\\scs-telemetry.dll` into
    `<game>\\\\bin\\\\win_x64\\\\plugins\\\\`). Start the game and click OK on the "advanced SDK features" message.
 
-To let drivers on your network connect, start **Fleet Manager Pro (LAN)** from the Start menu (zip: **Start Fleet
-Manager Pro (LAN).bat**); they open the `https://` address it prints.
+To let drivers connect, open **Drivers > Connect a driver** and press **Let other PCs in** (once); they open the
+`https://` address it shows. (Starting with **Fleet Manager Pro (LAN)** works too.)
 
 Your data lives in the `data` folder next to the program. **READ ME - Your Data.txt** explains where that is, how to
 move it to a new version or PC, and how to back it up.

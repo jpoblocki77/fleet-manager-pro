@@ -18,6 +18,7 @@ import socket
 import ssl
 import threading
 
+_LIVE = {}          # listening socket -> the connections that came through it
 PEERS = {}          # local port of our connection to Waitress -> (real client address, "http" | "https")
 _lock = threading.Lock()
 
@@ -126,8 +127,8 @@ def _redirect_to_https(conn, port):
         conn.close()
 
 
-def _handle(conn, addr, ctx, port, backend_port):
-    backend = None
+def _handle(conn, addr, ctx, port, backend_port, live):
+    backend, mine = None, []
     try:
         conn.settimeout(20)
         first = conn.recv(1, socket.MSG_PEEK)
@@ -141,6 +142,12 @@ def _handle(conn, addr, ctx, port, backend_port):
         conn.settimeout(None)
         backend = socket.create_connection(("127.0.0.1", backend_port), timeout=10)
         backend.settimeout(None)
+        mine = [conn, backend]
+        with _lock:
+            closed = live.get("closed")
+            live["socks"].update(mine)
+        if closed:
+            return None
         local = backend.getsockname()[1]
         with _lock:
             PEERS[local] = (addr[0], scheme)
@@ -153,6 +160,8 @@ def _handle(conn, addr, ctx, port, backend_port):
     except (OSError, ssl.SSLError):
         pass
     finally:
+        with _lock:
+            live["socks"].difference_update(mine)
         for s in (conn, backend):
             try:
                 if s:
@@ -170,6 +179,7 @@ def start(host, port, backend_port, cert_path, key_path):
     srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     srv.bind((host, port))
     srv.listen(64)
+    live = _LIVE[srv] = {"socks": set(), "closed": False}
 
     def loop():
         while True:
@@ -177,10 +187,36 @@ def start(host, port, backend_port, cert_path, key_path):
                 conn, addr = srv.accept()
             except OSError:
                 return
-            threading.Thread(target=_handle, args=(conn, addr, ctx, port, backend_port), daemon=True).start()
+            threading.Thread(target=_handle, args=(conn, addr, ctx, port, backend_port, live), daemon=True).start()
 
     threading.Thread(target=loop, daemon=True, name="tls-front").start()
     return srv
+
+
+def stop(srv, linger=0.0):
+    """Stop listening, and cut the connections that came through (after `linger` seconds)."""
+    live = _LIVE.pop(srv, None)
+    try:
+        srv.close()
+    except OSError:
+        pass
+
+    def cut():
+        with _lock:
+            live["closed"] = True
+            socks = list(live["socks"])
+        for s in socks:
+            try:
+                s.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+    if live:
+        if linger:
+            t = threading.Timer(linger, cut)
+            t.daemon = True
+            t.start()
+        else:
+            cut()
 
 
 class Middleware:

@@ -144,6 +144,7 @@ fmpro/compliance.py       Hours of Service rules and clocks, DVIR, roadside insp
 fmpro/compliance_views.py the ELD & Compliance pages
 fmpro/economy.py          XP/levels/ranks, scoring, ledger, loans, upkeep, achievements, Discord webhook
 fmpro/api.py              JSON API: live telemetry, remote agents (sanitised), map layers, overlay, CSV exports
+fmpro/network.py          "Let other PCs in" switch (the network door on a normal start)
 fmpro/tlsfront.py         HTTPS front door for LAN mode (self-signed certificate, pinning)
 fmpro/telemetry/          layout.py (DLL memory map) · reader.py (decoder) · service.py (sampler, job tracker,
                           anti-cheat, road/place learning) · demo.py (simulator)

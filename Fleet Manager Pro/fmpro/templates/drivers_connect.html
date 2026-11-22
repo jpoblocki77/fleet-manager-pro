@@ -12,9 +12,23 @@
     <div class="card">
       <div class="card-head"><h2><span class="step-no">1</span>Let other PCs in</h2>
         <span class="right">{% if info.lan %}<span class="badge active">on, port {{ info.lan.port }}</span>{% else %}<span class="badge warn">this PC only</span>{% endif %}</span></div>
-      {% if info.lan %}
+      {% if info.switch and not info.open %}
+      <p style="margin-top:0">{% if info.lan %}Only tablet access is on (port {{ info.lan.port }}).{% else %}Right now only this PC can use Fleet Manager Pro.{% endif %}
+        Turn this on once and members can connect every time you start Fleet Manager Pro. No restart and no LAN file needed.</p>
+      <form method="post" action="/network/access">{{ csrf() }}<input type="hidden" name="action" value="on">
+        <button class="btn primary">{{ icon('server') }}Let other PCs in</button></form>
+      <p class="hint">The link is encrypted (HTTPS) and everyone still has to sign in. If Windows asks, choose <b>Private networks</b> and click <b>Allow</b>.</p>
+      {% elif info.lan %}
       <p class="small muted" style="margin-top:0">Fleet Manager Pro is accepting other PCs{% if info.lan.scheme == 'https' %} over an encrypted (HTTPS) link{% else %} <b>without encryption</b>{% endif %}.</p>
       {% if info.pin %}<p class="small muted">This PC's certificate fingerprint (drivers' copies check it, so nobody can pretend to be you):<br><span class="mono" style="word-break:break-all">{{ info.pin }}</span></p>{% endif %}
+      <p class="small">Members open this in their browser and sign in (it warns once about the self-made certificate):</p>
+      <dl class="kv">{% if info.local %}<dt>On your Wi-Fi</dt><dd class="mono">{{ info.lan.scheme }}://{{ info.local[0] }}:{{ info.lan.port }}</dd>{% endif %}
+        {% if info.public %}<dt>From anywhere</dt><dd class="mono">{{ info.lan.scheme }}://{{ info.public }}:{{ info.lan.port }}</dd>{% endif %}</dl>
+      {% if info.open %}<form method="post" action="/network/access" style="margin-top:8px">{{ csrf() }}<input type="hidden" name="action" value="off">
+        <button class="btn sm" data-confirm="Stop letting other PCs in? Members and drivers are disconnected until you turn it back on.">Stop letting other PCs in</button></form>
+      {% elif not info.switch %}<form method="post" action="/network/access" style="margin-top:8px">{{ csrf() }}<input type="hidden" name="action" value="{{ 'off' if info.always else 'on' }}">
+        {% if info.always %}<p class="small muted">You started with the LAN file, but you don't need it: other PCs are let in at every start.</p><button class="btn sm">Only let other PCs in with the LAN file</button>
+        {% else %}<p class="small muted">You started with the LAN file. Turn this on and a normal start lets other PCs in too.</p><button class="btn sm primary">Always let other PCs in</button>{% endif %}</form>{% endif %}
       {% else %}
       <p style="margin-top:0">Right now only this PC can use Fleet Manager Pro.</p>
       <ol class="steps">
@@ -30,7 +44,7 @@
       <div class="card-head"><h2><span class="step-no">2</span>Your internet address</h2>
         <span class="right">{% if info.public %}<span class="badge active">{{ 'found automatically' if info.auto else 'set' }}</span>{% else %}<span class="badge">not set</span>{% endif %}</span></div>
       <p class="small muted" style="margin-top:0">The address drivers outside your home use to reach this PC. Press <b>Find it for me</b>
-        and Fleet Manager Pro asks your router; it then keeps it up to date each time it starts in LAN mode. Or type a free
+        and Fleet Manager Pro asks your router; it then keeps it up to date each time it starts. Or type a free
         dynamic-DNS name (No-IP, Duck DNS and others), which keeps working when your internet provider changes your IP.</p>
       <div class="row" style="gap:8px;flex-wrap:nowrap">
         <input name="public_address" value="{{ info.public }}" maxlength="253" placeholder="e.g. 203.0.113.25 or mycompany.ddns.net" aria-label="Internet address" style="flex:1">
@@ -43,7 +57,7 @@
       <div class="card-head"><h2><span class="step-no">3</span>Open the door on your router</h2>
         <span class="right">{% if info.upnp_port %}<span class="badge active">open, port {{ info.upnp_port }}</span>{% endif %}</span></div>
       <p class="small muted" style="margin-top:0">Your router blocks the internet by default. Press <b>Open the port for me</b> and
-        Fleet Manager Pro asks your router to let drivers through to this PC (only this one port), and asks again each time it starts in LAN mode.</p>
+        Fleet Manager Pro asks your router to let drivers through to this PC (only this one port), and asks again each time it starts.</p>
       <div class="row" style="gap:8px;margin-bottom:8px">
         <button class="btn primary" name="action" value="open" {{ 'disabled' if not info.lan }}>{{ icon('server') }}Open the port for me</button>
         {% if info.upnp_port %}<button class="btn" name="action" value="close">Close it</button>{% endif %}
@@ -54,7 +68,7 @@
         <dt>Protocol</dt><dd>TCP</dd>
         <dt>Send to (this PC)</dt><dd class="mono">{{ info.local[0] if info.local else 'this PC\'s address' }}</dd>
       </dl>
-      <p class="hint">Drivers on your own Wi-Fi don't need this. Keep this PC on, with Fleet Manager Pro open in LAN mode, while drivers drive.</p>
+      <p class="hint">Drivers on your own Wi-Fi don't need this. Keep this PC on, with Fleet Manager Pro open, while drivers drive.</p>
     </form>
   </div>
 

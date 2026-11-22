@@ -1019,7 +1019,9 @@ def _connect_info():
     from .tablet import lan_addresses
     lan = current_app.config.get("LAN")
     pin = tlsfront.fingerprint(current_app.config["DATA_DIR"]) if lan and lan.get("scheme") == "https" else None
-    return {"lan": lan, "pin": pin, "local": lan_addresses(), "public": db.setting("public_address", "") or "",
+    from . import network
+    return {"switch": network.can_switch(current_app), "open": network.is_open(), "always": db.setting("lan_access", "0") == "1",
+            "lan": lan, "pin": pin, "local": lan_addresses(), "public": db.setting("public_address", "") or "",
             "auto": db.setting("public_address_auto", "0") == "1", "upnp_port": db.setting("upnp_port", "") or "",
             "agent_cmd": AGENT_CMD}
 
@@ -1057,7 +1059,7 @@ def drivers_connect():
                     flash("The router no longer forwards the port to this PC.", "success")
                     return back
                 if action == "open" and not port:
-                    flash("Do step 1 first: start Fleet Manager Pro in LAN mode, then open the port.", "error")
+                    flash("Do step 1 first: let other PCs in, then open the port.", "error")
                     return back
                 r = upnp.detect_and_save(port, open_it=(action == "open"))
             except upnp.UPnPError as e:
@@ -1067,7 +1069,7 @@ def drivers_connect():
             msg = (f"Your internet address is {r['ip']}." if r["saved"] else
                    f"Your router reports {r['ip']}; your saved host name was kept.")
             if r["opened"]:
-                msg += f" Port {port} on the router now goes to this PC ({r['local']}). It's re-opened each time you start in LAN mode."
+                msg += f" Port {port} on the router now goes to this PC ({r['local']}). It's re-opened each time Fleet Manager Pro starts."
             if r["nat2"]:
                 flash(msg + " But that address is not reachable from the internet: your router is behind another router or "
                       "your provider shares one address between customers (CGNAT). Ask your provider for a public IP, or "
@@ -1126,7 +1128,7 @@ def driver_agent_bat(uid):
     host = info["public"] if where == "internet" else (info["local"][0] if info["local"] else "")
     line = agent_command(info, host, p["agent_token"])
     if not line:
-        flash("Start in LAN mode and set the address first.", "error")
+        flash("Let other PCs in and set the address first.", "error")
         return redirect(url_for("pages.drivers_connect", driver=uid))
     company = re.sub(r"[^A-Za-z0-9 _-]", "", db.setting("company_name", "") or "the company").strip() or "the company"
     body = ("@echo off\r\n"

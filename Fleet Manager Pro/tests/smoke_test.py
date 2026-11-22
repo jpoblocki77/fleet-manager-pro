@@ -79,6 +79,12 @@ def run(label, extra):
     base = f"{scheme}://127.0.0.1:{port}"
     out = open(os.path.join(data, "_stdout.txt"), "w+", encoding="utf-8", errors="replace")
     env = dict(os.environ, PYTHONUNBUFFERED="1")
+    if "lan_access" in label:                # what the Let other PCs in switch leaves behind
+        sys.path.insert(0, ROOT)
+        from fmpro import db
+        db.init(os.path.join(data, "fleet.db"))
+        db.set_setting("lan_access", "1")
+        db.conn().close()
     proc = subprocess.Popen([sys.executable, "run.py", "--no-browser", "--port", str(port), "--data", data, *extra],  # nosec B603
                             cwd=ROOT, stdout=out, stderr=subprocess.STDOUT, env=env)
     op = opener(base)
@@ -142,6 +148,7 @@ def main():
     run("Normal start (this PC only)", [])
     if "--lan" in sys.argv[1:]:
         run("LAN start (HTTPS front)", ["--lan"])
+        run("Normal start with other PCs let in (lan_access)", [])
     print("\nALL PASSED" if not FAILS else f"\nFAILED: {len(FAILS)}\n  " + "\n  ".join(FAILS))
     sys.exit(1 if FAILS else 0)
 

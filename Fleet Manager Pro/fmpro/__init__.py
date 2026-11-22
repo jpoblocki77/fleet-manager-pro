@@ -129,8 +129,9 @@ def create_app(data_dir=None, start_telemetry=True, check_licence=True):
     from . import ops, leasing_views, trailer_leasing_views, cleanup, insights
     app.register_blueprint(ops.bp)
     app.register_blueprint(insights.bp)
-    from . import tablet
+    from . import network, tablet
     app.register_blueprint(tablet.bp)
+    app.register_blueprint(network.bp)
     from . import fluids_views
     app.register_blueprint(fluids_views.bp)
     app.register_blueprint(cleanup.bp)

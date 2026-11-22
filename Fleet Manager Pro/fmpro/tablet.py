@@ -10,7 +10,8 @@ Tablets need the app to answer on the network. Two ways:
   * Tablet access (Owner/Manager switch on this page, remembered in the tablet_access setting): the normal
     exe / Start Fleet Manager Pro.bat keeps the PC itself on http://127.0.0.1:PORT and opens an encrypted
     (HTTPS) door for tablets on PORT+1, at once, no restart. The launcher calls autostart() on start-up.
-  * Network mode (Start Fleet Manager Pro (LAN).bat): the whole app is on the network already.
+  * Other PCs are let in (Connect a Driver switch, network.py) or network mode (Start Fleet Manager Pro (LAN).bat):
+    the whole app is on the network already.
 Either way app.config["LAN"] holds the scheme and port the QR link uses.
 """
 import ipaddress
@@ -23,7 +24,7 @@ import time
 from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
 from markupsafe import Markup
 
-from . import db, qr, tlsfront
+from . import db, network, qr, tlsfront
 from .auth import can, login_required, start_session, user
 
 bp = Blueprint("tablet", __name__)
@@ -40,6 +41,10 @@ _front = {"srv": None}      # the tablet door's listening socket while tablet ac
 
 def tablet_port(app):
     return app.config.get("TABLET_PORT") or (app.config["PORT"] + 1)
+
+
+def door_open():
+    return _front["srv"] is not None
 
 
 def network_on(app):
@@ -68,11 +73,9 @@ def start_network(app):
     except OSError as e:
         log.warning("tablet access: couldn't open port %s: %s", port, e)
         return f"Port {port} is already in use on this PC, so tablets can't connect. Close whatever uses it and try again."
-    if not app.config.get("_TLS_MW"):
-        app.wsgi_app = tlsfront.Middleware(app.wsgi_app)   # real tablet address + https for requests through the door
-        app.config["_TLS_MW"] = True
+    network.use_middleware(app)                            # real tablet address + https for requests through the door
     _front["srv"] = srv
-    app.config["LAN"] = {"scheme": "https", "port": port}
+    network.publish(app)
     log.info("tablet access on: https on port %s", port)
     return None
 
@@ -80,11 +83,8 @@ def start_network(app):
 def stop_network(app):
     srv, _front["srv"] = _front["srv"], None
     if srv is not None:
-        try:
-            srv.close()
-        except OSError:
-            pass
-        app.config.pop("LAN", None)
+        tlsfront.stop(srv, linger=1.5)
+        network.publish(app)
         log.info("tablet access off")
 
 
@@ -175,7 +175,8 @@ def access():
         db.set_setting("tablet_access", "0")
         stop_network(app)
         db.audit(user()["id"], "tablet access off", "")
-        flash("Tablet access is off. Tablets already signed in can no longer reach Fleet Manager Pro.", "success")
+        flash("Tablet access is off. " + ("Tablets can still connect because other PCs are let in (Connect a Driver)." if network.is_open()
+              else "Tablets already signed in can no longer reach Fleet Manager Pro."), "success")
     else:
         err = start_network(app)
         if err:

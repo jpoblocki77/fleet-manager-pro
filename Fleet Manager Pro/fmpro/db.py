@@ -212,6 +212,7 @@ DEFAULT_SETTINGS = {
     "discord_webhook": "", "webhook_on_delivery": "1", "webhook_on_event": "1",
     "webhook_applications": "", "webhook_on_application": "1",   # new driver applications: own channel optional
     "recruitment_open": "1", "recruitment_text": "We're hiring professional, friendly drivers!",
+    "lan_access": "0",                                  # let other PCs in on a normal start (network.py)
     "vtc_listed": "0", "vtc_profile": "",               # VTC Finder: off until a manager ticks it
     "global_board": "1", "global_board_drivers": "0",   # the global leaderboard: join it / share driver names
     "starting_balance": str(STARTING_CAPITAL), "initialized": "0",

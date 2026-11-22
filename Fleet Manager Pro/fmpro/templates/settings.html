@@ -106,7 +106,7 @@
     <input name="game_dir" placeholder="Other game folder, e.g. D:\Games\American Truck Simulator" maxlength="400"><button class="btn sm">Install here</button></form>
   <p class="small muted" style="margin-top:10px">After installing, start the game and click <b>OK</b> on the "advanced SDK features" message.</p>
   <h3 style="margin-top:14px">Remote drivers</h3>
-  <p class="small muted">Start this PC with <b>Fleet Manager Pro (LAN)</b> from the Start menu (zip copy: <b>Start Fleet Manager Pro (LAN).bat</b>). Other PCs then open
+  <p class="small muted">Press <b>Let other PCs in</b> on <a href="/drivers/connect">Connect a driver</a>, once. Other PCs then open
   <code>https://THIS-PC:8760</code> (encrypted; the browser shows a one-time warning because the certificate is self-made).
   Each driver's profile page shows the exact agent command with their token and this server's fingerprint.</p>
   {% if lan_pin %}<p class="small muted">Certificate fingerprint: <span class="mono" style="word-break:break-all">{{ lan_pin }}</span></p>{% endif %}

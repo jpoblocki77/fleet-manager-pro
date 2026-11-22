@@ -1580,7 +1580,7 @@ def main():
         return p_
     _srv = _cs(app, host="127.0.0.1", port=_free(), threads=4)
     _thr.Thread(target=_srv.run, daemon=True).start()
-    app.config["PORT"] = _srv.effective_port
+    app.config["PORT"] = int(_srv.effective_port)
     app.config["TABLET_PORT"] = _free()
     page = c.get("/tablet").get_data(as_text=True)
     check("Tablet access is off" in page and 'value="on"' in page and "LAN).bat" not in page,
@@ -1627,10 +1627,89 @@ def main():
         _closed = True
     check(db.setting("tablet_access") == "0" and app.config.get("LAN") is None and _closed,
           "turning tablet access off closes the door")
+    print("Let other PCs in (no LAN file)")
+    from fmpro import network, tlsfront as _tf
+    tablet.lan_addresses = _addrs
+    _ips = _addrs()
+    page = c.get("/drivers/connect").get_data(as_text=True)
+    check("Let other PCs in</button>" in page and "LAN).bat" not in page and "--token" not in page, "Connect a driver has the switch; no LAN file needed")
+    check(uc.post("/network/access", data={"action": "on", "csrf": utok}).status_code == 403 and not network.is_open(), "a driver can't let other PCs in")
+    check(c.get("/network/access").status_code == 405 and app.test_client().post("/network/access", data={"action": "on"}).status_code in (302, 400, 403)
+          and not network.is_open(), "nor can a stranger or a link")
+    post("/network/access", {"action": "junk"})
+    check(not network.is_open() and db.setting("lan_access") == "0", "an unknown action does nothing")
+    post("/network/access", {"action": "on"})
+    nport = app.config["PORT"]
+    check(network.is_open() and db.setting("lan_access") == "1" and app.config["LAN"] == {"scheme": "https", "port": nport}, "switching on opens the door at once, on the normal port, and remembers it")
+    page = c.get("/drivers/connect").get_data(as_text=True)
+    check("--token" in page and f":{nport}" in page and "Stop letting other PCs in" in page, "the drivers' connection lines appear")
+    with _ur.urlopen(f"http://127.0.0.1:{nport}/login", timeout=10) as r_:
+        check(r_.status == 200 and r_.url.startswith("http://"), "this PC itself still opens it as before")
+    if _ips:
+        with _ur.urlopen(f"https://{_ips[0]}:{nport}/login", context=_ctx, timeout=10) as r_:
+            check(r_.status == 200 and b"Sign in" in r_.read(), "another PC reaches the sign-in page over HTTPS")
+        try:
+            _ur.build_opener(_NoRedir).open(f"http://{_ips[0]}:{nport}/login", timeout=10)
+            _st, _loc = 200, ""
+        except _ur.HTTPError as e_:
+            _st, _loc = e_.code, e_.headers.get("Location", "")
+        check(_st == 308 and _loc.startswith("https://"), "unencrypted visits from another PC are never served")
+        _live = _ssl.create_default_context()
+        _live.check_hostname, _live.verify_mode = False, _ssl.CERT_NONE
+        _k = _live.wrap_socket(_sock.create_connection((_ips[0], nport), timeout=10))
+        _k.sendall(b"GET /login HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+        _first = _k.recv(100)
+    post("/tablet/access", {"action": "on"})
+    check(app.config["LAN"]["port"] == nport and tablet.door_open(), "tablet access can be on as well")
+    post("/tablet/access", {"action": "off"})
+    check(network.is_open() and app.config["LAN"]["port"] == nport, "turning tablet access off leaves other PCs let in")
+    post("/network/access", {"action": "off"})
+    check(not network.is_open() and db.setting("lan_access") == "0" and "LAN" not in app.config, "switching off closes it")
+    if _ips:
+        _k.settimeout(6)
+        _got, _end = b"", False
+        try:
+            while True:
+                _d = _k.recv(65536)
+                if not _d:
+                    _end = True
+                    break
+                _got += _d
+        except OSError as e_:
+            _end = not isinstance(e_, TimeoutError)
+        check(_first.startswith(b"HTTP/1.1") and _end, "and cuts whoever was connected")
+        _k.close()
+        try:
+            _sock.create_connection((_ips[0], nport), timeout=2).close()
+            _shut = False
+        except OSError:
+            _shut = True
+        check(_shut, "other PCs can't connect any more")
+    with _ur.urlopen(f"http://127.0.0.1:{nport}/login", timeout=10) as r_:
+        check(r_.status == 200, "while this PC carries on")
+    network.autostart(app)
+    check(not network.is_open(), "off stays off at the next start")
+    db.set_setting("lan_access", "1")
+    check(network.autostart(app) is None and network.is_open(), "on comes back by itself at the next start")
+    network.stop(app)
+    if _ips:
+        _busy = _sock.socket()
+        _busy.bind((_ips[0], nport))
+        _busy.listen(1)
+        check("already answers" in (network.start(app) or "") and not network.is_open(), "a port another program uses is reported, not taken over")
+        _busy.close()
+    app.config.pop("PORT")
+    app.config["LAN"] = {"scheme": "https", "port": 8760}
+    db.set_setting("lan_access", "0")
+    check("Always let other PCs in" in c.get("/drivers/connect").get_data(as_text=True), "started with the LAN file, the page offers to make it permanent")
+    post("/network/access", {"action": "on"})
+    check(db.setting("lan_access") == "1" and not network.is_open() and "you don't need it" in c.get("/drivers/connect").get_data(as_text=True), "which is remembered for the next start")
+    db.set_setting("lan_access", "0")
+    app.config.pop("LAN")
+    app.config["PORT"] = nport
     _srv.close()
     app.config.pop("PORT", None)
     app.config.pop("TABLET_PORT", None)
-    tablet.lan_addresses = _addrs
 
     # Fuel & AdBlue: live tanks + bar graph of the last hour
     from fmpro.telemetry import fluids as _fl

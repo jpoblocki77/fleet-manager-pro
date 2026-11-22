@@ -414,8 +414,14 @@ def dissolve_company(owner_id, erase=False):
             out["port"] = f"not closed ({e})"
     for key, value in (("upnp_port", ""), ("public_address", ""), ("public_address_auto", "0"), ("allowed_hosts", ""),
                        ("recruitment_open", "0"), ("global_board", "0"), ("global_board_drivers", "0"),
-                       ("vtc_listed", "0"), ("vtc_profile", "")):
+                       ("vtc_listed", "0"), ("vtc_profile", ""), ("lan_access", "0")):
         db.set_setting(key, value)
+    try:
+        from flask import current_app
+        from . import network
+        network.stop(current_app._get_current_object(), linger=3)    # other PCs can't connect any more
+    except Exception as e:
+        logging.getLogger(__name__).warning("closing the door for other PCs failed: %s", e)
     from . import global_board
     try:
         global_board.sync()             # take the company off the global leaderboard now (else at the next update)
@@ -462,7 +468,9 @@ def dissolve():
         msg += " The router no longer lets the internet in."
     elif r["port"]:
         msg += f" The router port is {r['port']}: remove the forward in your router's settings."
-    msg += " To stop other PCs on your network connecting too, start Fleet Manager Pro normally (not the LAN file)."
+    from flask import current_app
+    if current_app.config.get("LAN"):
+        msg += " To stop other devices on your network connecting too, turn off tablet access, or start Fleet Manager Pro normally if you used the LAN file."
     flash(msg, "success")
     return redirect(url_for("pages.settings", tab="data"))
 

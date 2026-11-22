@@ -196,8 +196,8 @@ def build():
 
     A(Paragraph("6. More drivers (optional)", H1))
     A(Paragraph("On the same network", H2))
-    A(steps(["On the PC that runs Fleet Manager Pro, close it and start <b>Fleet Manager Pro (LAN)</b> from the Start menu instead. "
-             "The black window shows an address like <b>https://192.168.1.20:8760</b>. Allow it if Windows Firewall asks.",
+    A(steps(["On the PC that runs Fleet Manager Pro, open <b>Drivers &gt; Connect a driver</b> and press <b>Let other PCs in</b> (once). "
+             "The page shows an address like <b>https://192.168.1.20:8760</b>. Allow it if Windows Firewall asks.",
              "Other PCs open that address in a browser. The first time, the browser warns about the certificate (it is made by your own "
              "PC): choose <b>Advanced &gt; Continue</b>. The connection is encrypted.",
              "A manager adds each driver under <b>Drivers &gt; Add member</b>, or drivers apply on your online Apply link (section 8) and a manager accepts them."]))
@@ -321,14 +321,14 @@ def build():
              ["Port 8760 is already in use", "Another copy is still running (check Task Manager for Fleet Manager Pro). "
                                              "Close it, or start on another port from a Command Prompt in its folder (section 6 shows how to open it): "
                                              "\"Fleet Manager Pro.exe\" --port 8770"],
-             ["Other PCs cannot connect", "Start <b>Fleet Manager Pro (LAN)</b> from the Start menu, use the https:// address it prints, and allow it through Windows Firewall."]],
+             ["Other PCs cannot connect", "Press <b>Let other PCs in</b> on Drivers &gt; Connect a driver, use the https:// address it shows, and allow it through Windows Firewall."]],
             [2.3 * inch, 4.6 * inch]))
     A(Spacer(1, 10))
     A(KeepTogether([Paragraph("Good to know", H2),
                     bullets(["The game plugin scs-telemetry.dll is open-source (MIT licence). It only reads data; "
                              "it does not change your game or your save.",
                              "It works alongside other telemetry tools: several can use the same plugin at once.",
-                             "Fleet Manager Pro only listens on your own PC unless you start it in LAN mode."])]))
+                             "Fleet Manager Pro only listens on your own PC unless you let other PCs or tablets in."])]))
     A(Spacer(1, 10))
     A(Paragraph("Fleet Manager Pro is (c) 2026 Jeff Poblocki. All rights reserved. It is licensed, not sold, under the licence "
                 "agreement: copying, sharing, reselling or reverse engineering it is not allowed.", SMALL))
