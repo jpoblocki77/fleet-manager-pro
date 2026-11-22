@@ -294,7 +294,7 @@ CLEAR_CONFIRM = "DELETE ALL DATA"
 # handled separately (members can be kept; the owner doing the reset and the settings always stay).
 CLEAR_TABLES = [("job_points", "route points"), ("job_events", "job events"), ("ledger", "ledger entries"),
                 ("hos_violations", "HOS violations"), ("hos_logs", "logbook lines"), ("dvirs", "DVIRs"),
-                ("inspections", "roadside inspections"), ("licence_points", "licence points"), ("licence_tests", "drivers tests"),
+                ("inspections", "roadside inspections"), ("licence_points", "licence points"), ("licence_tests", "drivers tests"), ("personal_loans", "personal loans"),
                 ("licences", "driver's licences"), ("maintenance", "maintenance records"),
                 ("leases", "truck leases"), ("trailer_leases", "trailer leases"), ("jobs", "jobs"), ("contracts", "contracts"), ("loans", "loans"), ("trucks", "trucks"),
                 ("trailers", "trailers"), ("garages", "garages"), ("event_rsvps", "event sign-ups"),

@@ -1636,7 +1636,7 @@ SETTING_FIELDS = {
     "maint_price_inspection": ("num", (0, 1e6)), "maint_price_upgrade": ("num", (0, 1e6)), "maint_price_wash": ("num", (0, 1e6)),
     "dvir_repair_per_defect": ("num", (0, 1e6)),
     "auto_create_trucks": ("bool", None), "auto_charge_repairs": ("bool", None),
-    "drivers_pay_fines": ("bool", None), "require_manual_approval": ("bool", None), "agent_jobs_need_approval": ("bool", None), "telemetry_mode": ("choice", ("auto", "demo", "off")),
+    "personal_loans": ("bool", None), "bank_opening": ("num", (0, 1e6)), "drivers_pay_fines": ("bool", None), "require_manual_approval": ("bool", None), "agent_jobs_need_approval": ("bool", None), "telemetry_mode": ("choice", ("auto", "demo", "off")),
     "discord_webhook": ("url", 300), "webhook_on_delivery": ("bool", None), "webhook_on_event": ("bool", None),
     "webhook_applications": ("url", 300), "webhook_on_application": ("bool", None),
     "recruitment_open": ("bool", None), "recruitment_text": ("str", 1000),

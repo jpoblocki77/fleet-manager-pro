@@ -109,6 +109,7 @@ def main():
     check(not open_posts, f"all {len(posts)} form actions need a login ({open_posts or 'none open'})")
 
     print("Role checks (driver must not reach manager functions)")
+    drv.get("/bank")                 # opens the bank accounts (once)
     before = db.val("SELECT COUNT(*) FROM ledger"), db.val("SELECT COUNT(*) FROM users")
     admin_posts = ["/settings", "/fleet/maintenance", "/finance/entry", "/finance/loan", "/drivers/new", "/fleet/truck/save",
                    "/fleet/garage/save", "/fleet/trailer/save", "/dispatch/new", "/events/save", "/announcements",
@@ -127,6 +128,12 @@ def main():
     check(not bad, f"driver refused on {len(admin_posts)} manager actions ({bad or 'all 403'})")
     check("Bank account" not in drv.get(f"/drivers/{boss_id}").get_data(as_text=True) and "Driver accounts" not in drv.get("/bank").get_data(as_text=True),
           "a driver never sees anyone else's bank account")
+    db.insert("personal_loans", user_id=boss_id, principal=500, apr=5, weeks=4, installment=126, balance=500,
+              next_due=time.time() + 9e6, created_at=time.time())
+    bl = db.val("SELECT id FROM personal_loans WHERE user_id=?", (boss_id,))
+    drv.post(f"/bank/loan/{bl}/payoff")
+    check(db.val("SELECT balance FROM personal_loans WHERE id=?", (bl,)) == 500, "a driver can't touch someone else's loan")
+    db.ex("DELETE FROM personal_loans WHERE id=?", (bl,))
     for u in (f"/bank?driver={boss_id}", "/settings", "/recruitment", "/api/export/ledger.csv", "/api/telemetry/raw"):
         check(drv.get(u).status_code == 403, f"driver can't open {u}")
     check((db.val("SELECT COUNT(*) FROM ledger"), db.val("SELECT COUNT(*) FROM users")) == before, "nothing changed by refused requests")

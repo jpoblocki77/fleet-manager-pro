@@ -78,6 +78,7 @@ GUIDES = {
         "Your own bank account, separate from the company account. Your pay is deposited every Friday at noon.",
         "Next payday shows what you have earned so far and the loads it comes from.",
         "The statement lists every deposit, traffic ticket and fine; Pay slips lists the loads in each payday.",
+        "Personal loans: pick one of four APRs and the money is in your account straight away; it is paid back every Friday.",
         ("admin", "Driver accounts at the bottom opens any driver's account you manage."),
     ],
     "cdl": [

@@ -76,6 +76,8 @@
     <div class="field"><label>{{ uf.xp_per_tonne.label }}</label><input name="xp_per_tonne" type="number" step="any" min="0" value="{{ uf.xp_per_tonne.value }}"></div>
     <div class="field"><label>{{ uf.speeding_tolerance_kmh.label }}</label><input name="speeding_tolerance_kmh" type="number" step="any" min="0" max="{{ 31 if current_units() == 'imperial' else 50 }}" value="{{ uf.speeding_tolerance_kmh.value }}"></div>
   </div>
+  <div class="fields"><div class="field"><label>A driver's bank account starts with</label><input name="bank_opening" type="number" min="0" step="100" value="{{ S.bank_opening }}"><div class="hint">Given once, when a member's account opens. It doesn't come out of the company account.</div></div></div>
+  {{ check('personal_loans', 'Drivers can take personal loans', "The money goes into the driver's own bank account and is paid back from it every Friday. Loans already taken carry on when you turn this off.") }}
   {{ check('auto_charge_repairs', 'Charge in-game repairs to the company account') }}
   {{ check('drivers_pay_fines', 'Drivers pay their own fines', "Game fines, Hours of Service, inspection report and roadside inspection fines come out of the driver's bank account. Off: the company pays them.") }}
   {{ check('require_manual_approval', 'Manual jobs from drivers need manager approval') }}

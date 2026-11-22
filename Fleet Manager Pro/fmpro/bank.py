@@ -4,7 +4,7 @@ Three pots in the ledger, never mixed:
   company   the company account. Driver pay leaves it when a load is delivered, so the company always has the week's
             payroll set aside.
   wages     pay a driver has earned that waits for the next payday. Not the driver's to spend yet.
-  driver    the driver's bank account: paydays in; fines, traffic tickets and licence fines out. May be overdrawn.
+  driver    the driver's bank account: paydays and personal loans in; fines, traffic tickets, licence fines and loan payments out. May be overdrawn.
 
 Noon is this PC's clock (the PC Fleet Manager Pro runs on). When the program was closed at noon the payday is made
 up the next time it runs.
@@ -18,7 +18,7 @@ from . import db, economy
 
 log = logging.getLogger("fmpro.bank")
 PAY_WEEKDAY, PAY_HOUR = 4, 12           # Friday (Monday is 0), noon
-_lock = threading.Lock()
+lock = threading.RLock()                 # one change of any bank account at a time
 
 
 def last_payday(now=None):
@@ -73,12 +73,25 @@ def number(uid):
     return f"4400 {n[:4]} {n[4:]}"
 
 
+def open_accounts():
+    """Every member's account opens once with a deposit (Settings, Economy), which doesn't come from the company. The
+    ledger line is the record that it was given, so it is never given twice, even when it was 0."""
+    amount = round(max(0.0, db.setting_f("bank_opening", 3000)), 2)
+    for u in db.q("SELECT id FROM users u WHERE status!='removed' AND username!='former-drivers' AND NOT EXISTS (SELECT 1 FROM "
+                  "ledger l WHERE l.user_id=u.id AND l.account='driver' AND l.category='opening deposit')"):
+        db.insert("ledger", account="driver", user_id=u["id"], category="opening deposit", amount=amount,
+                  description="Account opened", created_at=time.time())
+        if amount:
+            db.notify(u["id"], f"Your bank account is open with {db.setting('currency', '$')}{amount:,.0f}.", "/bank", "success")
+
+
 def process(now=None):
     """Pay every driver what they had earned by the latest Friday noon. Safe to call as often as you like: what was
     paid is taken out of the wages pot in the same transaction, so nothing is ever paid twice. Returns the drivers paid."""
     cut = last_payday(now)
     paid = []
-    with _lock:
+    with lock:
+        open_accounts()
         due = db.q("SELECT user_id, ROUND(SUM(amount), 2) due FROM ledger WHERE account='wages' AND user_id IS NOT NULL "
                    "AND created_at<=? GROUP BY user_id HAVING ROUND(SUM(amount), 2) >= 0.01", (cut,))
         when = dt.datetime.fromtimestamp(cut).strftime("%b %d, %Y")
@@ -94,13 +107,15 @@ def process(now=None):
     for r in due:
         db.notify(r["user_id"], f"Payday: {cur}{r['due']:,.2f} was deposited into your bank account.", "/bank", "success")
         log.info("payday %s: driver #%s paid %.2f", when, r["user_id"], r["due"])
+    from . import personal_loans
+    personal_loans.process(now)                     # loan payments come after the pay is in
     return paid
 
 
 def statement(uid, limit=100):
     """Newest first, each with the balance after it."""
     rows = db.q("SELECT id, category, amount, description, job_id, created_at FROM ledger WHERE account='driver' AND user_id=? "
-                "ORDER BY created_at DESC, id DESC LIMIT ?", (uid, limit))
+                "AND amount!=0 ORDER BY created_at DESC, id DESC LIMIT ?", (uid, limit))
     left = balance(uid)
     for r in rows:
         r["after"] = left

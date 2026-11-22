@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import icon, stat, avatar %}
+{% from "_macros.html" import icon, stat, avatar, csrf, status %}
 {% block title %}Bank{% endblock %}
 {% block head %}<style>
 .bank-card{background:linear-gradient(135deg,var(--navy-600),var(--crimson-600));color:#fff;border-radius:16px;padding:22px 24px;min-height:190px;display:flex;flex-direction:column;justify-content:space-between;max-width:420px}
@@ -27,6 +27,27 @@
     {% if pending < 0 %}<p class="small muted">Below zero because paid loads were removed later; it comes off the next pay.</p>{% endif %}
   </div>
 </div>
+
+{% if loans or (mine and lending) %}<div class="card" id="loans" style="margin-bottom:16px;scroll-margin-top:72px"><div class="card-head"><h2>Personal loans</h2>{% if mine and lending %}<button class="btn primary sm right" data-open="dlg-loan">Take a loan</button>{% endif %}</div>
+  {% for l in loans %}<div style="padding:8px 0;border-bottom:1px solid var(--line-soft)"><div class="between"><b>#{{ l.id }} · {{ l.principal|money }} @ {{ l.apr }}%</b>{{ status(l.status) }}</div>
+    <div class="small muted">{{ l.installment|money(2) }} every Friday · {{ l.payments_made }}/{{ l.weeks }} paid · owed {{ l.balance|money(2) }}{% if l.status == 'active' %} · next {{ l.next_due|dt('%b %d') }}{% endif %}</div>
+    <div class="bar navy" style="margin-top:4px"><i style="width:{{ 100 if l.status == 'paid' else l.payments_made / l.weeks * 100 }}%"></i></div>
+    {% if l.status == 'active' and mine %}<form method="post" action="/bank/loan/{{ l.id }}/payoff" style="margin-top:6px">{{ csrf() }}<button class="btn sm" data-confirm="Pay off {{ l.balance|money(2) }} now?">Pay off now</button></form>{% endif %}</div>
+  {% else %}<p class="muted">No loans. The money goes into your own bank account and has nothing to do with the company's.</p>{% endfor %}</div>{% endif %}
+{% if mine and lending %}<dialog id="dlg-loan"><form method="post" action="/bank/loan">{{ csrf() }}
+  <div class="dhead"><h2>Personal loan</h2><button type="button" class="btn ghost sm" data-close aria-label="Close">✕</button></div>
+  <div class="dbody"><div class="field"><label for="loan-plan">Plan</label><select name="plan" id="loan-plan">{% for k, p in PL.PLANS.items() %}<option value="{{ k }}" data-apr="{{ p.apr }}" data-weeks="{{ p.weeks }}">{{ p.label }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="loan-amount">Amount ({{ '{:,}'.format(PL.MIN_LOAN) }} – {{ '{:,}'.format(PL.MAX_LOAN) }})</label><input id="loan-amount" name="amount" type="number" min="{{ PL.MIN_LOAN }}" max="{{ PL.MAX_LOAN }}" step="100" value="2500" required></div>
+  <p id="loan-cost" aria-live="polite" style="font-weight:650"></p>
+  <p class="hint">The money goes straight into your bank account. Fixed instalments are taken from it automatically every Friday, right after payday. Pay off early any time, no penalty. Max {{ PL.MAX_LOANS }} active loans.</p></div>
+  <div class="dfoot"><button type="button" class="btn ghost" data-close>Cancel</button><button class="btn primary">Borrow</button></div></form></dialog>
+<script>
+(function(){var s=document.getElementById("loan-plan"),a=document.getElementById("loan-amount"),o=document.getElementById("loan-cost"),cur={{ S.currency|default('$')|tojson }};
+function m(v){return cur+v.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}
+function up(){var d=s.selectedOptions[0].dataset,P=+a.value,n=+d.weeks,r=+d.apr/5200;if(!(P>0)){o.textContent="";return}
+var w=Math.round(P*r/(1-Math.pow(1+r,-n))*100)/100;o.textContent=m(w)+" every Friday, "+m(w*n)+" in all"}
+s.addEventListener("change",up);a.addEventListener("input",up);up()})();
+</script>{% endif %}
 
 <div class="card flush" style="margin-bottom:16px"><div class="card-head" style="padding:16px 18px 0"><h2>Statement</h2></div>
 <div class="table-wrap"><table><thead><tr><th>Date</th><th>Details</th><th class="num">Amount</th><th class="num">Balance</th></tr></thead><tbody>

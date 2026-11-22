@@ -272,7 +272,7 @@ def clear_points(uid):
 def pay_fine(uid):
     """The driver pays to get every point back now. Returns (ok, message). Once only, however often it is pressed."""
     cur = db.setting("currency", "$")
-    with _lock:
+    with _lock, bank.lock:
         r = refresh(uid)
         if not r or not r["used"]:
             return False, "There are no points on your licence to clear."

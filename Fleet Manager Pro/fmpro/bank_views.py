@@ -1,7 +1,9 @@
 """Bank page: a driver's own account, next pay, pay slips and statement. Managers can look at drivers they outrank."""
-from flask import Blueprint, abort, render_template, request
+import math
 
-from . import bank, db
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+
+from . import bank, db, personal_loans
 from .auth import can, login_required, role_level, user
 
 bp = Blueprint("bank", __name__)
@@ -33,4 +35,26 @@ def page():
     uid = who["id"]
     return render_template("bank.html", who=who, mine=uid == me["id"], number=bank.number(uid), balance=bank.balance(uid),
                            pending=bank.pending(uid), waiting=bank.waiting(uid), payday=bank.next_payday(),
-                           rows=bank.statement(uid), stubs=bank.stubs(uid), people=people)
+                           rows=bank.statement(uid), stubs=bank.stubs(uid), people=people,
+                           loans=personal_loans.loans(uid), lending=personal_loans.enabled(), PL=personal_loans)
+
+
+def _done(ok, text):
+    flash(text, "success" if ok else "error")
+    return redirect(url_for("bank.page") + "#loans")
+
+
+@bp.route("/bank/loan", methods=["POST"])
+@login_required
+def borrow():
+    try:
+        v = float(request.form.get("amount", "").replace(",", "").strip())
+    except ValueError:
+        v = 0.0
+    return _done(*personal_loans.take(user()["id"], request.form.get("plan", ""), v if math.isfinite(v) else 0.0))
+
+
+@bp.route("/bank/loan/<int:lid>/payoff", methods=["POST"])
+@login_required
+def loan_payoff(lid):
+    return _done(*personal_loans.payoff(user()["id"], lid))

@@ -81,11 +81,14 @@ Rebuild after a game update or new DLC (writes `fmpro/cargo_list.json`):
 * **Dispatch holds** — drivers who are out of hours or whose truck is on hold can't claim contracts; the Drivers page
   shows each driver's hours left.
 
-* **Driver bank accounts (My Bank)** — each driver's own account, separate from the company account. Pay leaves the
+* **Driver bank accounts (My Bank)** — each driver's own account, separate from the company account. It opens with 3,000
+  (Settings → Economy; not taken from the company). Pay leaves the
   company account when a load is delivered, waits as the week's pay, and is deposited every Friday at noon (the clock of
   the PC running the program; made up later if it was closed). Statement, pay slips, next pay. Fines (game, Hours of
   Service, DVIR, roadside inspections), traffic tickets and licence fines come out of it; Settings → Economy can make
-  the company pay the fines instead. One offence is never paid twice. Private: only the driver and managers who outrank them see it.
+  the company pay the fines instead. One offence is never paid twice. Personal loans at one of four APRs (4, 12, 26 or 52 weeks)
+  work like the company's loans: the money goes into the driver's account and fixed instalments are taken from it every
+  Friday after payday. Private: only the driver and managers who outrank them see it.
 * **Driver's licences (CDL & Points)** — off until turned on. A driver passes a drivers test of two in-game hours
   (pre-trip, control skills, road, park), marked from live telemetry; 80 of 100 marks pass. The licence has 12 points.
   Accidents, red lights, fines and every 5 real minutes of speeding cost points and a ticket from the driver's bank account.
@@ -155,6 +158,7 @@ fmpro/pages.py            pages and forms: dashboard, logbook, dispatch, fleet, 
 fmpro/compliance.py       Hours of Service rules and clocks, DVIR, roadside inspections, dispatch holds
 fmpro/compliance_views.py the ELD & Compliance pages
 fmpro/bank.py             drivers' bank accounts and the Friday payday (bank_views.py: the page)
+fmpro/personal_loans.py   drivers' personal loans (the company's own loans are in economy.py)
 fmpro/cdl.py              driver's licences: points, tickets, suspension (not the program's own licence: licensing.py)
 fmpro/cdl_test.py         the drivers test: marks one telemetry frame at a time
 fmpro/cdl_views.py        the CDL & Points page

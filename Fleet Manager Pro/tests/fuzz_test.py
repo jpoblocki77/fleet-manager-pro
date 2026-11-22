@@ -71,7 +71,7 @@ def main():
         "/leasing/plans/save": ["id", "name", "weeks", "allowed", "excess_rate", "down_pct", "apr", "residual_pct", "early_fee_pct"],
         f"/fleet/truck/{tid}/delete": [], f"/fleet/trailer/{trl}/delete": [], "/fleet/clear-sold": [],
         "/drivers/9999/fire": ["confirm"], "/drivers/purge-former": [],
-        "/cdl/driver/%d" % uid: ["action"], "/cdl/pay": [], "/cdl/test/start": [], "/cdl/test/cancel": [], "/cdl/issue-all": [],
+        "/cdl/driver/%d" % uid: ["action"], "/cdl/pay": [], "/bank/loan": ["plan", "amount"], "/bank/loan/1/payoff": [], "/cdl/test/start": [], "/cdl/test/cancel": [], "/cdl/issue-all": [],
         "/compliance/status": ["status", "game"], "/settings": ["section", "repair_cost_per_pct", "fuel_price"],
     }
     # valid values for each form; the scan swaps one field at a time for an odd value
@@ -90,7 +90,7 @@ def main():
         f"/fleet/lease/{lsid}/end": {"action": "renew", "plan_id": "1"},
         "/leasing/plans/save": {"name": "F", "weeks": "10", "allowed": "5000", "excess_rate": "0.2", "down_pct": "5", "apr": "5",
                                 "residual_pct": "50", "early_fee_pct": "20"},
-        "/settings": {"section": "economy"},
+        "/settings": {"section": "economy"}, "/bank/loan": {"plan": "short", "amount": "600"},
     }
     for who, pw in [("owner", "ownerpass1")] + [(f"u_{r}", "pass12345") for r in ("admin", "dispatcher", "driver", "trainee")]:
         c.get("/login")

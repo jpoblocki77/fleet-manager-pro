@@ -223,6 +223,8 @@ DEFAULT_SETTINGS = {
     # driver's licences (cdl.py): off until the Owner or a Manager turns them on
     "licence_enabled": "0", "licence_block": "1", "licence_tickets": "1", "licence_fine": "5000",
     "licence_speed_min": "5", "licence_retest_hours": "0",
+    "personal_loans": "1",                               # drivers may borrow (personal_loans.py)
+    "bank_opening": "3000",                              # what a driver's bank account starts with
     "drivers_pay_fines": "1",                            # fines come out of the driver's bank account
 }
 
@@ -267,10 +269,11 @@ def init(path):
     c.commit()
     backfill_map()
     backfill_deductions()
-    from . import cdl, leasing, trailer_leasing
+    from . import cdl, leasing, personal_loans, trailer_leasing
     leasing.init()
     trailer_leasing.init()
     cdl.init()
+    personal_loans.init()
     if setting("repair_cost_lowered") != "1":            # 0.02: 180 per 1% wear made repairs cost far too much
         if setting("repair_cost_per_pct") == "180":
             set_setting("repair_cost_per_pct", "40")
