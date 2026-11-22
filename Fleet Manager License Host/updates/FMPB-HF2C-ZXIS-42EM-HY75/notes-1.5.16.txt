@@ -1,0 +1,1 @@
+Fuel fill-ups are tracked again, even when you stay on the pump screen for a few minutes before paying. The in-game overlay now works when you start Fleet Manager Pro in LAN mode.
