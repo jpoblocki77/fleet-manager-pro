@@ -13,7 +13,7 @@ bp = Blueprint("comp", __name__)
 
 def _uid_arg():
     a = request.args.get("driver", "") or request.args.get("user", "")
-    if a.isdigit() and db.val("SELECT id FROM users WHERE id=?", (int(a),)):
+    if a.isdecimal() and db.val("SELECT id FROM users WHERE id=?", (int(a),)):
         return int(a)
     return user()["id"]
 
@@ -57,7 +57,7 @@ def page():
     if tab == "logbook":
         c = compliance.clocks(uid, now_min, game) if now_min else None
         day = request.args.get("day", "")
-        day = int(day) if day.lstrip("-").isdigit() else ((now_min or 0) // 1440)
+        day = int(day) if day.lstrip("-").isdecimal() else ((now_min or 0) // 1440)
         start, end = day * 1440, day * 1440 + 1440
         segs = db.q("SELECT * FROM hos_logs WHERE user_id=? AND COALESCE(game,'ats')=? AND COALESCE(end_min,start_min) >= ? "
                     "AND start_min < ? ORDER BY start_min, id", (uid, game, start, end))
@@ -157,7 +157,7 @@ def dvir_submit():
     uid = user()["id"]
     kind = request.form.get("kind") if request.form.get("kind") in ("pre", "post") else "pre"
     tid = request.form.get("truck_id", "")
-    tid = int(tid) if tid.isdigit() and db.val("SELECT id FROM trucks WHERE id=?", (int(tid),)) else None
+    tid = int(tid) if tid.isdecimal() and db.val("SELECT id FROM trucks WHERE id=?", (int(tid),)) else None
     items, defects = {}, []
     for key, label, _hint in compliance.DVIR_ITEMS:
         state = request.form.get(f"item_{key}")
@@ -215,7 +215,7 @@ def dvir_repair(did):
 @login_required(role="dispatcher")
 def inspect_now():
     uid = request.form.get("driver", "")
-    uid = int(uid) if uid.isdigit() else user()["id"]
+    uid = int(uid) if uid.isdecimal() else user()["id"]
     v = _live_values(uid)
     if not v:
         flash("That driver has no live telemetry — the inspection needs the truck's current data.", "error")
@@ -230,7 +230,7 @@ def inspect_now():
 @login_required
 def api_hos():
     a = request.args.get("user", "")
-    uid = int(a) if a.isdigit() else user()["id"]
+    uid = int(a) if a.isdecimal() else user()["id"]
     game = _game(uid)
     c = compliance.clocks(uid, _now_min(uid, game), game)
     return jsonify(clocks=c, holds=compliance.holds(uid, game), statuses=compliance.STATUSES)

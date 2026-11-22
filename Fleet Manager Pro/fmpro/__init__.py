@@ -6,6 +6,7 @@ import sys
 import time
 
 from flask import Flask, request, g
+from werkzeug.routing import IntegerConverter
 from flask.sessions import SecureCookieSessionInterface
 
 
@@ -69,6 +70,13 @@ class _PagesLoader:
         return Loader()
 
 
+class _RecordId(IntegerConverter):
+    """Record numbers in addresses: anything SQLite can't hold doesn't exist, so it's a 404 rather than a crash."""
+    def __init__(self, url_map, *args, **kw):
+        kw.setdefault("max", 2 ** 63 - 1)
+        super().__init__(url_map, *args, **kw)
+
+
 def create_app(data_dir=None, start_telemetry=True, check_licence=True):
     from . import db, auth, pages, api, licensing, compliance_views
     from .telemetry.service import HUB
@@ -98,6 +106,7 @@ def create_app(data_dir=None, start_telemetry=True, check_licence=True):
         updater.start()
 
     app = Flask(__name__)
+    app.url_map.converters["int"] = _RecordId
     from . import howto
     howto.install(app)                      # the "How to use this page" panel at the top of each page
     if emb is not None:
@@ -163,6 +172,11 @@ def _logging_hooks(app):
     @app.teardown_request
     def _log_error(exc):
         if exc is not None:
+            try:
+                from . import db
+                db.conn().rollback()    # whatever the failed request had half-written is undone, and nothing stays locked
+            except Exception:  # nosec B110  # the error itself is what matters, and it is logged below
+                pass
             try:
                 logs.get("error").error("unhandled error on %s %s", request.method, request.path, exc_info=exc)
             except Exception:  # nosec B110  # logging an error must never raise another

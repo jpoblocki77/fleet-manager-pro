@@ -27,6 +27,7 @@ os.makedirs(DOWNLOADS, exist_ok=True)
 OUT = os.path.join(DOWNLOADS, "For Buyer")
 PUBLIC_LICENCE_SERVER = "https://fleetmanager.servehttp.com:8750"
 NAME = "Fleet Manager Pro"
+DATA_README = "READ ME - Your Data.txt"
 
 
 BUYER_RX = re.compile(r"^FMP-[A-Z0-9]{4}(-[A-Z0-9]{4}){3}$")
@@ -168,8 +169,8 @@ def main():
     readme = re.sub(r"\n## Start\n.*?(?=\n## )", '''
 ## Start
 
-1. Unzip the folder anywhere (for example your Desktop).
-2. Double-click **Fleet Manager Pro.exe**. Your browser opens <http://127.0.0.1:8760>. Nothing else needs installing.
+1. Run **Fleet Manager Pro Setup.exe** (or, if you were sent a zip, unzip it anywhere, for example your Desktop).
+2. Start **Fleet Manager Pro** from the Start menu (zip: double-click **Fleet Manager Pro.exe**). Your browser opens <http://127.0.0.1:8760>. Nothing else needs installing.
    (Windows may show "Windows protected your PC" the first time: click *More info* → *Run anyway*.)
    **Microsoft Defender flagged or removed it?** That's a false positive while the program isn't code-signed yet - a
    temporary step until Microsoft signs and clears it. Restore and allow it in Windows Security → Virus & threat
@@ -178,14 +179,25 @@ def main():
 4. **Settings → Telemetry → Game plugin → Install** (or copy `plugin\\\\scs-telemetry.dll` into
    `<game>\\\\bin\\\\win_x64\\\\plugins\\\\`). Start the game and click OK on the "advanced SDK features" message.
 
-To let drivers on your network connect, start it with **Start Fleet Manager Pro (LAN).bat**; they open the
-`https://` address it prints. Your data lives in the `data` folder next to the program: back that folder up.
+To let drivers on your network connect, start **Fleet Manager Pro (LAN)** from the Start menu (zip: **Start Fleet
+Manager Pro (LAN).bat**); they open the `https://` address it prints.
+
+Your data lives in the `data` folder next to the program. **READ ME - Your Data.txt** explains where that is, how to
+move it to a new version or PC, and how to back it up.
+
+Installation help: <http://fleetmanager.servehttp.com:8080/install.html> (also in **Installation Guide.pdf**).
+What every feature does and how to use it, searchable: <http://fleetmanager.servehttp.com:8080/features.html>.
+Questions and troubleshooting: <http://fleetmanager.servehttp.com:8080/faq.html>.
 
 Remote drivers stream their own game with (token and fingerprint are on their profile page):
 
     "Fleet Manager Pro.exe" agent --server https://HOST-PC:8760 --token TOKEN --pin FINGERPRINT
 ''', readme, flags=re.S)
     open(os.path.join(OUT, "README.md"), "w", encoding="utf-8", newline="\n").write(readme)
+    with open(os.path.join(HERE, "Guides", DATA_README), encoding="utf-8") as f:       # where the data lives, how to move it
+        text = f.read().replace("{VERSION}", version)
+    with open(os.path.join(OUT, DATA_README), "w", encoding="utf-8-sig", newline="\r\n") as f:
+        f.write(text)
     guide = os.path.join(HERE, "Guides", "Fleet Manager Pro - Installation Guide.pdf")
     if os.path.exists(guide):
         shutil.copy2(guide, os.path.join(OUT, "Installation Guide.pdf"))

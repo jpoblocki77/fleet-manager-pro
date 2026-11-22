@@ -2442,6 +2442,25 @@ def main():
     with srv.hits_lock:
         srv.hits.clear()
 
+    print("Robustness: huge numbers, failed writes, links after signing in")
+    huge_ = "9" * 20
+    codes_ = {u: c.get(u).status_code for u in (f"/jobs/{huge_}", f"/drivers/{huge_}", f"/fleet/truck/{huge_}", f"/events/{huge_}",
+                                                f"/fleet/trailer-lease/{huge_}")}
+    check(set(codes_.values()) == {404}, f"a record number too large to exist is a 404, not a crash ({codes_})")
+    check(c.get(f"/jobs?page={huge_}").status_code == 200 and c.get("/jobs?page=²").status_code == 200,
+          "odd page numbers show the Logbook")
+    check(c.get(f"/jobs?driver={huge_}").status_code == 404, "a driver filter too large to exist is a 404")
+    check(post(f"/drivers/{huge_}/edit").status_code == 404, "the same for form posts")
+    import sqlite3 as _sq4
+    try:
+        db.insert("users", username="boss", display_name="Twin", password_hash="x", role="driver", agent_token="twin", created_at=1)
+        check(False, "a duplicate username is refused by the database")
+    except _sq4.IntegrityError:
+        check(not db.conn().in_transaction, "a failed write doesn't leave the database locked")
+    loc_ = app.test_client().get("/leaderboard?view=global&metric=xp").headers["Location"]
+    check(_up.parse_qs(_up.urlsplit(loc_).query).get("next") == ["/leaderboard?view=global&metric=xp"],
+          "signing in returns to the same view, filters and all")
+
     print("Recruitment: reviewing and hiring")
     rid_ = ra["id"]
     page = c.get("/recruitment").get_data(as_text=True)

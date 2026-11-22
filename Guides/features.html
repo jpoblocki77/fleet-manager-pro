@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Features - Fleet Manager Pro</title>
+<meta name="description" content="What every Fleet Manager Pro feature does and how to use it, for American Truck Simulator and Euro Truck Simulator 2.">
+<style>
+:root{--bg:#f4f7fb;--card:#fff;--ink:#1b2a41;--muted:#4c6283;--line:#d3dcea;--pale:#eef2f8;--accent:#c8102e;--mark:#ffe08a}
+@media (prefers-color-scheme:dark){:root{--bg:#071327;--card:#0d203d;--ink:#e8eef8;--muted:#93a7c6;--line:#1d3a66;--pale:#12294c;--accent:#f0556d;--mark:#6b5200}}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:100px}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 "Segoe UI",system-ui,sans-serif}a{color:var(--accent)}
+header{background:linear-gradient(135deg,#050e1c,#15325e);border-bottom:5px solid #c8102e;color:#fff;padding:44px 20px;text-align:center}
+header h1{margin:0;font-size:clamp(28px,5vw,42px);line-height:1.15}header p{margin:8px auto 0;color:#b9cbe6;max-width:62ch}header a{color:#fff}
+.search{display:none}.js .search{display:block;position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding:12px 20px}
+.search div{max-width:1080px;margin:0 auto;display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center}
+.search input{flex:1 1 220px;min-width:0;padding:11px 14px;font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px}
+.search label{font-weight:600}.search p{margin:0;color:var(--muted);font-size:14px;flex:0 0 100%;min-height:1.6em}
+.wrap{max-width:1120px;margin:0 auto;padding:24px 20px;display:grid;grid-template-columns:230px minmax(0,1fr);gap:28px;align-items:start}
+nav{position:sticky;top:110px;max-height:calc(100vh - 130px);overflow-y:auto;font-size:14.5px}
+nav b{display:block;margin:12px 0 4px}nav b:first-child{margin-top:0}
+nav a{display:block;padding:3px 10px;color:var(--ink);text-decoration:none;border-left:3px solid var(--line)}
+nav a:hover,nav a:focus-visible{border-color:var(--accent);color:var(--accent)}
+main{min-width:0}h2{font-size:25px;margin:30px 0 12px}h2:first-child,section:first-child h2{margin-top:0}
+article{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 26px;margin:0 0 14px}
+article h3{margin:0;font-size:20px;color:var(--accent)}article h4{margin:14px 0 2px;font-size:15px}
+.meta{margin:2px 0 10px;color:var(--muted);font-size:14px}article p{margin:6px 0}ol,ul{margin:4px 0;padding-left:24px}li{margin:4px 0}li::marker{color:var(--accent);font-weight:700}
+code{font-family:Consolas,monospace;font-size:.92em;overflow-wrap:anywhere}[hidden]{display:none!important}
+::highlight(found){background-color:var(--mark)}
+footer{text-align:center;color:var(--muted);font-size:14px;padding:0 20px 34px}
+@media (max-width:760px){.wrap{grid-template-columns:minmax(0,1fr);padding:16px}nav{position:static;max-height:260px;border:1px solid var(--line);border-radius:10px;padding:10px}article{padding:16px}}
+@media print{nav,.search{display:none!important}.wrap{display:block;padding:0}article{border:0;break-inside:avoid}}
+</style>
+</head>
+<body>
+<header><h1>Features</h1><p>What every Fleet Manager Pro feature does, and how to use it</p>
+<p>Installing? See the <a href="install.html">installation guide</a>. Something wrong? See the <a href="faq.html">FAQ &amp; troubleshooting</a>.</p></header>
+<div class="search" role="search"><div><label for="q">Search</label>
+<input id="q" type="search" placeholder="For example: overlay, lease, loan, backup" autocomplete="off"><p id="found" role="status"></p></div></div>
+<div class="wrap">
+<nav aria-label="Features"><b data-area="a-start">Getting around</b><a href="#menu">Menu and page help</a><a href="#game-box">Game box (ATS, ETS2 or both)</a><a href="#status">Connection status</a><a href="#notifications">Notifications</a><a href="#theme">Light and dark look</a><a href="#roles">Roles</a><b data-area="a-drive">While you drive</b><a href="#dashboard">Dashboard</a><a href="#live">Live Cockpit</a><a href="#fluids">Fuel &amp; AdBlue</a><a href="#map">Fleet Map</a><a href="#telemetry">Telemetry Data</a><a href="#overlay">In-game overlay</a><a href="#stream">Stream overlay (OBS)</a><a href="#tablet">Connect a Tablet</a><b data-area="a-jobs">Jobs and dispatch</b><a href="#logbook">Logbook</a><a href="#job">Job details</a><a href="#manual">Log a job by hand</a><a href="#score">Driving score, XP, levels and ranks</a><a href="#dispatch">Dispatch Board</a><a href="#send">Send to game</a><a href="#planner">Route Planner</a><b data-area="a-eld">ELD &amp; Compliance</b><a href="#hos">Electronic logbook (Hours of Service)</a><a href="#rest">Simulate rest</a><a href="#dvir">Vehicle inspections (DVIR)</a><a href="#roadside">Roadside inspections</a><a href="#reset-eld">Reset compliance records</a><b data-area="a-fleet">Trucks, trailers and leasing</b><a href="#trucks">Trucks</a><a href="#maintenance">Maintenance</a><a href="#garages">Garages</a><a href="#trailers">Trailers</a><a href="#lease">Truck Leasing</a><a href="#trailer-lease">Trailer Leasing</a><b data-area="a-money">Money and results</b><a href="#finance">Finance</a><a href="#loans">Loans</a><a href="#expenses">Expenses</a><a href="#insights">Insights</a><a href="#performance">Driver Performance</a><b data-area="a-people">Drivers and recruitment</b><a href="#drivers">Drivers and divisions</a><a href="#profile">Profiles</a><a href="#connect">Connect a driver (their own PC)</a><a href="#lan">LAN mode</a><a href="#recruitment">Recruitment</a><b data-area="a-community">Community</b><a href="#events">Events &amp; Convoys</a><a href="#leaderboard">Leaderboard</a><a href="#global">Global Leaderboard</a><a href="#achievements">Achievements</a><a href="#announcements">Announcements</a><a href="#messages">Messages</a><a href="#discord">Discord posts</a><b data-area="a-admin">Settings and admin</b><a href="#set-company">Company settings and colours</a><a href="#set-economy">Economy settings</a><a href="#set-telemetry">Telemetry settings and game plugin</a><a href="#demo">Demo simulator</a><a href="#set-compliance">Compliance settings</a><a href="#licence">Licence</a><a href="#updates">Updates</a><a href="#backups">Backups</a><a href="#logs">Logs and health</a><a href="#audit">Audit log</a><a href="#clear">Clear all data</a><a href="#dissolve">Dissolve the company</a></nav>
+<main>
+<section id="a-start"><h2>Getting around</h2>
+<article id="menu"><h3>Menu and page help</h3><p class="meta"><b>Where:</b> Left side of every page &middot; <b>Who:</b> Everyone</p>
+<h4>What it does</h4><p>The menu groups every page under Operations, Company, Community and Admin. Each page opens with a <b>How to use this page</b> panel with short steps that fit your role.</p>
+<h4>How to use it</h4><ol><li>Click a page in the menu on the left.</li><li>Read <b>How to use this page</b> at the top.</li><li>Fold the panel away when you know the page. Your browser remembers that for each page.</li></ol>
+<h4>Good to know</h4><ul><li>Admin pages only show for Managers and the Owner.</li><li>Click a driver, a job or a truck on most pages to see its details.</li></ul>
+</article>
+<article id="game-box"><h3>Game box (ATS, ETS2 or both)</h3><p class="meta"><b>Where:</b> Top bar &middot; <b>Who:</b> Everyone</p>
+<h4>What it does</h4><p>Chooses which game's data you see and in which units: ATS in miles and pounds, ETS2 in kilometres and tonnes, or both games.</p>
+<h4>How to use it</h4><ol><li>Open the <b>Game</b> box at the top.</li><li>Pick <b>ATS only</b>, <b>ETS2 only</b> or <b>Both games</b>.</li></ol>
+<h4>Good to know</h4><ul><li>It filters the logbook, dashboard, dispatch, events, leaderboard, driver figures, garages, trucks and map.</li><li>Money (Finance) is for the whole company.</li><li>If jobs seem to be missing, check this box first.</li></ul>
+</article>
+<article id="status"><h3>Connection status</h3><p class="meta"><b>Where:</b> Top bar &middot; <b>Who:</b> Everyone</p>
+<h4>What it does</h4><p>Shows whether Fleet Manager Pro can see your game, and your truck and speed while you drive.</p>
+<h4>How to use it</h4><ol><li>Start the game and get into your truck.</li><li>Look at the top bar: your speed and truck appear.</li></ol>
+<h4>Good to know</h4><ul><li><b>waiting for game</b>: the game plugin isn't loaded. Install it in <b>Settings &gt; Telemetry</b>.</li><li><b>game not running</b>: the game is closed or still in its menus.</li></ul>
+</article>
+<article id="notifications"><h3>Notifications</h3><p class="meta"><b>Where:</b> Bell in the top bar &middot; <b>Who:</b> Everyone</p>
+<h4>What it does</h4><p>Tells you about things meant for you: a contract assigned to you, a level up, low fuel, an event that changed, a new application.</p>
+<h4>How to use it</h4><ol><li>Click the bell. The red number counts unread ones.</li><li>Click a notification to open what it is about.</li><li>Click <b>x</b> to delete one, <b>Mark all read</b> to clear the number, or <b>Delete all</b>.</li></ol>
+</article>
+<article id="theme"><h3>Light and dark look</h3><p class="meta"><b>Where:</b> Sun button in the top bar &middot; <b>Who:</b> Everyone</p>
+<h4>What it does</h4><p>Switches between the dark and light look.</p>
+<h4>How to use it</h4><ol><li>Click the sun button. Click it again to go back.</li></ol>
+<h4>Good to know</h4><ul><li>Company colours are a separate setting: see <b>Company settings</b>.</li></ul>
+</article>
+<article id="roles"><h3>Roles</h3><p class="meta"><b>Where:</b> Drivers &middot; <b>Who:</b> Managers and the Owner set them</p>
+<h4>What it does</h4><p>A member's role decides what they can do: <b>Owner</b> (everything), <b>Manager</b> (fleet, finance, members, recruitment and settings), <b>Dispatcher</b> (contracts, events and announcements), <b>Driver</b> and <b>Trainee</b> (drive, claim contracts, log jobs, sign up for events).</p>
+<h4>How to use it</h4><ol><li>Open <b>Drivers</b> and click the member.</li><li>Under <b>Management</b>, choose the role and press <b>Save</b>.</li></ol>
+<h4>Good to know</h4><ul><li>Only the Owner can make someone a Manager, take loans, or dissolve the company.</li><li>A Manager can't edit or remove anyone at their own level or above.</li></ul>
+</article>
+</section>
+<section id="a-drive"><h2>While you drive</h2>
+<article id="dashboard"><h3>Dashboard</h3><p class="meta"><b>Where:</b> Operations &gt; Dashboard &middot; <b>Who:</b> Everyone</p>
+<h4>What it does</h4><p>Your company at a glance: the last 14 days of revenue and distance, who is driving now, recent jobs, top drivers, your wallet and level, news, upcoming events and open contracts.</p>
+<h4>How to use it</h4><ol><li>Open it when you start a session.</li><li>Look at <b>Open contracts</b> for work and <b>Announcements</b> for news.</li><li>Click any job, driver or event to open it.</li></ol>
+<h4>Good to know</h4><ul><li>Managers also see jobs awaiting approval and new applications.</li></ul>
+</article>
+<article id="live"><h3>Live Cockpit</h3><p class="meta"><b>Where:</b> Operations &gt; Live Cockpit &middot; <b>Who:</b> Everyone</p>
+<h4>What it does</h4><p>A live dashboard for your truck that updates 4 times a second: speed and limit, RPM, gear, cruise control, current job, fluids, damage, your pedals and steering, lights, warnings, navigation, Hours of Service, trailers and wheels.</p>
+<h4>How to use it</h4><ol><li>Start the game and get into your truck. The page fills in by itself.</li><li>Put it on a second screen, or on a tablet with <b>Connect a Tablet</b>.</li><li>Press <b>Stream overlay</b> for OBS, or <b>All data points</b> for every value.</li></ol>
+</article>
+<article id="fluids"><h3>Fuel &amp; AdBlue</h3><p class="meta"><b>Where:</b> Operations &gt; Fuel &amp; AdBlue &middot; <b>Who:</b> Everyone</p>
+<h4>What it does</h4><p>Live tank levels and a graph of them over time, plus a refuel log showing when you filled up, how much went in and the level after.</p>
+<h4>How to use it</h4><ol><li>Drive: the bars and graph fill in by themselves.</li><li>Pick 1 hour, 6 hours, 24 hours or 7 days.</li><li>Scroll down for the refuel log.</li></ol>
+<h4>Good to know</h4><ul><li>Readings are kept for 30 days.</li><li>Managers can pick another driver at the top.</li><li>The driver, Managers and the Owner are told when fuel or AdBlue runs low. Turn that off in <b>Settings &gt; Compliance</b>.</li></ul>
+</article>
+<article id="map"><h3>Fleet Map</h3><p class="meta"><b>Where:</b> Operations &gt; Fleet Map &middot; <b>Who:</b> Everyone</p>
+<h4>What it does</h4><p>A real map of borders and cities. Roads your company drives are drawn in and remembered, places you visit are marked, and drivers on the road show live.</p>
+<h4>How to use it</h4><ol><li>Scroll to zoom and drag to move.</li><li>Choose ATS or ETS2.</li><li>Press <b>Whole map</b> to see everything, or <b>Fit drivers</b> to zoom to the trucks driving now.</li></ol>
+<h4>Good to know</h4><ul><li>The map starts empty and fills in as your drivers haul.</li><li>Cities become exact once you have been there; unvisited UK cities in ETS2 are approximate.</li></ul>
+</article>
+<article id="telemetry"><h3>Telemetry Data</h3><p class="meta"><b>Where:</b> Operations &gt; Telemetry Data &middot; <b>Who:</b> Everyone</p>
+<h4>What it does</h4><p>Every value the game sends, grouped and searchable: truck, engine, lights, damage, job, navigation, wheels and trailers. Values that change flash red.</p>
+<h4>How to use it</h4><ol><li>Type part of a name to find a value, or pick a group.</li><li>Press <b>Pause</b> to hold the list still.</li><li>Press <b>Download snapshot</b> to save everything as a JSON file.</li></ol>
+<h4>Good to know</h4><ul><li>Managers also get a raw view for troubleshooting.</li></ul>
+</article>
+<article id="overlay"><h3>In-game overlay</h3><p class="meta"><b>Where:</b> Operations &gt; Overlays &middot; <b>Who:</b> Everyone</p>
+<h4>What it does</h4><p>A small panel that floats over the game with the values you choose, plus pop-ups for breaks due, drive time running out, violations, inspections, defects and low fuel.</p>
+<h4>How to use it</h4><ol><li>Run the game in <b>windowed</b> or <b>borderless</b> mode.</li><li>Tick the values you want: driving, job, fuel and truck, or Hours of Service.</li><li>Choose alerts, position, opacity, size and the hide/show key.</li><li>Press <b>Save</b>, then <b>Open the overlay</b>.</li><li>In the game, press <b>Ctrl + I</b> (or your key) to hide or show it.</li></ol>
+<h4>Good to know</h4><ul><li>Clicks go straight through it to the game.</li><li>Exclusive full screen hides it, like every other window.</li><li>It can open by itself when Fleet Manager Pro starts, and hide when the game is closed.</li></ul>
+</article>
+<article id="stream"><h3>Stream overlay (OBS)</h3><p class="meta"><b>Where:</b> Operations &gt; Overlays &middot; <b>Who:</b> Everyone</p>
+<h4>What it does</h4><p>A see-through panel for OBS, a second screen or a tablet: company and driver, speed, gear, trip, deadline, fuel, Hours of Service, damage, clock, your chosen values and alerts.</p>
+<h4>How to use it</h4><ol><li>Choose a layout: wide bar, column or compact.</li><li>Tick what to show, set the size and watch the preview.</li><li>Press <b>Copy</b> to copy your link.</li><li>In OBS: <b>Sources &gt; + &gt; Browser</b>, paste the link, width 1920, height 220, OK.</li><li>Drag it where you want it.</li></ol>
+<h4>Good to know</h4><ul><li>Keep the link private: it signs in by itself. If it leaks, press <b>New token</b> on your profile.</li><li>Use <b>Solid background</b> for a second screen; leave it off for OBS.</li></ul>
+</article>
+<article id="tablet"><h3>Connect a Tablet</h3><p class="meta"><b>Where:</b> Community &gt; Connect a Tablet &middot; <b>Who:</b> Everyone; Managers and the Owner turn it on</p>
+<h4>What it does</h4><p>Opens Fleet Manager Pro on a tablet or phone by scanning a code. You are signed in as yourself.</p>
+<h4>How to use it</h4><ol><li>A Manager presses <b>Turn on tablet access</b>. If Windows asks, choose <b>Private networks</b> and <b>Allow</b>.</li><li>Put the tablet on the same Wi-Fi as the PC.</li><li>Scan the code with the camera and tap the link.</li><li>The browser warns about the certificate the first time. iPad: <b>Show Details &gt; visit this website</b>. Android: <b>Advanced &gt; Proceed</b>.</li><li>Use <b>Add to Home Screen</b> to open it like an app.</li></ol>
+<h4>Good to know</h4><ul><li>Each code works once and for a few minutes. Keep it private.</li><li>Press <b>Turn off tablet access</b> when you don't need it.</li></ul>
+</article>
+</section>
+<section id="a-jobs"><h2>Jobs and dispatch</h2>
+<article id="logbook"><h3>Logbook</h3><p class="meta"><b>Where:</b> Operations &gt; Logbook &middot; <b>Who:</b> Everyone</p>
+<h4>What it does</h4><p>Every delivery. A job you drive is logged the moment you deliver it, with route, cargo, distance, pay, costs, profit and driving score.</p>
+<h4>How to use it</h4><ol><li>Start Fleet Manager Pro <i>before</i> you drive.</li><li>Take a job in the game and deliver it.</li><li>Use search, driver, status and game, then <b>Filter</b>.</li><li>Click a job to open it.</li><li>Press <b>Export CSV</b> for a spreadsheet.</li></ol>
+<h4>Good to know</h4><ul><li>Jobs from the demo simulator are marked <i>demo</i> and can be cleared.</li></ul>
+</article>
+<article id="job"><h3>Job details</h3><p class="meta"><b>Where:</b> Logbook &gt; click a job &middot; <b>Who:</b> Everyone; Managers and the Owner approve and delete</p>
+<h4>What it does</h4><p>One delivery in full: the route you drove, a timeline, every cost, anything the game took off the pay, damage, speeding, fuel and the driving score.</p>
+<h4>How to use it</h4><ol><li>Open a job from the Logbook.</li><li>Managers: press <b>Approve &amp; pay</b> or <b>Reject</b> on a held job, or <b>Clear flags</b>.</li><li>Managers: <b>Delete job</b> removes it.</li></ol>
+<h4>Good to know</h4><ul><li>Pay is held when the checks find something odd: a position jump without a ferry or train, too much distance, a trip finished too fast, a drive the app barely saw, or pay far above the offer.</li></ul>
+</article>
+<article id="manual"><h3>Log a job by hand</h3><p class="meta"><b>Where:</b> Logbook &gt; Log a job &middot; <b>Who:</b> Everyone</p>
+<h4>What it does</h4><p>Adds a delivery you drove without telemetry.</p>
+<h4>How to use it</h4><ol><li>Press <b>Log a job</b>.</li><li>Fill in the cargo, route, distance and pay. Add fuel, tolls, fines and damage if you know them.</li><li>Put a screenshot link in <b>Notes / proof</b> if your company wants one.</li><li>Press <b>Submit job</b>.</li></ol>
+<h4>Good to know</h4><ul><li>Drivers' manual jobs wait for a Manager unless that is turned off in <b>Settings &gt; Economy</b>.</li></ul>
+</article>
+<article id="score"><h3>Driving score, XP, levels and ranks</h3><p class="meta"><b>Where:</b> Logbook and your profile &middot; <b>Who:</b> Everyone</p>
+<h4>What it does</h4><p>Each delivery gets a score from 0 to 100. You start at 100 and lose points for cargo damage, truck wear, fines, speeding and arriving late. Distance and weight earn XP, and a better score earns more.</p>
+<h4>How to use it</h4><ol><li>Drive carefully and on time.</li><li>See a job's score on its page.</li><li>See your level and next rank on your profile.</li></ol>
+<h4>Good to know</h4><ul><li>The most you can lose: cargo damage 40, fines 30 (8 each), truck wear 25, speeding 25, late 15.</li><li>Special transport adds 25% of the base XP and a company contract adds 20%.</li><li>Ranks: Rookie, Driver (level 5), Senior Driver (10), Road Captain (20), Veteran (35), Elite (50), Legend (75).</li><li>XP rates and how much speeding is forgiven are in <b>Settings &gt; Economy</b>.</li></ul>
+</article>
+<article id="dispatch"><h3>Dispatch Board</h3><p class="meta"><b>Where:</b> Operations &gt; Dispatch &middot; <b>Who:</b> Everyone can claim; Dispatchers, Managers and the Owner post</p>
+<h4>What it does</h4><p>Contracts the company wants driven, with a bonus, priority and deadline. A matching delivery completes the contract by itself.</p>
+<h4>How to use it</h4><ol><li>Dispatchers: press <b>New contract</b>.</li><li>Choose the game, cities, companies and cargo from the lists. Only the destination city is required.</li><li>Set the bonus, deadline, priority and who it is for, then <b>Post contract</b>.</li><li>Drivers: press <b>Claim</b>. <b>Release</b> gives it back.</li><li>Pick up the matching load in the game and deliver it.</li></ol>
+<h4>Good to know</h4><ul><li>Company lists only show companies that are in the city you picked.</li><li>It matches even when the driver plays in another language.</li><li>Dispatchers can press <b>Done</b>, <b>Cancel</b> or <b>Reopen</b>.</li><li>You can't claim when you are out of hours or your truck is on hold.</li></ul>
+</article>
+<article id="send"><h3>Send to game</h3><p class="meta"><b>Where:</b> Dispatch &gt; Send to game &middot; <b>Who:</b> Everyone, in a browser on the game PC</p>
+<h4>What it does</h4><p>Puts a contract into the game's freight market so you can pick it up in the truck.</p>
+<h4>How to use it</h4><ol><li>Save your game.</li><li>Press <b>Send to game</b> on the contract and pick the save to start from.</li><li>In the game, load <b>Fleet Manager Pro - Contract #N</b>.</li><li>Drive to the pickup company, take the job and deliver it.</li></ol>
+<h4>Good to know</h4><ul><li>It makes a new save and never changes your others.</li><li>The contract needs a From city, To city and Cargo from the lists.</li><li>Single-player only: TruckersMP doesn't use your saves.</li><li>The job stays in the market for about a game day.</li></ul>
+</article>
+<article id="planner"><h3>Route Planner</h3><p class="meta"><b>Where:</b> Company &gt; Route Planner &middot; <b>Who:</b> Everyone</p>
+<h4>What it does</h4><p>Tells you whether a lane pays before you take it, using your company's own deliveries: average pay, costs, profit, time on the road and where to go next.</p>
+<h4>How to use it</h4><ol><li>Choose a From city and a To city. Cargo is optional.</li><li>Press <b>Check this lane</b>.</li><li>New lane? Type the distance to get an estimate from your averages.</li><li>Look at <b>Best next legs</b> and <b>Most profitable lanes</b>.</li></ol>
+<h4>Good to know</h4><ul><li>It needs some deliveries before it has anything to show.</li></ul>
+</article>
+</section>
+<section id="a-eld"><h2>ELD &amp; Compliance</h2>
+<article id="hos"><h3>Electronic logbook (Hours of Service)</h3><p class="meta"><b>Where:</b> Operations &gt; ELD &amp; Compliance &middot; <b>Who:</b> Everyone</p>
+<h4>What it does</h4><p>Records your duty status on in-game time and shows how long you can still drive. ATS uses US rules and ETS2 uses EU rules, each with its own log.</p>
+<h4>How to use it</h4><ol><li>Drive: driving and on-duty time record themselves. Sleeping in the game logs as sleeper berth.</li><li>Press <b>Off duty</b>, <b>Sleeper</b> or <b>On duty</b> when you stop for the day.</li><li>Use <b>Previous day</b> and <b>Next day</b> to look back.</li></ol>
+<h4>Good to know</h4><ul><li>US: 11 h driving, 14 h window, 30-minute break after 8 h, 70 h in 8 days or 60 h in 7.</li><li>EU: 9 h driving, 45-minute break after 4.5 h, 56 h a week.</li><li>Breaking a rule is a violation with a fine.</li></ul>
+</article>
+<article id="rest"><h3>Simulate rest</h3><p class="meta"><b>Where:</b> ELD &amp; Compliance &middot; <b>Who:</b> Each driver, for themselves</p>
+<h4>What it does</h4><p>Takes a break, a sleeper berth or a full restart now, without waiting in the game.</p>
+<h4>How to use it</h4><ol><li>Press the rest you need: break, sleeper berth or restart.</li><li>Your clocks update and the rest shows in green on the graph.</li></ol>
+<h4>Good to know</h4><ul><li>Only you can simulate your own rest.</li></ul>
+</article>
+<article id="dvir"><h3>Vehicle inspections (DVIR)</h3><p class="meta"><b>Where:</b> ELD &amp; Compliance &gt; DVIR &middot; <b>Who:</b> Everyone; Managers and the Owner mark repairs</p>
+<h4>What it does</h4><p>A pre-trip or post-trip report of eight items. Telemetry hints help you spot problems.</p>
+<h4>How to use it</h4><ol><li>Choose pre-trip or post-trip and your truck.</li><li>Mark each item <b>OK</b> or <b>Defect</b> and add notes.</li><li>Tick the signature box and press <b>Submit report</b>.</li><li>Managers: mark the report <b>Repaired</b> when it is fixed.</li></ol>
+<h4>Good to know</h4><ul><li>Picking up a load without a pre-trip in the last 24 game-hours is a violation.</li><li>A defect puts the truck on hold until it is repaired, and repairs cost a set price per defect.</li></ul>
+</article>
+<article id="roadside"><h3>Roadside inspections</h3><p class="meta"><b>Where:</b> ELD &amp; Compliance &gt; Inspections &middot; <b>Who:</b> Everyone sees them; Dispatchers and above can start one</p>
+<h4>What it does</h4><p>On some loads an inspector checks you at a stop on the way. Level 1 checks driver, vehicle and load; level 2 driver and vehicle; level 3 hours and reports.</p>
+<h4>How to use it</h4><ol><li>Keep your hours legal, do your pre-trip and fix defects.</li><li>Read the results and pass rate here.</li><li>Dispatchers: pick a driver who is driving and a level to inspect them now.</li></ol>
+<h4>Good to know</h4><ul><li>Serious findings put you out of service with a bigger fine.</li><li>The chance per load starts at 15%. Change it in <b>Settings &gt; Compliance</b>.</li></ul>
+</article>
+<article id="reset-eld"><h3>Reset compliance records</h3><p class="meta"><b>Where:</b> ELD &amp; Compliance &gt; Reset &middot; <b>Who:</b> Managers and the Owner</p>
+<h4>What it does</h4><p>Clears logbooks, violations, reports or inspections for one driver or all, for example for a new season.</p>
+<h4>How to use it</h4><ol><li>Press <b>Reset</b>.</li><li>Choose the driver, game and what to clear.</li><li>Type <b>RESET</b> and confirm.</li></ol>
+<h4>Good to know</h4><ul><li>It can't be undone. Fines already charged stay in the books.</li></ul>
+</article>
+</section>
+<section id="a-fleet"><h2>Trucks, trailers and leasing</h2>
+<article id="trucks"><h3>Trucks</h3><p class="meta"><b>Where:</b> Company &gt; Fleet &amp; Garages &middot; <b>Who:</b> Everyone can look; Managers and the Owner make changes</p>
+<h4>What it does</h4><p>Your trucks with plate, driver, garage, odometer, condition and jobs. A truck is added by itself the first time it is driven.</p>
+<h4>How to use it</h4><ol><li>Drive, and the truck appears. Or press <b>Truck</b> to buy one from the dealer list.</li><li>Click a truck for its condition, jobs and maintenance.</li><li>Press <b>Edit</b> to change its plate, driver, garage or service interval.</li><li>Press <b>Sell</b> to take it out of the fleet and bank the money.</li><li><b>Delete sold</b> clears sold trucks from the list.</li></ol>
+<h4>Good to know</h4><ul><li>A purchase can't take the company account below zero.</li><li>Suggested resale is 60% of its value.</li><li>A leased truck can't be sold: buy it out first.</li></ul>
+</article>
+<article id="maintenance"><h3>Maintenance</h3><p class="meta"><b>Where:</b> Fleet &amp; Garages &gt; Maintenance log &gt; Record &middot; <b>Who:</b> Everyone can look; Managers and the Owner make changes</p>
+<h4>What it does</h4><p>Records services, repairs, tyres, inspections, washes and upgrades. Repairs you do in the game are noticed by themselves.</p>
+<h4>How to use it</h4><ol><li>Press <b>Record</b>, pick the truck and the type.</li><li>Check the cost, add notes and press <b>Save</b>.</li></ol>
+<h4>Good to know</h4><ul><li>Prices come from <b>Settings &gt; Economy</b> and can't be changed here. A repair costs the truck's wear times the repair rate.</li><li>A service clears the <i>service due</i> reminder.</li></ul>
+</article>
+<article id="garages"><h3>Garages</h3><p class="meta"><b>Where:</b> Company &gt; Fleet &amp; Garages &middot; <b>Who:</b> Everyone can look; Managers and the Owner make changes</p>
+<h4>What it does</h4><p>Home bases for your trucks, in any garage location in either game.</p>
+<h4>How to use it</h4><ol><li>Press <b>Garage</b> and choose a location and size.</li><li>Leave the price blank for the standard price, then <b>Buy garage</b>.</li><li>Use <b>Edit</b> to change it, or <b>Delete</b> to sell it.</li></ol>
+<h4>Good to know</h4><ul><li>Small: 1 truck, 100,000, 500 a week. Medium: 3 trucks, 250,000, 1,500 a week. Large: 5 trucks, 450,000, 2,500 a week.</li></ul>
+</article>
+<article id="trailers"><h3>Trailers</h3><p class="meta"><b>Where:</b> Company &gt; Fleet &amp; Garages &middot; <b>Who:</b> Everyone can look; Managers and the Owner make changes</p>
+<h4>What it does</h4><p>Trailers the company owns or leases.</p>
+<h4>How to use it</h4><ol><li>Press <b>Trailer</b> and choose a model: name, brand and price fill in.</li><li>Set its type, plate and garage, then <b>Add trailer</b>.</li><li>Press <b>Sell</b> or <b>Delete</b> when you no longer need it.</li></ol>
+<h4>Good to know</h4><ul><li>Suggested resale is 60% of what you paid.</li></ul>
+</article>
+<article id="lease"><h3>Truck Leasing</h3><p class="meta"><b>Where:</b> Company &gt; Truck Leasing &middot; <b>Who:</b> Everyone can look; Managers and the Owner make changes</p>
+<h4>What it does</h4><p>Use a truck for a small down payment and a weekly payment, with a set number of miles included. Every cost is shown before you sign.</p>
+<h4>How to use it</h4><ol><li>Pick a new truck, or one you own, under <b>Compare lease plans</b>.</li><li>Compare length, miles, interest, down payment, weekly payment and buyout price.</li><li>Press <b>Lease on</b> under the plan you want.</li><li>Click the lease to see miles used, your pace and what ending it today would cost.</li><li>After the last payment: <b>Buy it</b>, <b>Return</b> or <b>Renew</b>.</li></ol>
+<h4>Good to know</h4><ul><li>Payments are taken from the company account every week.</li><li>Built-in plans: Short Haul (12 weeks), Regional (26), Long Haul (52), Owner-Operator (104).</li><li>Extra miles are charged when you return it. Ending early costs a share of the payments left.</li><li>Managers add or change plans with <b>New plan</b> and <b>Edit</b>; signed leases keep their terms.</li></ul>
+</article>
+<article id="trailer-lease"><h3>Trailer Leasing</h3><p class="meta"><b>Where:</b> Company &gt; Trailer Leasing &middot; <b>Who:</b> Everyone can look; Managers and the Owner make changes</p>
+<h4>What it does</h4><p>The same idea for trailers, with no mileage limit.</p>
+<h4>How to use it</h4><ol><li>Pick a trailer under <b>Compare trailer lease plans</b>.</li><li>Compare the plans and press <b>Lease on</b>.</li><li>Click a lease to see what it costs and what ending it would cost.</li><li>At the end: buy it, return it at no charge, or renew.</li></ol>
+<h4>Good to know</h4><ul><li>Built-in plans: Short Term (12 weeks), Seasonal (26), Annual (52), Long Term (104).</li><li>The game doesn't report trailer mileage, so there is no mileage charge.</li></ul>
+</article>
+</section>
+<section id="a-money"><h2>Money and results</h2>
+<article id="finance"><h3>Finance</h3><p class="meta"><b>Where:</b> Company &gt; Finance &middot; <b>Who:</b> Everyone can look; Managers and the Owner make changes</p>
+<h4>What it does</h4><p>The company ledger: freight income, driver pay, fuel, tolls, fines, repairs, garages, leases and loans, with a 30-day cash-flow chart.</p>
+<h4>How to use it</h4><ol><li>Read the balance, income and expenses at the top.</li><li>Look at <b>By category</b> and <b>Driver earnings</b>.</li><li>Managers: press <b>Entry</b> to record money in or out by hand.</li><li>Press <b>CSV</b> for a spreadsheet.</li></ol>
+<h4>Good to know</h4><ul><li>Every company starts with 300,000. That can't be changed.</li><li>Costs from driving are booked by themselves.</li></ul>
+</article>
+<article id="loans"><h3>Loans</h3><p class="meta"><b>Where:</b> Finance &gt; Take a loan &middot; <b>Who:</b> The Owner</p>
+<h4>What it does</h4><p>Borrows money for the company and pays it back every week.</p>
+<h4>How to use it</h4><ol><li>Press <b>Take a loan</b>.</li><li>Choose a plan: Starter (12 weeks, 6.9%), Standard (26 weeks, 8.9%) or Expansion (52 weeks, 11.5%).</li><li>Type an amount from 10,000 to 5,000,000 and press <b>Borrow</b>.</li><li>Press <b>Pay off now</b> to finish early.</li></ol>
+<h4>Good to know</h4><ul><li>Up to 3 loans at a time. There is no penalty for paying off early.</li></ul>
+</article>
+<article id="expenses"><h3>Expenses</h3><p class="meta"><b>Where:</b> Company &gt; Expenses &middot; <b>Who:</b> Everyone can look; Managers and the Owner make changes</p>
+<h4>What it does</h4><p>Every cost the company has paid, with search, filters and totals by category.</p>
+<h4>How to use it</h4><ol><li>Filter by category, truck, driver, source or words.</li><li>Managers: press <b>Add expense</b> for costs the game doesn't know, such as insurance or parking.</li><li>Use <b>Edit</b> or <b>Delete</b> to fix an expense entered by hand.</li></ol>
+<h4>Good to know</h4><ul><li>The page shows the newest 500. Press <b>CSV</b> for all of them.</li></ul>
+</article>
+<article id="insights"><h3>Insights</h3><p class="meta"><b>Where:</b> Company &gt; Insights &middot; <b>Who:</b> Everyone</p>
+<h4>What it does</h4><p>How the company really makes money: profit margin, pay, cost and profit per mile or kilometre, 12-month trends, and the best lanes, cargo, trucks and drivers.</p>
+<h4>How to use it</h4><ol><li>Pick a period at the top.</li><li>Compare profit with cost per distance.</li><li>Use the best lanes and cargo to choose your next loads.</li></ol>
+<h4>Good to know</h4><ul><li>Only delivered loads count.</li></ul>
+</article>
+<article id="performance"><h3>Driver Performance</h3><p class="meta"><b>Where:</b> Company &gt; Driver Performance &middot; <b>Who:</b> Everyone</p>
+<h4>What it does</h4><p>Each driver's loads, distance, on-time rate, score, revenue, damage and fines.</p>
+<h4>How to use it</h4><ol><li>Pick a period.</li><li>Click a driver to see each load's deadline and arrival time.</li></ol>
+</article>
+</section>
+<section id="a-people"><h2>Drivers and recruitment</h2>
+<article id="drivers"><h3>Drivers and divisions</h3><p class="meta"><b>Where:</b> Company &gt; Drivers &middot; <b>Who:</b> Everyone can look; Managers and the Owner make changes</p>
+<h4>What it does</h4><p>Everyone in the company: role, division, level, jobs, distance, hours left and who is on the road.</p>
+<h4>How to use it</h4><ol><li>Press <b>Add member</b>, type a username and temporary password, choose a role and press <b>Add</b>.</li><li>Give the driver their username and password.</li><li>Press <b>Divisions</b> to make teams, then set a member's division on their profile.</li></ol>
+<h4>Good to know</h4><ul><li>Passwords need at least 8 characters.</li></ul>
+</article>
+<article id="profile"><h3>Profiles</h3><p class="meta"><b>Where:</b> Drivers &gt; click a member &middot; <b>Who:</b> Everyone edits their own; Managers and the Owner manage others</p>
+<h4>What it does</h4><p>A member's level, recent jobs, favourite cargo, destinations, achievements, records and contact names.</p>
+<h4>How to use it</h4><ol><li>Open your own profile to change your name, colour, country, bio or password.</li><li>Managers: change role, status, division or pay, or reset a password.</li><li><b>New token</b> makes a fresh key for remote telemetry and the stream overlay.</li></ol>
+<h4>Good to know</h4><ul><li><b>Leave the company</b> deletes your account for good.</li><li><b>Fire</b> (Managers) deletes a member for good. Deliveries and pay stay in the books as "Former driver".</li></ul>
+</article>
+<article id="connect"><h3>Connect a driver (their own PC)</h3><p class="meta"><b>Where:</b> Drivers &gt; Connect a driver &middot; <b>Who:</b> Managers and the Owner</p>
+<h4>What it does</h4><p>Lets a driver play on their own PC, at home or anywhere, and have their jobs logged here.</p>
+<h4>How to use it</h4><ol><li>Start <b>Fleet Manager Pro (LAN)</b> on your PC.</li><li>Save your internet address, or press <b>Find it for me</b>.</li><li>Press <b>Open the port for me</b>, or forward the port on your router yourself.</li><li>Pick the driver and press <b>Download file</b> (or <b>Copy the line</b>). Send it only to them.</li><li>The driver installs Fleet Manager Pro and the game plugin, puts the file in their Fleet Manager Pro folder, double-clicks it and leaves it open.</li></ol>
+<h4>Good to know</h4><ul><li>The driver needs no purchase key.</li><li>The file holds their private token. If it leaks, make a <b>New token</b> and send a new file.</li><li>Keep your PC on, in LAN mode, while they drive.</li><li>Drivers on your own Wi-Fi don't need the router step.</li></ul>
+</article>
+<article id="lan"><h3>LAN mode</h3><p class="meta"><b>Where:</b> Start menu &gt; Fleet Manager Pro (LAN) &middot; <b>Who:</b> Whoever runs the main PC</p>
+<h4>What it does</h4><p>Lets other PCs on your network open your company in a browser, encrypted.</p>
+<h4>How to use it</h4><ol><li>Close Fleet Manager Pro and start <b>Fleet Manager Pro (LAN)</b>. In a zip copy, use <b>Start Fleet Manager Pro (LAN).bat</b>.</li><li>Allow it if Windows Firewall asks.</li><li>On the other PC, open the <code>https://</code> address the black window shows.</li><li>Accept the certificate warning the first time, then sign in.</li></ol>
+<h4>Good to know</h4><ul><li>Without LAN mode (or tablet access), only your own PC can open it.</li></ul>
+</article>
+<article id="recruitment"><h3>Recruitment</h3><p class="meta"><b>Where:</b> Company &gt; Recruitment &middot; <b>Who:</b> Managers and the Owner</p>
+<h4>What it does</h4><p>An online Apply page for your company. It works even when your PC is off, and applications arrive here.</p>
+<h4>How to use it</h4><ol><li>Copy your Apply link and share it on Discord, TruckersMP or your website.</li><li>Press <b>Check now</b>, or wait about 10 minutes.</li><li>Choose <b>Accept</b>, <b>Interview</b> or <b>Reject</b>.</li><li>Accepting makes the driver's account: send them their username and password.</li></ol>
+<h4>Good to know</h4><ul><li>Open or close applications and change the page's text in <b>Settings &gt; Recruitment</b>.</li><li><b>Clean up old applications</b> deletes ones you have already decided.</li><li>At most 300 can wait at once, so open the app regularly.</li></ul>
+</article>
+</section>
+<section id="a-community"><h2>Community</h2>
+<article id="events"><h3>Events &amp; Convoys</h3><p class="meta"><b>Where:</b> Community &gt; Events &amp; Convoys &middot; <b>Who:</b> Everyone can look; Dispatchers, Managers and the Owner make changes</p>
+<h4>What it does</h4><p>Convoys, meetings, training, public events and races, with sign-up and XP for showing up.</p>
+<h4>How to use it</h4><ol><li>Dispatchers: press <b>New event</b> and fill in the time, game, server, meet-up and route.</li><li>Everyone: open the event and choose your RSVP.</li><li>Afterwards the organiser ticks who attended and presses <b>Save attendance &amp; award XP</b>.</li></ol>
+<h4>Good to know</h4><ul><li>You can set required DLC, a minimum level and slots.</li><li>Drivers who signed up are told when the time, place or route changes.</li></ul>
+</article>
+<article id="leaderboard"><h3>Leaderboard</h3><p class="meta"><b>Where:</b> Community &gt; Leaderboard &middot; <b>Who:</b> Everyone</p>
+<h4>What it does</h4><p>Ranks your drivers by distance, revenue, deliveries, tonnage, score, XP or realism.</p>
+<h4>How to use it</h4><ol><li>Pick what to rank by and the period.</li></ol>
+<h4>Good to know</h4><ul><li>Realism rewards careful driving: distance weighted by driving score and cargo condition.</li></ul>
+</article>
+<article id="global"><h3>Global Leaderboard</h3><p class="meta"><b>Where:</b> Leaderboard &gt; Global &middot; <b>Who:</b> Everyone can look; Managers and the Owner choose what is shared</p>
+<h4>What it does</h4><p>Ranks every Fleet Manager Pro company together, and the drivers of companies that share their names. A public page shows the same board.</p>
+<h4>How to use it</h4><ol><li>Press <b>Global</b> on the Leaderboard.</li><li>Pick what to rank by, the period and the game.</li><li>Press <b>Update now</b> to refresh, at most once every 30 seconds.</li><li>Managers: untick <b>Show my company on the global leaderboard</b> to leave, or tick <b>Show my drivers' names too</b>.</li></ol>
+<h4>Good to know</h4><ul><li>It updates every 10 minutes while the app runs.</li><li>Shared: your company name, currency and totals, including revenue. Driver names only if you tick the box.</li><li>Leaving removes your company straight away, and so does dissolving the company.</li><li>Simulator drives don't count. Companies that don't update for 30 days drop off.</li><li>Each company reports its own numbers, so treat it as friendly competition.</li></ul>
+</article>
+<article id="achievements"><h3>Achievements</h3><p class="meta"><b>Where:</b> Community &gt; Achievements &middot; <b>Who:</b> Everyone</p>
+<h4>What it does</h4><p>Badges that unlock as you drive, each worth 250 XP: first delivery, long hauls, heavy loads, perfect scores, ferries, trains, special transport, convoys and contracts.</p>
+<h4>How to use it</h4><ol><li>Drive. They unlock by themselves.</li><li>Open the page to see what each one still needs.</li></ol>
+</article>
+<article id="announcements"><h3>Announcements</h3><p class="meta"><b>Where:</b> Community &gt; Announcements &middot; <b>Who:</b> Everyone can look; Dispatchers, Managers and the Owner make changes</p>
+<h4>What it does</h4><p>Company news for everyone.</p>
+<h4>How to use it</h4><ol><li>Dispatchers: write a title and message, choose Info, Important or Event, and press <b>Post</b>.</li><li>Tick <b>Pin to top</b> to keep it first.</li></ol>
+<h4>Good to know</h4><ul><li>Posts also go to Discord when a webhook is set.</li></ul>
+</article>
+<article id="messages"><h3>Messages</h3><p class="meta"><b>Where:</b> Community &gt; Messages &middot; <b>Who:</b> Everyone</p>
+<h4>What it does</h4><p>Company chat for everyone, and private messages to one member.</p>
+<h4>How to use it</h4><ol><li>Pick <b>Company chat</b> or a member.</li><li>Type your message and press <b>Send</b>.</li></ol>
+<h4>Good to know</h4><ul><li>The menu shows how many you haven't read.</li></ul>
+</article>
+<article id="discord"><h3>Discord posts</h3><p class="meta"><b>Where:</b> Settings &gt; Discord &middot; <b>Who:</b> Managers and the Owner</p>
+<h4>What it does</h4><p>Posts deliveries, announcements, events, contracts and new applications to your Discord server.</p>
+<h4>How to use it</h4><ol><li>In Discord: <b>Server Settings &gt; Integrations &gt; Webhooks &gt; New Webhook &gt; Copy URL</b>.</li><li>Paste it into <b>Settings &gt; Discord</b> and tick what to post.</li><li>Press <b>Save</b>, then <b>Send test message</b>.</li></ol>
+<h4>Good to know</h4><ul><li>Applications can use their own webhook, for a staff-only channel.</li></ul>
+</article>
+</section>
+<section id="a-admin"><h2>Settings and admin</h2>
+<article id="set-company"><h3>Company settings and colours</h3><p class="meta"><b>Where:</b> Settings &gt; Company &middot; <b>Who:</b> Managers and the Owner</p>
+<h4>What it does</h4><p>Company name, tag, motto, main game, units, currency symbol and colours.</p>
+<h4>How to use it</h4><ol><li>Change what you need.</li><li>Pick a main and accent colour, or a ready-made pair. You see a preview straight away.</li><li>Press <b>Save</b>.</li></ol>
+<h4>Good to know</h4><ul><li>Everyone sees the colours, including on the sign-in page. <b>Reset</b> brings back navy and crimson.</li></ul>
+</article>
+<article id="set-economy"><h3>Economy settings</h3><p class="meta"><b>Where:</b> Settings &gt; Economy &middot; <b>Who:</b> Managers and the Owner</p>
+<h4>What it does</h4><p>Fuel price, driver pay and commission, repair and service prices, XP rates and how much speeding is forgiven.</p>
+<h4>How to use it</h4><ol><li>Type the new values and press <b>Save</b>.</li></ol>
+<h4>Good to know</h4><ul><li>Values use your units.</li><li>Here you also choose whether in-game repairs are charged and whether manual jobs need approval.</li></ul>
+</article>
+<article id="set-telemetry"><h3>Telemetry settings and game plugin</h3><p class="meta"><b>Where:</b> Settings &gt; Telemetry &middot; <b>Who:</b> Managers and the Owner</p>
+<h4>What it does</h4><p>Installs the plugin that reads the game, and chooses where the data comes from and which driver this PC's game is credited to.</p>
+<h4>How to use it</h4><ol><li>Close the game and press <b>Install</b> next to it.</li><li>Start the game and click <b>OK</b> on the "advanced SDK features" message.</li><li>Choose the driver under <b>Credit this PC's telemetry to</b> and press <b>Save</b>.</li></ol>
+<h4>Good to know</h4><ul><li>The plugin only reads data.</li><li>Not listed? Type the game's folder and press <b>Install here</b>.</li><li>You can hold every remote driver's delivery for approval, and list allowed host names.</li></ul>
+</article>
+<article id="demo"><h3>Demo simulator</h3><p class="meta"><b>Where:</b> Settings &gt; Telemetry &gt; Source &middot; <b>Who:</b> Managers and the Owner</p>
+<h4>What it does</h4><p>Drives a truck between real ATS cities so you can try everything without the game.</p>
+<h4>How to use it</h4><ol><li>Set <b>Source</b> to <b>Demo simulator</b> and press <b>Save</b>.</li><li>Watch Live Cockpit and the Logbook.</li><li>Set it back to <b>Game</b> when you are done.</li></ol>
+<h4>Good to know</h4><ul><li>Its jobs and money go into your real books. Clear them from the Logbook with <b>Clear demo jobs</b>.</li></ul>
+</article>
+<article id="set-compliance"><h3>Compliance settings</h3><p class="meta"><b>Where:</b> Settings &gt; Compliance &middot; <b>Who:</b> Managers and the Owner</p>
+<h4>What it does</h4><p>Turns the logbook, inspections, roadside checks and low-fuel alerts on or off, and sets the rules, chances and fines.</p>
+<h4>How to use it</h4><ol><li>Tick what you want, set the numbers and press <b>Save</b>.</li></ol>
+<h4>Good to know</h4><ul><li>Starting fines: 500 per hours violation, 250 for no pre-trip, 1,500 out of service.</li></ul>
+</article>
+<article id="licence"><h3>Licence</h3><p class="meta"><b>Where:</b> Settings &gt; Licence &middot; <b>Who:</b> Managers and the Owner look; the Owner deactivates</p>
+<h4>What it does</h4><p>Shows this PC's activation and lets you move to another PC.</p>
+<h4>How to use it</h4><ol><li>Press <b>Check now</b> to check with the licence server.</li><li>Moving? The Owner presses <b>Deactivate this PC</b>, then activates on the new PC with the same key.</li></ol>
+<h4>Good to know</h4><ul><li>One key works on 2 PCs.</li><li>Without internet it works for 7 days.</li></ul>
+</article>
+<article id="updates"><h3>Updates</h3><p class="meta"><b>Where:</b> Admin &gt; Updates &middot; <b>Who:</b> Managers and the Owner</p>
+<h4>What it does</h4><p>Finds and installs new versions. Your data is never touched.</p>
+<h4>How to use it</h4><ol><li>Press <b>Check for updates</b>.</li><li>Read <b>What's new</b> and press <b>Update now</b>. The app closes and reopens.</li><li>Or press <b>Install updates automatically</b>.</li></ol>
+<h4>Good to know</h4><ul><li>Automatic updates wait until nobody is driving.</li><li>Every update is signed and checked before it installs.</li></ul>
+</article>
+<article id="backups"><h3>Backups</h3><p class="meta"><b>Where:</b> Admin &gt; System &amp; Backups &middot; <b>Who:</b> Managers and the Owner</p>
+<h4>What it does</h4><p>Saves copies of your company database.</p>
+<h4>How to use it</h4><ol><li>Press <b>Back up now</b>.</li><li>Leave <b>Automatic backups</b> on for one copy a day.</li></ol>
+<h4>Good to know</h4><ul><li>The newest 14 automatic copies are kept in <code>data\backups</code>. Your own are kept until deleted.</li><li>Only the Owner can download or delete them.</li><li>Safest of all: close the app and copy the whole <b>data</b> folder. <b>READ ME - Your Data.txt</b> explains how to go back to a backup.</li></ul>
+</article>
+<article id="logs"><h3>Logs and health</h3><p class="meta"><b>Where:</b> Admin &gt; System &amp; Backups &middot; <b>Who:</b> Managers and the Owner</p>
+<h4>What it does</h4><p>Shows how this copy is doing and what it has been doing, for when you need help.</p>
+<h4>How to use it</h4><ol><li>Pick a log and type a word to filter it.</li><li>Press <b>Download all logs</b> to send them to the seller.</li></ol>
+<h4>Good to know</h4><ul><li>Passwords, tokens and purchase keys are hidden in the logs.</li></ul>
+</article>
+<article id="audit"><h3>Audit log</h3><p class="meta"><b>Where:</b> Settings &gt; Audit log &middot; <b>Who:</b> Managers and the Owner</p>
+<h4>What it does</h4><p>A list of who changed what, and when.</p>
+<h4>How to use it</h4><ol><li>Open the tab and read the newest lines.</li></ol>
+</article>
+<article id="clear"><h3>Clear all data</h3><p class="meta"><b>Where:</b> Settings &gt; Clear data &middot; <b>Who:</b> The Owner</p>
+<h4>What it does</h4><p>Starts the company over: deletes jobs, money, fleet and records, and keeps your account, settings and licence.</p>
+<h4>How to use it</h4><ol><li>Press <b>Clear all data</b>.</li><li>Choose whether to keep the members, tick the box, type the word shown and your password.</li></ol>
+<h4>Good to know</h4><ul><li>A backup is saved to <code>data\backups</code> first.</li></ul>
+</article>
+<article id="dissolve"><h3>Dissolve the company</h3><p class="meta"><b>Where:</b> Settings &gt; Clear data &middot; <b>Who:</b> The Owner</p>
+<h4>What it does</h4><p>Ends the company: every other member is removed for good and recruiting closes.</p>
+<h4>How to use it</h4><ol><li>Press <b>Dissolve the company</b>.</li><li>Choose to keep your books or erase everything.</li><li>Tick the box, type the word shown and your password.</li></ol>
+<h4>Good to know</h4><ul><li>This can't be undone in the app. Erasing saves a backup first.</li><li>The company also leaves the Global Leaderboard.</li></ul>
+</article>
+</section>
+</main>
+</div>
+<footer>Fleet Manager Pro is (c) 2026 Jeff Poblocki. American Truck Simulator and Euro Truck Simulator 2 are trademarks of SCS Software, which is not affiliated with Fleet Manager Pro.</footer>
+<script>
+(function () {
+  document.documentElement.classList.add("js");
+  var box = document.getElementById("q"), found = document.getElementById("found"), nav = document.querySelector("nav");
+  var arts = [].slice.call(document.querySelectorAll("article")), areas = [].slice.call(document.querySelectorAll("section"));
+  var texts = arts.map(function (a) { return a.textContent.toLowerCase(); });
+  function mark(words) {
+    if (!window.CSS || !CSS.highlights || typeof Highlight === "undefined") return;
+    CSS.highlights.delete("found");
+    if (!words.length) return;
+    var h = new Highlight();
+    arts.forEach(function (a) {
+      if (a.hidden) return;
+      var w = document.createTreeWalker(a, NodeFilter.SHOW_TEXT), n;
+      while ((n = w.nextNode())) {
+        var t = n.nodeValue.toLowerCase();
+        words.forEach(function (word) {
+          for (var i = t.indexOf(word); i >= 0; i = t.indexOf(word, i + word.length)) {
+            var r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + word.length); h.add(r);
+          }
+        });
+      }
+    });
+    CSS.highlights.set("found", h);
+  }
+  function run() {
+    var words = box.value.toLowerCase().split(/\s+/).filter(Boolean), count = 0;
+    arts.forEach(function (a, i) {
+      a.hidden = !words.every(function (w) { return texts[i].indexOf(w) >= 0; });
+      if (!a.hidden) count++;
+      nav.querySelector('a[href="#' + a.id + '"]').hidden = a.hidden;
+    });
+    areas.forEach(function (s) {
+      s.hidden = !s.querySelector("article:not([hidden])");
+      nav.querySelector('[data-area="' + s.id + '"]').hidden = s.hidden;
+    });
+    found.textContent = !words.length ? arts.length + " features" : count ? count + (count === 1 ? " feature found" : " features found") : "Nothing found. Try another word.";
+    mark(words);
+  }
+  box.addEventListener("input", run);
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && box.value) { box.value = ""; run(); }
+    if (e.key === "/" && document.activeElement !== box) { e.preventDefault(); box.focus(); }
+  });
+  run();
+})();
+</script>
+</body>
+</html>

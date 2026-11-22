@@ -120,7 +120,9 @@ def login_required(fn=None, role="trainee"):
             if not user():
                 if request.path.startswith("/api/"):
                     abort(401)
-                return redirect(url_for("auth.login", next=request.path))
+                # come back to the same view (filters, tabs) after signing in; a POST can't be repeated, so just its page
+                back = request.full_path if request.method == "GET" and request.query_string else request.path
+                return redirect(url_for("auth.login", next=back))
             if not can(role):
                 abort(403)
             return f(*a, **kw)
@@ -181,6 +183,21 @@ def install(app):
     @app.errorhandler(404)
     def _404(e):
         return render_template("error.html", code=404, msg="That page doesn't exist."), 404
+
+    @app.errorhandler(OverflowError)
+    def _too_big(e):                    # a number too large for the database: no such record
+        db.conn().rollback()
+        return _404(e)
+
+    @app.errorhandler(500)
+    def _500(e):
+        msg = "Something went wrong on this page. The details are in System & Backups > Logs."
+        if request.path.startswith("/api/"):
+            return {"error": msg}, 500
+        try:
+            return render_template("error.html", code=500, msg=msg), 500
+        except Exception:               # the page itself can't be drawn (a database problem, say)
+            return msg, 500, {"Content-Type": "text/plain; charset=utf-8"}
 
     @app.errorhandler(400)
     def _400(e):

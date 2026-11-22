@@ -122,55 +122,43 @@ def build():
              ["Internet", "Needed to activate, then checked every few hours. Without internet it keeps working for 7 days."],
              ["A web browser", "Edge, Chrome or Firefox. Fleet Manager Pro opens in your browser."]],
             [1.6 * inch, 5.3 * inch]))
-    A(Paragraph("Nothing else needs installing: no Python, no database. Everything is inside the program folder.", SMALL))
-
-    A(Paragraph("Which version do you have?", H2))
-    A(table([["Version", "How to tell", "Start it with"],
-             ["<b>Standard</b> (recommended)", "The folder has <b>Start Fleet Manager Pro.bat</b> and the folders <b>app</b> and "
-                                               "<b>runtime</b>.", "<b>Start Fleet Manager Pro.bat</b>"],
-             ["<b>Single-program (.exe)</b>", "The folder has <b>Fleet Manager Pro.exe</b> and many .dll / .pyd files next to it.",
-              "<b>Fleet Manager Pro.exe</b>"]],
-            [1.8 * inch, 3.3 * inch, 1.8 * inch]))
-    A(Paragraph("Both work the same once started. Where a step differs, this guide says so.", SMALL))
+    A(Paragraph("You get one file: <b>Fleet Manager Pro Setup.exe</b>. Nothing else needs installing: no Python, no database.", SMALL))
 
     A(Paragraph("1. Install", H1))
-    A(steps(["Right-click the zip file you received and choose <b>Properties</b>. If there is an <b>Unblock</b> box at the bottom, "
-             "tick it and click OK. (This stops Windows warning about every file inside.)",
-             "Right-click the zip again and choose <b>Extract All</b>. Put the <b>Fleet Manager Pro</b> folder somewhere easy "
-             "to find, such as your Desktop or Documents. Keep every file in it together, and do not run it from inside the zip.",
-             "Open the folder and start it: <b>Standard</b> - double-click <b>Start Fleet Manager Pro.bat</b>. "
-             "<b>Single-program</b> - double-click <b>Fleet Manager Pro.exe</b>.",
+    A(steps(["Double-click <b>Fleet Manager Pro Setup.exe</b>.",
+             "Accept the licence agreement, choose whether you want a desktop shortcut, and click <b>Install</b>. "
+             "Windows does not ask for an administrator password.",
+             "Leave <b>Start Fleet Manager Pro</b> ticked and click <b>Finish</b>. Later, start it from the Start menu or the desktop shortcut.",
              "A black window opens (leave it open while you use the app) and your browser opens "
              "<b>http://127.0.0.1:8760</b>. If the browser does not open, type that address yourself."]))
     A(Paragraph("<b>Windows protected your PC?</b> The first time, Windows may show a blue box because the program is new. "
-                "Click <b>More info</b>, then <b>Run anyway</b>. This is more common with the single-program <b>Fleet Manager Pro.exe</b>.", NOTE))
+                "Click <b>More info</b>, then <b>Run anyway</b>.", NOTE))
     A(Paragraph("If Microsoft Defender blocks or removes Fleet Manager Pro", H2))
     A(Paragraph("<b>This is a temporary step.</b> Fleet Manager Pro is new and is not yet code-signed, so Microsoft Defender may "
-                "wrongly report it as a threat (a \"false positive\") - most often the single-program <b>Fleet Manager Pro.exe</b>. "
+                "wrongly report <b>Fleet Manager Pro Setup.exe</b> or the installed program as a threat (a \"false positive\"). "
                 "The program is being submitted to Microsoft to be signed and cleared; once that is done these steps won't be needed.", NOTE))
     A(steps(["Open <b>Windows Security</b> (Start menu &gt; type <b>Windows Security</b>) &gt; <b>Virus &amp; threat protection</b> "
              "&gt; <b>Protection history</b>.",
-             "Click the entry that names Fleet Manager Pro (or a file in its folder, such as <b>Fleet Manager Pro.exe</b>). "
-             "Check the path shown is <i>your</i> Fleet Manager Pro folder.",
+             "Click the entry that names Fleet Manager Pro. "
+             "Check the path shown is the Setup file you were sent, or <b>AppData\\Local\\Programs\\Fleet Manager Pro</b>.",
              "Click <b>Actions</b> &gt; <b>Restore</b> (if it was quarantined) or <b>Allow on device</b> (if it was blocked). "
              "Click <b>Yes</b> if Windows asks for permission.",
              "To stop it being flagged again: <b>Virus &amp; threat protection settings</b> &gt; <b>Manage settings</b> &gt; scroll to "
-             "<b>Exclusions</b> &gt; <b>Add or remove exclusions</b> &gt; <b>Add an exclusion</b> &gt; <b>Folder</b>, and pick your "
-             "<b>Fleet Manager Pro</b> folder (only that folder).",
-             "Start Fleet Manager Pro again. If a file is still missing, extract the zip again (step 1)."]))
+             "<b>Exclusions</b> &gt; <b>Add or remove exclusions</b> &gt; <b>Add an exclusion</b> &gt; <b>Folder</b>, and pick "
+             "<b>%LOCALAPPDATA%\\Programs\\Fleet Manager Pro</b> (only that folder).",
+             "Start Fleet Manager Pro again. If it still does not start, run <b>Fleet Manager Pro Setup.exe</b> again."]))
     A(Paragraph("Only do this for the Fleet Manager Pro folder you got from the seller, never for other programs or whole drives. "
                 "When you install a signed version later, remove the exclusion again (same place, click it &gt; <b>Remove</b>). "
                 "Other antivirus programs (Norton, Avast, Bitdefender...) have the same options under <i>Quarantine</i> and "
-                "<i>Exceptions</i>. If it keeps happening, ask the seller for the <b>Standard</b> version, which antivirus "
-                "programs rarely flag.", SMALL))
+                "<i>Exceptions</i>. If it keeps happening, contact the seller.", SMALL))
 
     A(Paragraph("2. Activate", H1))
     A(steps(["On the <b>Activate</b> screen, type your purchase key, tick <b>I have read and agree to the licence agreement</b> "
-             "(the link opens it; it is also in <b>Licence Agreement.txt</b>) and click <b>Activate this PC</b>.",
+             "(the link opens it) and click <b>Activate this PC</b>.",
              "That is it. The key is remembered; you will not be asked again on this PC."]))
     A(Spacer(1, 8))
     A(table([["If you see...", "What to do"],
-             ["Can't reach the licence server", "Check your internet connection and try again. A firewall or VPN can block it: allow Fleet Manager Pro (python.exe in its runtime folder, or Fleet Manager Pro.exe)."],
+             ["Can't reach the licence server", "Check your internet connection and try again. A firewall or VPN can block it: allow Fleet Manager Pro."],
              ["This purchase is already active on 2 PCs", "Deactivate it on a PC you no longer use (Settings > Licence > Deactivate this PC), or ask the seller to release one."],
              ["That purchase key doesn't exist", "Check for typing mistakes. Keys use letters A-Z and digits 2-7 only (no 0, 1, 8 or 9)."],
              ["That's a key for the original Fleet Manager", "Fleet Manager Pro keys start with FMP-. Keys starting with FM- are for the older app."]],
@@ -190,7 +178,7 @@ def build():
              "Click <b>Install</b> next to each game. (If your game is not listed, type its folder in the box below the list and click <b>Install here</b>.)",
              "Start the game. It shows a message about <b>advanced SDK features</b>: click <b>OK</b>."]))
     A(Paragraph("By hand", H2))
-    A(Paragraph("Copy <b>plugin\\scs-telemetry.dll</b> from the Fleet Manager Pro folder into:", P))
+    A(Paragraph("Copy <b>%LOCALAPPDATA%\\Programs\\Fleet Manager Pro\\plugin\\scs-telemetry.dll</b> into:", P))
     A(Paragraph("...\\Steam\\steamapps\\common\\American Truck Simulator\\bin\\win_x64\\plugins\\<br/>"
                 "...\\Steam\\steamapps\\common\\Euro Truck Simulator 2\\bin\\win_x64\\plugins\\", CODE))
     A(Paragraph("Create the <b>plugins</b> folder if it does not exist. To find the game folder: in Steam, right-click the game &gt; "
@@ -208,19 +196,17 @@ def build():
 
     A(Paragraph("6. More drivers (optional)", H1))
     A(Paragraph("On the same network", H2))
-    A(steps(["On the PC that runs Fleet Manager Pro, close it and start <b>Start Fleet Manager Pro (LAN).bat</b> instead "
-             "(both versions have this file). "
+    A(steps(["On the PC that runs Fleet Manager Pro, close it and start <b>Fleet Manager Pro (LAN)</b> from the Start menu instead. "
              "The black window shows an address like <b>https://192.168.1.20:8760</b>. Allow it if Windows Firewall asks.",
              "Other PCs open that address in a browser. The first time, the browser warns about the certificate (it is made by your own "
              "PC): choose <b>Advanced &gt; Continue</b>. The connection is encrypted.",
              "A manager adds each driver under <b>Drivers &gt; Add member</b>, or drivers apply on your online Apply link (section 8) and a manager accepts them."]))
     A(Paragraph("Logging a driver's own game", H2))
-    A(Paragraph("Each driver who plays on their own PC copies the Fleet Manager Pro folder to that PC and runs one command. The exact command, "
+    A(Paragraph("Each driver who plays on their own PC installs Fleet Manager Pro on that PC with the same Setup file and runs one command. The exact command, "
                 "with that driver's token and your server's fingerprint, is on their <b>profile page</b> under <b>Remote telemetry</b>:", P))
-    A(Paragraph('Standard:        "Driver Agent.bat" --server https://HOST-PC:8760 --token TOKEN --pin FINGERPRINT<br/>'
-                'Single-program:  "Fleet Manager Pro.exe" agent --server https://HOST-PC:8760 --token TOKEN --pin FINGERPRINT', CODE))
-    A(Paragraph("Open a Command Prompt in the Fleet Manager Pro folder (click the folder's address bar, type <b>cmd</b> and press "
-                "Enter) and paste the command. The profile page shows the right one for the version the main PC uses.", SMALL))
+    A(Paragraph('"Fleet Manager Pro.exe" agent --server https://HOST-PC:8760 --token TOKEN --pin FINGERPRINT', CODE))
+    A(Paragraph("Press <b>Windows + R</b>, type <b>%LOCALAPPDATA%\\Programs\\Fleet Manager Pro</b> and press Enter. Click the folder's "
+                "address bar, type <b>cmd</b>, press Enter and paste the command.", SMALL))
     A(Paragraph("They do not need their own purchase key for this: only the main PC is activated.", SMALL))
 
     A(Paragraph("7. Finding your way around", H1))
@@ -305,16 +291,19 @@ def build():
                 "A leased truck can't be sold - buy it out first.", SMALL))
 
     A(Paragraph("10. Looking after your data", H1))
-    A(bullets(["Everything (company, drivers, jobs, money, licence) is in the <b>data</b> folder. <b>Standard:</b> "
-               "<b>Fleet Manager Pro\\app\\data</b>. <b>Single-program:</b> <b>Fleet Manager Pro\\data</b>, next to Fleet Manager Pro.exe. "
+    A(bullets(["Everything (company, drivers, jobs, money, licence) is in <b>%LOCALAPPDATA%\\Programs\\Fleet Manager Pro\\data</b> (press Windows + R and paste that to open it). "
                "It appears the first time you start the program.",
                "<b>Back up:</b> close Fleet Manager Pro and copy the <b>data</b> folder somewhere safe.",
-               "<b>Move to another PC:</b> in Settings &gt; Licence click <b>Deactivate this PC</b>, copy the whole Fleet Manager Pro folder "
-               "(with <b>data</b>) to the new PC, start it and activate with the same key.",
-               "<b>Update to a new version:</b> close Fleet Manager Pro, unzip the new version to a new folder, then copy your old "
-               "<b>data</b> folder into the same place in it (<b>app</b> folder for Standard, next to the .exe for Single-program).",
-               "<b>Switch versions:</b> copy the <b>data</b> folder from one into the matching place in the other. Your company, "
-               "jobs and licence carry over."]))
+               "<b>Move to another PC:</b> in Settings &gt; Licence click <b>Deactivate this PC</b>, run <b>Fleet Manager Pro Setup.exe</b> "
+               "on the new PC, copy the <b>data</b> folder into the same place there, start it and activate with the same key.",
+               "<b>Already using a copy from a zip?</b> Close it, install, then copy its <b>data</b> folder into "
+               "<b>%LOCALAPPDATA%\\Programs\\Fleet Manager Pro</b> before starting the installed one.",
+               "<b>Update to a new version:</b> open <b>Updates</b>, press <b>Check for updates</b>, then <b>Update now</b>. The app "
+               "closes and reopens by itself and your data is not touched.",
+               "<b>Update by hand</b> (if the seller sends you a new Setup file): close Fleet Manager Pro and run it. Your data is kept.",
+               "<b>Step by step:</b> <b>READ ME - Your Data.txt</b>, in the program folder and the Start menu, covers moving your "
+               "data, backing up and going back to a backup.",
+               "<b>Uninstall:</b> Windows Settings &gt; Apps. Your <b>data</b> folder stays; delete it yourself if you no longer want it."]))
 
     A(Paragraph("Troubleshooting", H1))
     A(table([["Problem", "Fix"],
@@ -323,29 +312,26 @@ def build():
              ["Jobs are not logged", "Fleet Manager Pro must be running <i>before</i> you deliver. Check Live Cockpit shows \"On job\" while you drive."],
              ["A delivery says \"pending review\"", "The anti-cheat checks held its pay (for example the app was closed for most of the drive). "
                                                     "A manager opens the job and clicks Approve."],
-             ["The page will not open", "Is the black window still open? If you closed it, start it again: Start Fleet Manager Pro.bat "
-                                        "(Standard) or Fleet Manager Pro.exe (Single-program)."],
-             ["Fleet Manager Pro.exe closes straight away", "The zip was not fully extracted, or the .exe was moved on its own. Extract "
-                                                           "the whole zip and run the .exe inside that folder, next to its .dll files."],
-             ["Fleet Manager Pro.exe is missing, or Defender says it's a threat", "A temporary false positive until the program is signed. "
+             ["The page will not open", "Is the black window still open? If you closed it, start Fleet Manager Pro again."],
+             ["Fleet Manager Pro closes straight away", "Run <b>Fleet Manager Pro Setup.exe</b> again: it puts back any missing file and keeps your data."],
+             ["Fleet Manager Pro is missing, or Defender says it's a threat", "A temporary false positive until the program is signed. "
                                                     "Restore and allow it - see <i>If Microsoft Defender blocks or removes Fleet Manager Pro</i> in section 1."],
              ["\"Too many wrong passwords\"", "Wait five minutes and try again. A manager can reset a driver's password on their profile page."],
              ["Forgot the owner password", "Contact the seller: it cannot be read back, only reset."],
-             ["Port 8760 is already in use", "Another copy is still running (check Task Manager for python.exe or Fleet Manager Pro.exe). "
-                                             "Close it, or start on another port from a Command Prompt in the folder: "
-                                             "\"Start Fleet Manager Pro.bat\" --port 8770 (Standard) or "
-                                             "\"Fleet Manager Pro.exe\" --port 8770 (Single-program)"],
-             ["Other PCs cannot connect", "Start with the LAN .bat file, use the https:// address it prints, and allow it through Windows Firewall."]],
+             ["Port 8760 is already in use", "Another copy is still running (check Task Manager for Fleet Manager Pro). "
+                                             "Close it, or start on another port from a Command Prompt in its folder (section 6 shows how to open it): "
+                                             "\"Fleet Manager Pro.exe\" --port 8770"],
+             ["Other PCs cannot connect", "Start <b>Fleet Manager Pro (LAN)</b> from the Start menu, use the https:// address it prints, and allow it through Windows Firewall."]],
             [2.3 * inch, 4.6 * inch]))
     A(Spacer(1, 10))
     A(KeepTogether([Paragraph("Good to know", H2),
-                    bullets(["The game plugin scs-telemetry.dll is open-source (MIT licence, included in the plugin folder). It only reads data; "
+                    bullets(["The game plugin scs-telemetry.dll is open-source (MIT licence). It only reads data; "
                              "it does not change your game or your save.",
                              "It works alongside other telemetry tools: several can use the same plugin at once.",
                              "Fleet Manager Pro only listens on your own PC unless you start it in LAN mode."])]))
     A(Spacer(1, 10))
     A(Paragraph("Fleet Manager Pro is (c) 2026 Jeff Poblocki. All rights reserved. It is licensed, not sold, under the licence "
-                "agreement (Licence Agreement.txt): copying, sharing, reselling or reverse engineering it is not allowed.", SMALL))
+                "agreement: copying, sharing, reselling or reverse engineering it is not allowed.", SMALL))
     doc.build(s, onFirstPage=cover, onLaterPages=page)
     print("written:", OUT, f"({os.path.getsize(OUT) // 1024} KB)")
 

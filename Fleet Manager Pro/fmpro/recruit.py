@@ -62,7 +62,7 @@ def _store(a, rid):
     age = str(a.get("age") or "")
     games = a.get("games") if a.get("games") in ("ats", "ets2") else ("ats,ets2" if a.get("games") == "both" else "")
     db.insert("applications", name=str(a.get("name") or "")[:48] or "(no name)", contact=str(a.get("contact") or "")[:100],
-              age=int(age) if age.isdigit() and 0 < int(age) < 120 else None, country=str(a.get("country") or "")[:48],
+              age=int(age) if age.isdecimal() and 0 < int(age) < 120 else None, country=str(a.get("country") or "")[:48],
               games=games, experience=str(a.get("experience") or "")[:1000], message=str(a.get("message") or "")[:2000],
               remote_id=rid, source="online", created_at=time.time())
 

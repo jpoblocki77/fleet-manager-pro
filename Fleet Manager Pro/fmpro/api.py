@@ -92,7 +92,7 @@ def _frame_payload(uid, full=True):
 
 def _uid_arg():
     a = request.args.get("user", "")
-    return int(a) if a.isdigit() else (local_user() or user()["id"])
+    return int(a) if a.isdecimal() else (local_user() or user()["id"])
 
 
 @bp.route("/live")
@@ -229,7 +229,7 @@ def raw():
         return jsonify(error="no local frame yet"), 404
     def num(name, default):
         raw = request.args.get(name, "")
-        return int(raw) if raw.isdigit() and len(raw) < 7 else default
+        return int(raw) if raw.isdecimal() and len(raw) < 7 else default
     off = max(0, min(MMF_SIZE - 16, num("offset", 0)))
     n = max(16, min(1024, num("length", 256)))
     chunk = s.raw[off:off + n]

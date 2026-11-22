@@ -132,7 +132,7 @@ def plan_save():
         return redirect(url_for("tlease.page") + "#plans")
     vals.update(name=name, weeks=int(weeks))
     pid = request.form.get("id", "")
-    if pid.isdigit() and db.val("SELECT id FROM trailer_lease_plans WHERE id=?", (int(pid),)):
+    if pid.isdecimal() and db.val("SELECT id FROM trailer_lease_plans WHERE id=?", (int(pid),)):
         db.update("trailer_lease_plans", int(pid), **vals)
         flash(f"Trailer lease plan {name} updated. Leases already signed keep their own terms.", "success")
     else:

@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FAQ and Troubleshooting - Fleet Manager Pro</title>
+<meta name="description" content="Install steps, common questions and troubleshooting for Fleet Manager Pro, the virtual trucking company manager for American Truck Simulator and Euro Truck Simulator 2.">
+<style>
+:root{--bg:#f4f7fb;--card:#fff;--ink:#1b2a41;--muted:#4c6283;--line:#d3dcea;--pale:#eef2f8;--accent:#c8102e;--note:#fbe3e7}
+@media (prefers-color-scheme:dark){:root{--bg:#071327;--card:#0d203d;--ink:#e8eef8;--muted:#93a7c6;--line:#1d3a66;--pale:#12294c;--accent:#f0556d;--note:#3a1424}}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:16px}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 "Segoe UI",system-ui,sans-serif}
+a{color:var(--accent)}
+header{background:linear-gradient(135deg,#050e1c,#15325e);border-bottom:5px solid #c8102e;color:#fff;padding:44px 20px;text-align:center}
+header h1{margin:0;font-size:clamp(28px,5vw,42px);line-height:1.15}header p{margin:8px auto 0;color:#b9cbe6;max-width:60ch}
+.wrap{max-width:1120px;margin:0 auto;padding:28px 20px;display:grid;grid-template-columns:230px minmax(0,1fr);gap:28px;align-items:start}
+nav{position:sticky;top:16px;font-size:14.5px}nav b{display:block;margin-bottom:6px}
+nav a{display:block;padding:5px 10px;color:var(--ink);text-decoration:none;border-left:3px solid var(--line)}
+nav a:hover,nav a:focus-visible{border-color:var(--accent);color:var(--accent)}
+main{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 30px 30px;min-width:0}
+h2{font-size:24px;margin:34px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+h3{font-size:18px;margin:22px 0 6px;color:var(--accent)}
+li{margin:6px 0}li::marker{color:var(--accent);font-weight:700}
+.search{display:none}.js .search{display:block}
+.search label{font-weight:600;display:block;margin-bottom:4px}
+.search input{width:100%;padding:11px 14px;font:inherit;color:var(--ink);background:var(--pale);border:1px solid var(--line);border-radius:8px}
+.search p{margin:6px 0 0;color:var(--muted);font-size:14px;min-height:1.6em}
+.note{border-left:4px solid var(--accent);background:var(--note);padding:12px 16px;border-radius:8px}
+details{border:1px solid var(--line);border-radius:10px;margin:8px 0;background:var(--card)}
+details[open]{background:var(--pale)}
+summary{cursor:pointer;padding:11px 16px;font-weight:600}
+summary:hover{color:var(--accent)}
+details>div{padding:0 16px 10px}details p{margin:6px 0}
+code{font-family:Consolas,monospace;font-size:.92em;overflow-wrap:anywhere}
+pre{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 14px;overflow-x:auto;margin:8px 0}
+[hidden]{display:none!important}
+footer{text-align:center;color:var(--muted);font-size:14px;padding:0 20px 34px}
+@media (max-width:760px){.wrap{grid-template-columns:minmax(0,1fr);padding:16px}nav{position:static}main{padding:14px 16px 20px}}
+@media print{nav,.search{display:none!important}.wrap{display:block;padding:0}main{border:0}h2,h3,summary{break-after:avoid}}
+</style>
+</head>
+<body>
+<header><h1>FAQ &amp; Troubleshooting</h1>
+<p>Install steps, common questions and fixes for Fleet Manager Pro, the virtual trucking company manager for American Truck Simulator and Euro Truck Simulator 2</p></header>
+<div class="wrap">
+<nav aria-label="Sections"><b>On this page</b>
+<a href="#install">Install steps</a>
+<a href="#first">First checks when something is wrong</a>
+<a href="#t-install">Fix: installing and starting</a>
+<a href="#t-licence">Fix: activation</a>
+<a href="#t-game">Fix: the game and jobs</a>
+<a href="#t-drivers">Fix: drivers and other PCs</a>
+<a href="#t-data">Fix: data and updates</a>
+<a href="#q-general">Questions: general</a>
+<a href="#q-data">Questions: data and updates</a>
+<a href="#q-licence">Questions: your key</a>
+<a href="#q-drivers">Questions: drivers</a>
+<a href="#q-company">Questions: running the company</a>
+<a href="#q-privacy">Questions: privacy</a>
+<a href="#help">Still stuck?</a>
+<a href="install.html">Full installation guide</a>
+<a href="features.html">Every feature explained</a>
+</nav>
+<main>
+<div class="search"><label for="q">Search this page</label>
+<input id="q" type="search" placeholder="For example: plugin, password, port, update" autocomplete="off">
+<p id="found" role="status"></p></div>
+
+<h2 id="install">Install steps</h2>
+<p>You need Windows 10 or 11 (64-bit), American Truck Simulator or Euro Truck Simulator 2 on Steam, your purchase key, and internet to activate. The <a href="install.html">installation guide</a> shows every step in full.</p>
+<ol>
+<li>Double-click <b>Fleet Manager Pro Setup.exe</b>. If Windows shows a blue "Windows protected your PC" box, click <b>More info</b>, then <b>Run anyway</b>.</li>
+<li>Accept the licence agreement, click <b>Install</b>, then <b>Finish</b>. No administrator password is needed.</li>
+<li>A black window opens: leave it open. Your browser opens <code>http://127.0.0.1:8760</code>. If it doesn't, type that address yourself.</li>
+<li>Type your purchase key (<code>FMP-XXXX-XXXX-XXXX-XXXX</code>), tick the licence agreement box and click <b>Activate this PC</b>.</li>
+<li>Name your company, create the owner account (password of at least 8 characters) and click <b>Create company</b>.</li>
+<li>Close the game. Open <b>Settings &gt; Telemetry</b> and, under <b>Game plugin</b>, click <b>Install</b> next to each game.</li>
+<li>Start the game and click <b>OK</b> on the "advanced SDK features" message.</li>
+<li>Get into your truck. The top bar of Fleet Manager Pro shows your speed and truck: you're ready to drive.</li>
+</ol>
+<p><b>Were you sent a zip instead?</b> Unzip it to a folder, double-click <b>Fleet Manager Pro.exe</b> in it, and carry on from step 3.</p>
+
+<h2 id="first">First checks when something is wrong</h2>
+<p>These fix most problems. Try them in this order.</p>
+<ol>
+<li>Is the <b>black window</b> still open? If not, start Fleet Manager Pro again.</li>
+<li>Reload the page in your browser, or type <code>http://127.0.0.1:8760</code>.</li>
+<li>Close Fleet Manager Pro <i>and</i> the game. Start Fleet Manager Pro first, then the game.</li>
+<li>Look at the <b>top bar</b>: it says whether the game is found.</li>
+<li>Open <b>Updates</b> and press <b>Check for updates</b>: the problem may already be fixed.</li>
+<li>Still wrong? Restart the PC, then look for your problem below.</li>
+</ol>
+
+<h2 id="t-install">Fix: installing and starting</h2>
+<details><summary>"Windows protected your PC"</summary><div>
+<p>Windows shows this for new programs that aren't signed yet. Click <b>More info</b>, then <b>Run anyway</b>.</p></div></details>
+<details><summary>Microsoft Defender (or another antivirus) blocks or removes it</summary><div>
+<p>The program isn't code-signed yet, so antivirus programs may wrongly flag it.</p>
+<ol><li>Start menu &gt; type <b>Windows Security</b> &gt; <b>Virus &amp; threat protection</b> &gt; <b>Protection history</b>.</li>
+<li>Click the entry that names Fleet Manager Pro. Check the path is the file you were sent or your Fleet Manager Pro folder.</li>
+<li><b>Actions</b> &gt; <b>Restore</b> or <b>Allow on device</b>.</li>
+<li>If it keeps happening: <b>Manage settings</b> &gt; <b>Add or remove exclusions</b> &gt; <b>Add an exclusion</b> &gt; <b>Folder</b>, and pick only <code>%LOCALAPPDATA%\Programs\Fleet Manager Pro</code>.</li>
+<li>Run <b>Fleet Manager Pro Setup.exe</b> again if files are missing. Your data is kept.</li></ol>
+<p>Only allow the file you got from the seller. Other antivirus programs have the same options under Quarantine and Exceptions.</p></div></details>
+<details><summary>It closes straight away, or won't start</summary><div>
+<ol><li>Open Task Manager and check it isn't already running.</li>
+<li>Check antivirus hasn't removed a file (see above).</li>
+<li>Run <b>Fleet Manager Pro Setup.exe</b> again: it puts back missing files and keeps your data.</li></ol></div></details>
+<details><summary>The black window is open but no page appears</summary><div>
+<p>Type <code>http://127.0.0.1:8760</code> in Edge, Chrome or Firefox. Start with <code>http://</code>, not <code>https://</code>, on the same PC.</p></div></details>
+<details><summary>"Port 8760 is already in use"</summary><div>
+<p>Another copy is running. Close it in Task Manager. Or start on another port: press <b>Windows + R</b>, paste <code>%LOCALAPPDATA%\Programs\Fleet Manager Pro</code>, press Enter, click the address bar, type <b>cmd</b>, press Enter and run:</p>
+<pre><code>"Fleet Manager Pro.exe" --port 8770</code></pre></div></details>
+
+<h2 id="t-licence">Fix: activation</h2>
+<details><summary>"Can't reach the licence server"</summary><div>
+<ol><li>Check your internet connection and try again.</li><li>Turn off your VPN for a moment.</li><li>Allow Fleet Manager Pro in your firewall or antivirus.</li><li>Still no? Wait a while and try again, then contact the seller.</li></ol></div></details>
+<details><summary>"This purchase is already active on 2 PCs"</summary><div>
+<p>On a PC you no longer use, open <b>Settings &gt; Licence &gt; Deactivate this PC</b>. If that PC is gone, ask the seller to release it.</p></div></details>
+<details><summary>"That purchase key doesn't exist"</summary><div>
+<p>Check for typing mistakes. Keys start with <b>FMP-</b> and use only letters A-Z and digits 2-7 (no 0, 1, 8 or 9). Keys starting with <b>FM-</b> are for the older app.</p></div></details>
+<details><summary>It worked before and now asks to be activated</summary><div>
+<p>Connect to the internet: without it, Fleet Manager Pro works for 7 days. If you moved the program to another PC, activate there with the same key.</p></div></details>
+
+<h2 id="t-game">Fix: the game and jobs</h2>
+<details><summary>The top bar says "waiting for game"</summary><div>
+<ol><li>Close the game.</li><li><b>Settings &gt; Telemetry &gt; Game plugin &gt; Install</b> next to your game.</li><li>Start the game and click <b>OK</b> on the "advanced SDK features" message.</li><li>Get into the truck.</li></ol>
+<p>In <b>Settings &gt; Telemetry</b>, the Source must not be set to Demo simulator.</p></div></details>
+<details><summary>The top bar says "game not running"</summary><div><p>The game is closed or still on the profile or menu screen. Load your profile and get into the truck.</p></div></details>
+<details><summary>My game isn't in the plugin list</summary><div>
+<p>In Steam, right-click the game &gt; <b>Manage &gt; Browse local files</b>. Type that folder in the box below the list and click <b>Install here</b>. Or copy <code>plugin\scs-telemetry.dll</code> from the Fleet Manager Pro folder into <code>bin\win_x64\plugins</code> in the game's folder (create <b>plugins</b> if it isn't there).</p></div></details>
+<details><summary>My delivery wasn't logged</summary><div>
+<ol><li>Fleet Manager Pro must be running <i>before</i> you deliver. Start it before you drive.</li><li>While driving, <b>Live Cockpit</b> should show "On job".</li><li>Missed one? <b>Logbook &gt; Log a job manually</b>. A manager may have to approve it before it's paid.</li></ol></div></details>
+<details><summary>A delivery says "pending review"</summary><div>
+<p>Its pay is being held: the checks found something unusual (for example, the app was closed for most of the drive, or the truck's position jumped). A manager opens the job and clicks <b>Approve &amp; pay</b> or <b>Reject</b>.</p></div></details>
+<details><summary>The page shows no jobs, or the wrong units</summary><div><p>Check the <b>Game</b> box at the top: ATS, ETS2 or Both. Pages show only that game's jobs, in its units.</p></div></details>
+<details><summary>"Send to game" isn't there, or the contract isn't in the game</summary><div>
+<ol><li>Use a browser on the PC where the game is installed.</li><li>The contract needs a From city, To city and Cargo picked from the lists.</li><li>In the game, load the save named <b>Fleet Manager Pro - Contract #N</b>, then take the job at the pickup company.</li><li>It's single-player only; TruckersMP doesn't use your saves.</li></ol></div></details>
+<details><summary>I can't claim a contract</summary><div><p>You may be out of driving hours, or your truck is on a maintenance hold from an inspection defect. Open <b>ELD &amp; Compliance</b>: take a rest (or <b>Simulate rest</b>), and ask a manager to mark the defect repaired.</p></div></details>
+<details><summary>The in-game overlay doesn't show</summary><div><p>Run the game in windowed or borderless mode: exclusive full screen hides other windows. Press <b>Ctrl + I</b> (unless you changed it).</p></div></details>
+
+<h2 id="t-drivers">Fix: drivers and other PCs</h2>
+<details><summary>Other PCs can't open the page</summary><div>
+<ol><li>On the main PC, close Fleet Manager Pro and start <b>Fleet Manager Pro (LAN)</b> from the Start menu (zip copy: <b>Start Fleet Manager Pro (LAN).bat</b>).</li>
+<li>Allow it if Windows Firewall asks.</li><li>On the other PC, type the <code>https://</code> address the black window shows.</li><li>The first time, the browser warns about the certificate: <b>Advanced &gt; Continue</b>. Your own PC made it, and the connection is encrypted.</li></ol></div></details>
+<details><summary>A driver at home can't connect over the internet</summary><div>
+<p>Open <b>Drivers &gt; Connect a driver</b> and work down the steps: LAN mode, your internet address, and opening the port on your router. Your PC must stay on with Fleet Manager Pro in LAN mode while they drive.</p></div></details>
+<details><summary>A remote driver's jobs don't show up</summary><div>
+<ol><li>Their connection window must stay open while they drive.</li><li>The game plugin must be installed on <i>their</i> PC.</li><li>Make sure they use their own file or command from <b>Connect a driver</b>. If the token was changed, send a new one.</li></ol></div></details>
+<details><summary>"Too many wrong passwords"</summary><div><p>Wait five minutes and try again. A manager can reset a driver's password on the driver's profile page.</p></div></details>
+<details><summary>I forgot the owner password</summary><div><p>Contact the seller. It can't be read back, only reset.</p></div></details>
+<details><summary>The tablet won't connect</summary><div><p>Turn on tablet access on the <b>Tablet</b> page, keep the tablet on the same Wi-Fi as the PC, scan the code, and choose to continue if it warns about the certificate.</p></div></details>
+
+<h2 id="t-data">Fix: data and updates</h2>
+<details><summary>A new version asks me to create a company</summary><div>
+<p>Nothing is lost: it just found no data next to it. Close it, rename the new <b>data</b> folder to <b>data-empty</b>, copy your real <b>data</b> folder in its place, and start again.</p></div></details>
+<details><summary>An update won't install</summary><div>
+<ol><li>Check your internet connection.</li><li>Open <b>Updates</b>, press <b>Check for updates</b>, then <b>Update now</b>.</li><li>Stop driving first: automatic updates wait until nobody is driving.</li><li>Still no? Close the app and run the newest Setup file the seller sent you. Your data is kept.</li></ol></div></details>
+<details><summary>I need to go back to a backup</summary><div>
+<ol><li>Close Fleet Manager Pro and copy the whole <b>data</b> folder somewhere safe.</li>
+<li>In <b>data</b>, rename <code>fleet.db</code> to <code>fleet-old.db</code>, and move <code>fleet.db-wal</code> and <code>fleet.db-shm</code> out of the folder if they are there.</li>
+<li>Copy the backup you want from <code>data\backups</code> into <b>data</b> and rename it to <code>fleet.db</code>.</li><li>Start the app.</li></ol></div></details>
+<details><summary>The Global Leaderboard isn't updating</summary><div><p>It updates every 10 minutes while the app runs. You can press <b>Update now</b>, but not more than once every 30 seconds. You need internet and an activated copy.</p></div></details>
+
+<h2 id="q-general">Questions: general</h2>
+<details><summary>What is Fleet Manager Pro?</summary><div><p>A company manager for virtual trucking. It logs your deliveries from the game and runs the rest: drivers, dispatch, trucks, money, driving hours, recruitment, events and leaderboards.</p></div></details>
+<details><summary>Which games does it work with?</summary><div><p>American Truck Simulator and Euro Truck Simulator 2. One company can run both, each with its own units.</p></div></details>
+<details><summary>How much does it cost?</summary><div><p>It's planned as a one-time $10 with every feature and no subscription. It isn't on general sale yet, and the price may change before launch.</p></div></details>
+<details><summary>Do I need Python, a database or a web server?</summary><div><p>No. Everything is in the one Setup file. It runs on your PC and opens in your browser.</p></div></details>
+<details><summary>Does it work on Mac or Linux?</summary><div><p>The program needs Windows 10 or 11. Drivers can open your company in a browser on other devices.</p></div></details>
+<details><summary>Do I have to enter jobs by hand?</summary><div><p>No. Deliveries log themselves. You can still add one by hand.</p></div></details>
+<details><summary>Does it change my game or my saves?</summary><div><p>The plugin only reads data. <b>Send to game</b> makes a new save and never changes your others.</p></div></details>
+<details><summary>Does it work with TruckersMP?</summary><div><p>Deliveries log from the game's telemetry, and you can share your Apply link with TruckersMP drivers. <b>Send to game</b> is single-player only.</p></div></details>
+<details><summary>Can I use other telemetry programs at the same time?</summary><div><p>Yes. Several programs can use the same plugin at once.</p></div></details>
+<details><summary>Can I try it without the game?</summary><div><p>Yes: <b>Settings &gt; Telemetry &gt; Source &gt; Demo simulator</b> drives a truck for you. Its jobs and money go into your real logbook, so use it before you start your company properly. They don't count on the Global Leaderboard.</p></div></details>
+
+<h2 id="q-data">Questions: data and updates</h2>
+<details><summary>Where is my data?</summary><div>
+<p>In one folder named <b>data</b>, next to <b>Fleet Manager Pro.exe</b>. If you used Setup, press <b>Windows + R</b> and paste:</p>
+<pre><code>%LOCALAPPDATA%\Programs\Fleet Manager Pro\data</code></pre></div></details>
+<details><summary>How do I update?</summary><div><p>An Owner or Manager opens <b>Updates</b>, presses <b>Check for updates</b>, then <b>Update now</b>. The app closes and reopens by itself and your data isn't touched.</p></div></details>
+<details><summary>How do I move from the zip version to the installed version?</summary><div>
+<ol><li>Close the old copy.</li><li>Run Setup, and untick <b>Start Fleet Manager Pro</b> at the end.</li><li>Copy the <b>data</b> folder from your old folder into <code>%LOCALAPPDATA%\Programs\Fleet Manager Pro</code>.</li><li>Start it from the Start menu and check your company is there.</li></ol></div></details>
+<details><summary>How do I move to another PC?</summary><div>
+<ol><li>Old PC: <b>Settings &gt; Licence &gt; Deactivate this PC</b>, then close the app.</li><li>Copy the whole <b>data</b> folder to the new PC.</li><li>Run Setup on the new PC without starting the app, and put <b>data</b> next to <b>Fleet Manager Pro.exe</b>.</li><li>Start it, activate with the same key, and install the game plugin.</li></ol></div></details>
+<details><summary>How do I back up?</summary><div><p>Close the app and copy the <b>data</b> folder. While it's running, <b>System &amp; Backups &gt; Back up now</b> saves the company database. It also makes one each day and keeps the newest 14.</p></div></details>
+<details><summary>Does uninstalling delete my company?</summary><div><p>No. The <b>data</b> folder stays until you delete it yourself.</p></div></details>
+
+<h2 id="q-licence">Questions: your key</h2>
+<details><summary>How many PCs can I use?</summary><div><p>Two. Deactivate one to move to another.</p></div></details>
+<details><summary>Do my drivers need a key?</summary><div><p>No. Only the main PC is activated.</p></div></details>
+<details><summary>Does it work offline?</summary><div><p>You need internet to activate. After that it works for 7 days without it.</p></div></details>
+<details><summary>Can I share my copy?</summary><div><p>No. Each copy is made for one purchase key and is licensed to you. Keep your key private.</p></div></details>
+
+<h2 id="q-drivers">Questions: drivers</h2>
+<details><summary>How do I add a driver?</summary><div><p><b>Drivers &gt; Add member</b>. Or share your Apply link from <b>Recruitment</b> and accept applications there; the link works even when your PC is off.</p></div></details>
+<details><summary>How does a driver connect from their own PC?</summary><div>
+<ol><li>They install Fleet Manager Pro with the same Setup file and install the game plugin on their PC.</li><li>You open <b>Drivers &gt; Connect a driver</b>, pick them and press <b>Download file</b>. Send it only to that driver: it holds their private token.</li><li>They put the file in their Fleet Manager Pro folder, double-click it and leave it open while they drive.</li></ol></div></details>
+<details><summary>What can each role do?</summary><div><ul><li><b>Owner</b>: everything.</li><li><b>Manager</b>: fleet, finance, members and settings.</li><li><b>Dispatcher</b>: contracts, events and announcements.</li><li><b>Driver</b> and <b>Trainee</b>: drive, claim contracts and sign up for events.</li></ul></div></details>
+<details><summary>What happens when I fire a driver?</summary><div><p>Their account is deleted. Their deliveries and pay stay in the books as "Former driver".</p></div></details>
+
+<h2 id="q-company">Questions: running the company</h2>
+<details><summary>How much money does a company start with?</summary><div><p>$300,000. It's the same for every company.</p></div></details>
+<details><summary>How do contracts work?</summary><div><p>A dispatcher posts one on <b>Dispatch</b>, a driver claims it, and a matching delivery completes it by itself.</p></div></details>
+<details><summary>Should I buy or lease?</summary><div><p>Buying takes all the money now. Leasing takes a small down payment and a weekly payment; at the end you buy, return or renew. Truck leases include a set number of miles; trailer leases have no mileage limit.</p></div></details>
+<details><summary>What are Hours of Service and DVIRs?</summary><div><p>Driving-time rules and vehicle inspections, on in-game time. US rules for ATS, EU rules for ETS2. Change the rules or turn parts off in <b>Settings &gt; Compliance</b>.</p></div></details>
+<details><summary>Where do I change pay, fuel and repair prices?</summary><div><p><b>Settings &gt; Economy</b>.</p></div></details>
+<details><summary>Can it post to Discord?</summary><div><p>Yes. Add a webhook in <b>Settings &gt; Discord</b>.</p></div></details>
+<details><summary>Can I show it on stream?</summary><div><p>Yes. Make a stream overlay, copy its link into an OBS Browser source, and keep that link private.</p></div></details>
+
+<h2 id="q-privacy">Questions: privacy</h2>
+<details><summary>What leaves my PC?</summary><div>
+<p>Your company database stays on your PC. These do go to the licence server:</p>
+<ul><li><b>Licence checks</b>: your key and an ID for your PC.</li><li><b>Recruitment</b>: your company name, Apply page text and whether applications are open. Applications wait there until your copy collects them.</li>
+<li><b>Global Leaderboard</b>: your company name, currency and totals, including revenue, unless you leave it. Driver names are off unless you turn them on.</li></ul>
+<p>If you add a Discord webhook, those posts go to Discord.</p></div></details>
+<details><summary>How do I leave the Global Leaderboard?</summary><div><p>Open <b>Leaderboard &gt; Global</b> and turn your company off. It's removed from the server straight away. You can still look at the board.</p></div></details>
+<details><summary>Are the Global Leaderboard numbers checked?</summary><div><p>Each company's copy reports its own totals, so treat it as friendly competition.</p></div></details>
+<details><summary>Can people on the internet reach my PC?</summary><div><p>Not unless you allow it. By default only your own PC can open it. LAN mode opens it to your network, encrypted, and only opening a port on your router lets the internet in.</p></div></details>
+
+<h2 id="help">Still stuck?</h2>
+<p>Contact the person you bought Fleet Manager Pro from. Include:</p>
+<ul><li>your version (shown on the <b>Updates</b> page),</li><li>what you were doing and the exact message,</li><li>a screenshot,</li><li>the log from <b>System &amp; Backups &gt; Logs</b>.</li></ul>
+<p class="note"><b>Never send</b> your password, your <b>data</b> folder, a driver's token or connection file, or post your purchase key in public.</p>
+</main>
+</div>
+<footer>Fleet Manager Pro is (c) 2026 Jeff Poblocki. American Truck Simulator and Euro Truck Simulator 2 are trademarks of SCS Software, which is not affiliated with Fleet Manager Pro.</footer>
+<script>
+(function () {
+  document.documentElement.classList.add("js");
+  var box = document.getElementById("q"), found = document.getElementById("found");
+  var all = [].slice.call(document.querySelectorAll("main details"));
+  var heads = [].slice.call(document.querySelectorAll("main h2"));
+  function siblings(h) { var out = [], n = h.nextElementSibling; while (n && n.tagName !== "H2") { out.push(n); n = n.nextElementSibling; } return out; }
+  box.addEventListener("input", function () {
+    var words = box.value.toLowerCase().split(/\s+/).filter(Boolean), count = 0;
+    all.forEach(function (d) {
+      var t = d.textContent.toLowerCase(), hit = words.every(function (w) { return t.indexOf(w) >= 0; });
+      d.hidden = !hit; d.open = words.length > 0 && hit && box.value.trim().length > 2;
+      if (hit) count++;
+    });
+    heads.forEach(function (h) {
+      var parts = siblings(h), qs = parts.filter(function (p) { return p.tagName === "DETAILS"; });
+      var show = !words.length || qs.some(function (p) { return !p.hidden; });
+      h.hidden = !show;
+      parts.forEach(function (p) { if (p.tagName !== "DETAILS") p.hidden = !show; });
+    });
+    found.textContent = words.length ? (count ? count + (count === 1 ? " answer" : " answers") : "Nothing found. Try another word.") : "";
+  });
+  document.querySelector("nav").addEventListener("click", function () {
+    if (box.value) { box.value = ""; box.dispatchEvent(new Event("input")); }
+  });
+  window.addEventListener("beforeprint", function () { all.forEach(function (d) { d.open = true; }); });
+})();
+</script>
+</body>
+</html>

@@ -68,7 +68,7 @@ def affordable(price, what):
 
 def opt_id(name, table):
     raw = request.form.get(name, "")
-    if not str(raw).isdigit():
+    if not str(raw).isdecimal():
         return None
     return int(raw) if db.val(f"SELECT id FROM {table} WHERE id=?", (int(raw),)) else None  # nosec B608  # table/column names are fixed in the code; every value is a ? parameter
 
@@ -307,7 +307,7 @@ def overlay_ingame():
 def jobs():
     a = request.args
     where, args = ["1=1"], []
-    if a.get("driver", "").isdigit():
+    if a.get("driver", "").isdecimal():
         where.append("j.user_id=?"); args.append(int(a["driver"]))
     if a.get("status"):
         where.append("j.status=?"); args.append(a["status"])
@@ -316,8 +316,9 @@ def jobs():
         args += [f"%{a['q']}%"] * 3
     if game_scope() or a.get("game"):
         where.append("j.game=?"); args.append(game_scope() or a["game"])
-    page = max(1, int(a.get("page", "1")) if a.get("page", "1").isdigit() else 1)
+    page = max(1, int(a.get("page", "1")) if a.get("page", "1").isdecimal() else 1)
     total = db.val(f"SELECT COUNT(*) FROM jobs j WHERE {' AND '.join(where)}", tuple(args), 0)  # nosec B608  # table/column names are fixed in the code; every value is a ? parameter
+    page = min(page, max(1, (total + 24) // 25))             # past the end: show the last page
     rows = db.q(f"""SELECT j.*, u.display_name, u.color FROM jobs j JOIN users u ON u.id=j.user_id
                     WHERE {' AND '.join(where)} ORDER BY j.started_at DESC LIMIT 25 OFFSET ?""",  # nosec B608  # table/column names are fixed in the code; every value is a ? parameter
                 tuple(args) + ((page - 1) * 25,))
@@ -658,7 +659,7 @@ def truck_save():
     if not cols["brand"] or not cols["model"]:
         flash("Brand and model are required.", "error")
         return back("pages.fleet")
-    if tid.isdigit():
+    if tid.isdecimal():
         db.update("trucks", int(tid), **cols)
         flash("Truck updated.", "success")
         return redirect(url_for("pages.truck_detail", tid=int(tid)))
@@ -733,7 +734,7 @@ def garage_save():
     size = request.form.get("size") if request.form.get("size") in ("small", "medium", "large") else "small"
     slots = GARAGE_SIZES[size][0]
     gid = request.form.get("id", "")
-    if gid.isdigit():                                  # edit
+    if gid.isdecimal():                                  # edit
         g = db.one("SELECT * FROM garages WHERE id=?", (int(gid),)) or abort(404)
         used = db.val("SELECT COUNT(*) FROM trucks WHERE garage_id=? AND status NOT IN ('sold','returned')", (g["id"],), 0)
         if used > slots:
@@ -998,7 +999,7 @@ def profile():
 @login_required(role="admin")
 def division_save():
     name = txt("name", 48)
-    if request.form.get("delete", "").isdigit():
+    if request.form.get("delete", "").isdecimal():
         did = int(request.form["delete"])
         db.ex("UPDATE users SET division_id=NULL WHERE division_id=?", (did,))
         db.ex("DELETE FROM divisions WHERE id=?", (did,))
@@ -1380,7 +1381,7 @@ def event_manage(eid):
         if e["status"] == "cancelled":
             flash("A cancelled event can't be completed.", "error")
             return redirect(url_for("pages.event_detail", eid=eid))
-        attended = {int(x) for x in request.form.getlist("attended") if x.isdigit()}
+        attended = {int(x) for x in request.form.getlist("attended") if x.isdecimal()}
         for r in db.q("SELECT * FROM event_rsvps WHERE event_id=?", (eid,)):
             now_att = r["user_id"] in attended
             paid = r["xp_awarded"] or 0
@@ -1482,7 +1483,7 @@ def leaderboard_global_settings():
 @login_required
 def achievements():
     uid = request.args.get("user", "")
-    uid = int(uid) if uid.isdigit() else user()["id"]
+    uid = int(uid) if uid.isdecimal() else user()["id"]
     who = db.one("SELECT id, display_name FROM users WHERE id=?", (uid,)) or abort(404)
     holders = db.q("""SELECT code, COUNT(*) n FROM user_achievements GROUP BY code""")
     return render_template("achievements.html", items=economy.achievement_progress(uid), who=who,
@@ -1497,7 +1498,7 @@ def announcements():
     if request.method == "POST":
         if not can("dispatcher"):
             abort(403)
-        if request.form.get("delete", "").isdigit():
+        if request.form.get("delete", "").isdecimal():
             db.ex("DELETE FROM announcements WHERE id=?", (int(request.form["delete"]),))
         else:
             title, body = txt("title", 120), txt("body", 5000)
@@ -1520,15 +1521,15 @@ def messages():
         body = txt("body", 2000)
         to = request.form.get("to", "")
         if body:
-            to_id = int(to) if to.isdigit() and db.val("SELECT id FROM users WHERE id=? AND status!='removed'", (int(to),)) else None
-            if to.isdigit() and not to_id:
+            to_id = int(to) if to.isdecimal() and db.val("SELECT id FROM users WHERE id=? AND status!='removed'", (int(to),)) else None
+            if to.isdecimal() and not to_id:
                 abort(404)                         # never turn a private message to a missing member into a public one
             db.insert("messages", from_id=me["id"], to_id=to_id, body=body, created_at=time.time())
             if to_id:
                 db.notify(to_id, f"New message from {me['display_name']}", f"/messages?with={me['id']}", "info")
         return redirect(url_for("pages.messages", **({"with": to} if to else {})))
     other = request.args.get("with", "")
-    if other.isdigit():
+    if other.isdecimal():
         other = int(other)
         rows = db.q("""SELECT m.*, u.display_name, u.color FROM messages m JOIN users u ON u.id=m.from_id
                        WHERE (from_id=? AND to_id=?) OR (from_id=? AND to_id=?) ORDER BY created_at DESC LIMIT 200""",

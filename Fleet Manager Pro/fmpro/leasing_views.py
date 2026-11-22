@@ -134,7 +134,7 @@ def plan_save():
     vals.update(name=name, weeks=int(weeks), km_allowed=allowed * (KM_PER_MI if imp else 1),
                 excess_per_km=rate / (KM_PER_MI if imp else 1))
     pid = request.form.get("id", "")
-    if pid.isdigit() and db.val("SELECT id FROM lease_plans WHERE id=?", (int(pid),)):
+    if pid.isdecimal() and db.val("SELECT id FROM lease_plans WHERE id=?", (int(pid),)):
         db.update("lease_plans", int(pid), **vals)
         flash(f"Lease plan {name} updated. Leases already signed keep their own terms.", "success")
     else:

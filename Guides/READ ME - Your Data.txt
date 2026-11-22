@@ -1,0 +1,116 @@
+FLEET MANAGER PRO {VERSION} - YOUR DATA
+=======================================
+
+In short: everything you own is in ONE folder called "data", next to Fleet Manager Pro.exe.
+Move that folder to the new version and nothing is lost.
+Always close Fleet Manager Pro before you copy it.
+
+Installation help: http://fleetmanager.servehttp.com:8080/install.html
+(the same guide is in this folder as Installation Guide.pdf)
+What every feature does and how to use it (searchable): http://fleetmanager.servehttp.com:8080/features.html
+Questions and troubleshooting: http://fleetmanager.servehttp.com:8080/faq.html
+
+
+1. WHERE YOUR DATA LIVES
+------------------------
+Installed with Fleet Manager Pro Setup.exe:
+    %LOCALAPPDATA%\Programs\Fleet Manager Pro\data
+    (press Windows + R, paste that line, press Enter)
+    If you picked another folder in Setup, it is in that folder instead.
+
+Running from an unzipped folder:
+    the "data" folder inside the folder that holds Fleet Manager Pro.exe
+
+Can't find it? Right-click the shortcut you start it with and choose "Open file location" (on a Start menu
+shortcut, do it twice). The folder that holds Fleet Manager Pro.exe also holds "data".
+It is created the first time you start the program.
+
+What is inside:
+    fleet.db         your whole company: drivers, jobs, money, trucks, trailers, leases, settings
+    fleet.db-wal     the newest changes to fleet.db - always keep it together with fleet.db
+    fleet.db-shm     a helper file for fleet.db
+    backups          copies of fleet.db made by the program (one a day, newest 14 kept, unless switched off)
+    licence.json     this PC's activation
+    secret.key       keeps people signed in
+    tls_cert.pem     used in LAN mode so other PCs can connect safely
+    tls_key.pem      (as above)
+    logs             the program's log files
+    updates          downloaded updates
+You may not have every file. Copy the whole folder, not just fleet.db.
+
+The "data" folder holds passwords (scrambled) and your licence. Never post it online or send it to other players.
+
+
+2. UPDATING TO A NEW VERSION (THE NORMAL WAY - NOTHING TO MOVE)
+---------------------------------------------------------------
+In the app open Updates, press Check for updates, then Update now.
+The app closes, updates and opens again. Your data folder is not touched.
+
+
+3. UPDATING WITH A NEW SETUP FILE
+---------------------------------
+1. Close Fleet Manager Pro (close the black window too).
+2. Run the new Fleet Manager Pro Setup.exe and keep the same folder.
+3. Start it. Your company is there: Setup never installs over the data folder.
+
+
+4. MOVING FROM AN UNZIPPED FOLDER TO THE INSTALLED VERSION (SAME PC)
+--------------------------------------------------------------------
+1. Close Fleet Manager Pro (close the black window too).
+2. Run Fleet Manager Pro Setup.exe. On the last page UNTICK "Start Fleet Manager Pro" and click Finish.
+3. In your old folder, right-click the "data" folder and choose Copy.
+4. Press Windows + R, paste   %LOCALAPPDATA%\Programs\Fleet Manager Pro   and press Enter.
+5. Paste, so that "data" sits next to Fleet Manager Pro.exe.
+   Already started the new one, so a "data" folder is there? Close it and rename that folder to "data-empty" first.
+   Don't merge two data folders.
+6. Start Fleet Manager Pro from the Start menu and check your company, drivers and jobs are there.
+   You do not need to activate again on the same PC.
+7. Keep the old folder until you are sure, and don't run both copies: changes go only into the one you use.
+
+
+5. MOVING FROM ONE UNZIPPED FOLDER TO A NEWER ONE
+-------------------------------------------------
+1. Close Fleet Manager Pro.
+2. Unzip the new version into a NEW folder. Don't start it yet.
+3. Copy "data" from the old folder into the new folder, next to Fleet Manager Pro.exe.
+4. Start the new one and check your company is there. Keep the old folder until you are sure.
+
+
+6. MOVING TO ANOTHER PC
+-----------------------
+1. Old PC: Settings > Licence > Deactivate this PC, then close Fleet Manager Pro.
+   (This frees the slot. If the old PC no longer works, ask the seller to release it.)
+2. Copy the whole "data" folder to a USB stick or your own cloud drive.
+3. New PC: install with your own Setup file but don't start it yet (untick "Start Fleet Manager Pro").
+4. Paste "data" next to Fleet Manager Pro.exe (section 1 shows where).
+5. Start it and activate with the same purchase key.
+6. Install the game plugin on the new PC: Settings > Telemetry > Game plugin > Install.
+
+
+7. BACKING UP
+-------------
+Easiest: in the app open System & Backups and press Back up now. The copy goes into data\backups.
+Safest: close Fleet Manager Pro and copy the whole "data" folder to another drive. Do this before every big change.
+
+
+8. GOING BACK TO A BACKUP
+-------------------------
+1. Close Fleet Manager Pro and make a copy of the whole "data" folder, just in case.
+2. In "data", rename fleet.db to fleet-old.db. If fleet.db-wal and fleet.db-shm are there, move them out of the folder.
+   (They belong to the old fleet.db and must not be used with the backup.)
+3. Copy the backup you want from data\backups into "data" and rename it to fleet.db.
+4. Start Fleet Manager Pro. Anything done after that backup was made is not in it.
+
+
+9. IF THE NEW VERSION LOOKS EMPTY
+---------------------------------
+"Create your company" instead of your company means the program found no data next to it. Nothing is lost.
+Close it, rename the new "data" folder to "data-empty", copy your real "data" folder in its place and start again.
+
+
+10. GOOD TO KNOW
+----------------
+- A newer version upgrades your data the first time it starts. After that, don't open it with an older version.
+- Your copy works with your own purchase key. Don't use another buyer's copy or data folder.
+- Uninstalling leaves the "data" folder. Delete it yourself only if you no longer want your company.
+- Don't put the data folder in a folder that syncs (OneDrive, Dropbox) while the program is running.

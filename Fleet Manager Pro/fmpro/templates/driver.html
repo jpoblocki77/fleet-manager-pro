@@ -39,7 +39,7 @@
       <dt>Pay rate</dt><dd>{{ (rate_km * 1.609344 if imp else rate_km)|money(2) }}/{{ 'mi' if imp else 'km' }}</dd></dl></div>
     {% if can_token %}
     <div class="card accent"><h2>Remote telemetry</h2>
-      <p class="small muted">To log jobs from {{ 'your' if is_self else 'their' }} own PC, run this there in the Fleet Manager Pro folder (copied to that PC; no purchase key needed):</p>
+      <p class="small muted">To log jobs from {{ 'your' if is_self else 'their' }} own PC, run this there in the Fleet Manager Pro folder (installed on or copied to that PC; no purchase key needed):</p>
       <pre class="mono small" style="white-space:pre-wrap;word-break:break-all;background:var(--panel-2);padding:8px;border-radius:8px">{% if lan_pin %}{{ AGENT_CMD }} --server https://THIS-PC-IP:8760 --token {{ p.agent_token }} --pin {{ lan_pin }}{% else %}{{ AGENT_CMD }} --server http://THIS-PC-IP:8760 --token {{ p.agent_token }}{% endif %}</pre>{% if not lan_pin %}<p class="small muted">Start this PC in LAN mode once to get the encrypted https address and its fingerprint.</p>{% endif %}
       <p class="small muted">Stream overlay for OBS: {% if is_self %}<a href="/overlay/setup">set it up and copy your link</a>{% else %}<code>/overlay?key={{ p.agent_token }}</code>{% endif %}</p>
       <div class="row" style="gap:8px">{% if can('admin') %}<a class="btn sm primary" href="/drivers/connect?driver={{ p.id }}">Connect over the internet</a>{% endif %}

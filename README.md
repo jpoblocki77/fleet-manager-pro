@@ -1,7 +1,7 @@
 # Fleet Manager Pro - Development (seller folder)
 
 Everything for Fleet Manager Pro in one place: the development copy, the licence server, the build scripts and every
-guide. This folder is `D:\Fleet Manager Pro\Fleet Manager Pro RC 1.5.20-beta\Development`. **Never share this folder.** Full instructions: **Guides\Fleet Manager Pro - Seller Guide.pdf**.
+guide. This folder is `D:\Fleet Manager Pro\Fleet Manager Pro RC 1.5.21-beta\Development`. **Never share this folder.** Full instructions: **Guides\Fleet Manager Pro - Seller Guide.pdf**.
 
 | Here | What it is | Share it? |
 |---|---|---|
@@ -11,7 +11,8 @@ guide. This folder is `D:\Fleet Manager Pro\Fleet Manager Pro RC 1.5.20-beta\Dev
 | `Build and Publish Update (All Buyers).bat` | Rebuilds every active buyer's copy (keys come from the licence server) at the current VERSION and publishes each as an update. | No |
 | `Buyer Builds (PRIVATE).csv` | Written by every buyer build: date, purchase key, hidden build tag, version, zip. Your record of which copy went to whom. | **Never** |
 | `Build Pro Buyer Copy.py` | Builds `..\Build Output\For Buyer - FMP-....zip`: the buyer copy, a single `Fleet Manager Pro.exe` (a Nuitka standalone build). The only build shipped; the no-exe build was retired. | No |
-| `Guides\` | Installation Guide (goes to buyers, already inside the buyer zips), Seller Guide and the licence-server guides. | Installation Guide only |
+| `Build Installer.py` | Makes the one-file `Fleet Manager Pro Setup.exe` for copies already built (`--all` for every buyer), in `..\Build Output\Installers\<key>\`. Needs Inno Setup 6. Send each buyer only their own. | No |
+| `Guides\` | Website pages (install.html, features.html, faq.html), `READ ME - Your Data.txt` (ships in every copy), Installation Guide (goes to buyers, already inside the buyer zips), Seller Guide and the licence-server guides. | Installation Guide only |
 
 The buyer copy is compiled to native machine code with **Nuitka** (no Python source or bytecode to recover),
 contain no data and no secrets, ship `Licence Agreement.txt`, check `https://fleetmanager.servehttp.com:8750` pinned
@@ -48,7 +49,7 @@ After a game update or new DLC run `python tools\build_cargo.py`.
 
 ## The packaged release on D:
 
-`D:\Fleet Manager Pro\Fleet Manager Pro RC 1.5.20-beta\` holds this Development folder, `Build Output\` (fresh buyer
+`D:\Fleet Manager Pro\Fleet Manager Pro RC 1.5.21-beta\` holds this Development folder, `Build Output\` (fresh buyer
 copies), the guides, database backups and a private backup of the licence host. Its `READ ME FIRST.txt`
 explains each folder. The source code is here and in the private GitHub repo.
 

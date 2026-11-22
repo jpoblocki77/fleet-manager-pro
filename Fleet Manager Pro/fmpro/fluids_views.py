@@ -23,7 +23,7 @@ _LIVE_KEYS = ("fuel", "fuel_capacity", "fuel_pct", "fuel_warning", "fuel_warning
 
 def _uid():
     a = request.args.get("user", "")
-    return int(a) if a.isdigit() else (local_user() or user()["id"])
+    return int(a) if a.isdecimal() else (local_user() or user()["id"])
 
 
 @bp.route("/fuel")
@@ -31,7 +31,7 @@ def _uid():
 def page():
     drivers = db.q("SELECT id, display_name FROM users WHERE status!='removed' ORDER BY display_name")
     want = request.args.get("user", "")
-    me = int(want) if want.isdigit() and any(d["id"] == int(want) for d in drivers) else (local_user() or user()["id"])
+    me = int(want) if want.isdecimal() and any(d["id"] == int(want) for d in drivers) else (local_user() or user()["id"])
     rng = request.args.get("range") if request.args.get("range") in fluids.RANGES else "1h"
     return render_template("fluids.html", drivers=drivers, me=me, ranges=RANGE_LABELS, rng=rng,
                            sample_s=fluids.SAMPLE_S)

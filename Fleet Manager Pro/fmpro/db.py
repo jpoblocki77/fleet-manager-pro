@@ -381,6 +381,7 @@ def ex(sql, args=(), _cols=None):
         cur = c.execute(sql, args)
         c.commit()
     except Exception as e:
+        c.rollback()                    # a failed write must not keep the database locked for everyone else
         tracelog.db_error(sql, args, e, _cols)
         raise
     tracelog.db_write(sql, args, (time.perf_counter() - t) * 1000, _cols, cur.lastrowid)

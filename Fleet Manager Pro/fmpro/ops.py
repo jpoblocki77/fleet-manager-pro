@@ -38,7 +38,7 @@ def _num(name, lo=0.0, hi=1e9):
 
 def _id(name, table):
     raw = str(request.values.get(name, ""))
-    return int(raw) if raw.isdigit() and db.val(f"SELECT id FROM {table} WHERE id=?", (int(raw),)) else None  # nosec B608  # table/column names are fixed in the code; every value is a ? parameter
+    return int(raw) if raw.isdecimal() and db.val(f"SELECT id FROM {table} WHERE id=?", (int(raw),)) else None  # nosec B608  # table/column names are fixed in the code; every value is a ? parameter
 
 
 def _csv_cell(v):
@@ -54,10 +54,10 @@ def _expense_filter():
     if a["category"]:
         where.append("l.category = ?")
         args.append(a["category"][:40])
-    if a["truck"].isdigit():
+    if a["truck"].isdecimal():
         where.append("COALESCE(l.truck_id, j.truck_id) = ?")
         args.append(int(a["truck"]))
-    if a["driver"].isdigit():
+    if a["driver"].isdecimal():
         where.append("COALESCE(l.driver_id, j.user_id) = ?")
         args.append(int(a["driver"]))
     if a["kind"] == "manual":
@@ -142,7 +142,7 @@ def expense_save():
                 driver_id=_id("driver_id", "users"), job_id=_id("job_id", "jobs"), created_at=created)
     eid = request.form.get("id", "")
     u = user()
-    if eid.isdigit():
+    if eid.isdecimal():
         row = db.one("SELECT * FROM ledger WHERE id=? AND account='company' AND manual=1 AND amount<0", (int(eid),))
         if not row:
             abort(404)
@@ -217,7 +217,7 @@ def performance():
             rows.append(d)
     rows.sort(key=lambda d: (-d["km"], d["display_name"]))
     sel = request.args.get("driver", "")
-    sel = int(sel) if sel.isdigit() and int(sel) in drivers else None
+    sel = int(sel) if sel.isdecimal() and int(sel) in drivers else None
     loads = [j for j in jobs if j["user_id"] == sel][:200] if sel else []
     fleet = {"loads": len(jobs), "km": sum(d["km"] for d in rows), "on_time": sum(d["on_time"] for d in rows),
              "late": sum(d["late"] for d in rows)}
@@ -245,7 +245,7 @@ def compliance_reset():
     if request.form.get("confirm", "").strip().upper() != "RESET":
         flash("Type RESET to confirm.", "error")
         return redirect(url_for("comp.page"))
-    if who != "all" and not (who.isdigit() and db.val("SELECT id FROM users WHERE id=?", (int(who),))):
+    if who != "all" and not (who.isdecimal() and db.val("SELECT id FROM users WHERE id=?", (int(who),))):
         abort(400)
     if game not in ("ats", "ets2", "both"):
         abort(400)
