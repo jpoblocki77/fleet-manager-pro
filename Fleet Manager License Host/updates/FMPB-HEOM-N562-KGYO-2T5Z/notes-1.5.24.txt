@@ -1,0 +1,1 @@
+You no longer need the LAN file: press Let other PCs in on Drivers > Connect a driver, once. Members and drivers can then connect every time you start Fleet Manager Pro. Same port and address, so connection files you already sent keep working.
