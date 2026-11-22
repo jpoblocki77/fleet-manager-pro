@@ -1,0 +1,1 @@
+New: a banner on every page tells Owners and Managers when a driver applies. New: VTC Finder - list your company under Company > VTC Profile so drivers can find it, read its profile and apply; add up to 5 questions of your own to your Apply form. New: Community > Find a VTC. Recruitment shows where each applicant found you.
