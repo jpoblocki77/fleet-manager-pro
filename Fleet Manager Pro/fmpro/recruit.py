@@ -1,4 +1,4 @@
-"""Online recruitment: the company's public Apply page lives on the licence server (always online), because this
+"""Online recruitment: the company's public Apply page lives on the Fleet Manager server (always online), because this
 app only listens on this PC. Every few minutes the app publishes its company name / intro / open-closed state there
 and collects new applications, which then appear on the Recruitment page. The server deletes each application once
 this app confirms it has saved it."""
@@ -16,23 +16,22 @@ _lock = threading.Lock()
 
 
 def _body():
-    lic = licensing.LICENCE
-    # the company's own server ID; key + machine still go along so the server can move this company's Apply page
-    # and profile over to it (and an older server, which only knows keys, keeps working)
-    return dict(online_id.identity(), key=lic.key, machine=lic.machine, product=licensing.PRODUCT,
+    # the company's own server ID (no licence key: Fleet Manager Pro is free; the old key only goes along until the
+    # server has moved this company's Apply page and profile to the ID)
+    return online_id.body(product=licensing.PRODUCT,
                 company=db.setting("company_name", "") or "", intro=(db.setting("recruitment_text", "") or "")[:600],
                 open=db.setting("recruitment_open") == "1", ack=[])
 
 
 def push_profile():
     """Send the VTC Finder profile now (applications are left for the normal collection). Returns an error or None.
-    The first call carries no profile, so a licence server from before the VTC Finder is never sent one."""
-    if not licensing.licensed():
-        return "Fleet Manager Pro isn't activated."
+    The first call carries no profile, so a Fleet Manager server from before the VTC Finder is never sent one."""
     with _lock:
         body = _body()
         try:
-            if not vtc_profile.note_status(licensing._post("/v1/recruit", body, timeout=10)):
+            d = licensing._post("/v1/recruit", body, timeout=10)
+            online_id.note_reply(body, d)
+            if not vtc_profile.note_status(d):
                 return vtc_profile.NEEDS_UPDATE
             body["profile"] = vtc_profile.payload()
             vtc_profile.note_status(licensing._post("/v1/recruit", body, timeout=10))
@@ -45,14 +44,13 @@ def push_profile():
 
 def sync():
     """Publish the Apply page and collect new applications. Returns (new applications, error message or None)."""
-    if not licensing.licensed():
-        return 0, "Fleet Manager Pro isn't activated, so the online Apply page is off."
     with _lock:
         body = _body()
         new, profile_sent = 0, False
         try:
             for _ in range(6):                               # up to 600 waiting applications per run
                 d = licensing._post("/v1/recruit", body, timeout=10)
+                online_id.note_reply(body, d)
                 saved = []
                 for a in d.get("applications") or []:
                     rid = int(a.get("id") or 0)
@@ -105,7 +103,7 @@ def waiting(u):
 
 def _store(a, rid):
     age = str(a.get("age") or "")
-    if age.isdecimal() and int(age) < MIN_AGE:      # an older licence server still lets younger applicants through
+    if age.isdecimal() and int(age) < MIN_AGE:      # an older Fleet Manager server still lets younger applicants through
         log.info("online application %s skipped: under %s", rid, MIN_AGE)
         return False
     games = a.get("games") if a.get("games") in ("ats", "ets2") else ("ats,ets2" if a.get("games") == "both" else "")

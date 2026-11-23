@@ -1,15 +1,12 @@
-"""Seller tool: build the copy of Fleet Manager Pro that buyers get.
+"""Build the copy of Fleet Manager Pro that everyone downloads (it's free: no licence key, no activation).
 
-    python "Build Pro Buyer Copy.py"                                  stock copy (not traceable to a buyer)
-    python "Build Pro Buyer Copy.py" --buyer FMP-XXXX-XXXX-XXXX-XXXX  copy for one purchase (hidden buyer ID)
-    python "Build Pro Buyer Copy.py" --public                         the one public build (pages not sealed, one
-                                                                      update channel for everyone): For Everyone
-    (or just double-click  Build Buyer Copy.bat , which asks for everything)
+    python "Build Pro Buyer Copy.py"            (or double-click  Build Buyer Copy.bat )
 
-Makes  ..\\Build Output\\For Buyer\\  (a compiled program: Fleet Manager Pro.exe, no Python source, no Python needed on
-the buyer's PC) and  ..\\Build Output\\For Buyer.zip  (what you send) from the development copy in  Fleet Manager Pro\\ .
-The buyer copy checks licences at the public address below and is pinned to this licence server's certificate
-and signing key (taken from the development copy's fmpro\\licensing.py).
+Makes  ..\\Build Output\\For Everyone\\  (a compiled program: Fleet Manager Pro.exe, no Python source, no Python needed)
+and  ..\\Build Output\\For Everyone.zip  from the development copy in  Fleet Manager Pro\\ . The copy carries the public
+build tag (its update channel), talks to the Fleet Manager server at the public address below, and is pinned to that
+server's certificate and update-signing key (taken from the development copy's fmpro\\licensing.py).
+--public is still accepted (it's the only kind of build now).
 
 Compiled to native machine code with Nuitka (no Python source or bytecode to recover).
 Needs once:  python -m pip install nuitka   and Visual Studio (or its Build Tools) with C++.
@@ -26,61 +23,34 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, "Fleet Manager Pro")
 DOWNLOADS = os.path.join(os.path.dirname(HERE), "Build Output")   # ...\RC 1.3 Alpha\Build Output
 os.makedirs(DOWNLOADS, exist_ok=True)
-OUT = os.path.join(DOWNLOADS, "For Buyer")
+OUT = os.path.join(DOWNLOADS, "For Everyone")
 PUBLIC_LICENCE_SERVER = "https://fleetmanager.servehttp.com:8750"
 NAME = "Fleet Manager Pro"
 DATA_README = "READ ME - Your Data.txt"
 
 
-BUYER_RX = re.compile(r"^FMP-[A-Z0-9]{4}(-[A-Z0-9]{4}){3}$")
 HOST_KEY = os.path.join(HERE, "Fleet Manager License Host", "host_key.json")
 
 
-def buyer_from_args():
-    """--buyer FMP-XXXX-XXXX-XXXX-XXXX builds a copy for one purchase (hidden buyer ID); --public the one public
-    build; neither, a stock copy. Returns (buyer key or None, public?)."""
+def args():
     import argparse
-    ap = argparse.ArgumentParser(description="Build the buyer copy of Fleet Manager Pro")
-    g = ap.add_mutually_exclusive_group()
-    g.add_argument("--buyer", default="", help="the purchase key this copy is for (License Manager > 2)")
-    g.add_argument("--public", action="store_true", help="the public build: pages not sealed, one update channel")
-    a = ap.parse_args()
-    key = a.buyer.strip().upper()
-    if key and not BUYER_RX.match(key):
-        sys.exit(f"--buyer must be a purchase key like FMP-XXXX-XXXX-XXXX-XXXX (got {key})")
-    return key or None, a.public
+    ap = argparse.ArgumentParser(description="Build the public copy of Fleet Manager Pro")
+    ap.add_argument("--public", action="store_true", help="(the default - kept so older commands still work)")
+    return ap.parse_args()
 
 
-def seal_pages_for(fmpro_dir, buyer, public=False):
-    """Seal the pages to this build (only the licence server can unlock them) and return its hidden build tag.
-    The public build keeps every page readable and gets the one public tag (its update channel)."""
+def pages_for(fmpro_dir):
+    """Compile the pages into the copy and return its build tag (the public update channel)."""
     sys.path.insert(0, os.path.join(SRC, "tools"))
     import seal_pages
     if not os.path.isfile(HOST_KEY):
-        sys.exit(f"Can't find the licence server's key ({HOST_KEY}) - it's needed to seal the pages")
-    public, master = seal_pages.master_from_hostkey(HOST_KEY)
-    if f'PUBLIC_KEY_HEX = "{public}"' not in open(os.path.join(SRC, "fmpro", "licensing.py"), encoding="utf-8").read():
-        sys.exit("host_key.json isn't the key of the licence server this copy trusts - the pages can't be sealed")
-    if public:
-        tag = seal_pages.build_tag(master, seal_pages.PUBLIC_BUILD)
-        seal_pages.open_templates(fmpro_dir, tag)
-        return tag
-    tag = seal_pages.build_tag(master, buyer or "STOCK")
-    seal_pages.seal_templates(fmpro_dir, master, tag)
+        sys.exit(f"Can't find the server's key ({HOST_KEY}) - it's needed for the build tag")
+    server_key, master = seal_pages.master_from_hostkey(HOST_KEY)
+    if f'PUBLIC_KEY_HEX = "{server_key}"' not in open(os.path.join(SRC, "fmpro", "licensing.py"), encoding="utf-8").read():
+        sys.exit("host_key.json isn't the key of the server this copy trusts - its updates couldn't be checked")
+    tag = seal_pages.build_tag(master, seal_pages.PUBLIC_BUILD)
+    seal_pages.open_templates(fmpro_dir, tag)
     return tag
-
-
-def record_build(buyer, tag, kind, folder):
-    """Keep a private list of which copy went to whom (Development folder: Buyer Builds (PRIVATE).csv)."""
-    import csv
-    import datetime
-    path = os.path.join(HERE, "Buyer Builds (PRIVATE).csv")
-    new = not os.path.exists(path)
-    with open(path, "a", newline="", encoding="utf-8") as fh:
-        w = csv.writer(fh)
-        if new:
-            w.writerow(["built", "purchase key", "hidden build tag", "version", "folder"])
-        w.writerow([datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), buyer, tag, kind, folder])
 
 
 def tk_library_args(work):
@@ -113,12 +83,7 @@ def tk_library_args(work):
 
 
 def main():
-    global OUT
-    buyer, public = buyer_from_args()
-    if buyer:
-        OUT = os.path.join(DOWNLOADS, f"For Buyer - {buyer}")
-    elif public:
-        OUT = os.path.join(DOWNLOADS, "For Everyone")
+    args()
     version = open(os.path.join(SRC, "VERSION"), encoding="utf-8").read().strip()
     # Windows file/product version fields must be purely numeric (e.g. 1.3.0.0), so strip any
     # suffix like "-alpha" from VERSION for Nuitka while the readable VERSION file ships as-is.
@@ -139,7 +104,7 @@ def main():
         sys.exit("Couldn't switch off developer mode in licensing.py")
     open(lic, "w", encoding="utf-8", newline="\n").write(s)
 
-    tag = seal_pages_for(os.path.join(stage, "fmpro"), buyer, public)
+    tag = pages_for(os.path.join(stage, "fmpro"))
     cmd = [sys.executable, "-m", "nuitka", "--mode=standalone", "--python-flag=no_docstrings", "--msvc=latest", "--assume-yes-for-downloads",
            "--remove-output", "--output-dir=" + os.path.join(work, "dist"), f"--output-filename={NAME}.exe",
            "--windows-console-mode=force", "--include-package=fmpro", "--include-package=waitress",
@@ -188,7 +153,7 @@ def main():
    **Microsoft Defender flagged or removed it?** That's a false positive while the program isn't code-signed yet - a
    temporary step until Microsoft signs and clears it. Restore and allow it in Windows Security → Virus & threat
    protection → Protection history; the Installation Guide (section 1) shows every click.
-3. Type your purchase key on the **Activate** screen, then create your company and owner account.
+3. Read and accept the licence agreement, then create your company and owner account. No key is needed.
 4. **Settings → Telemetry → Game plugin → Install** (or copy `plugin\\\\scs-telemetry.dll` into
    `<game>\\\\bin\\\\win_x64\\\\plugins\\\\`). Start the game and click OK on the "advanced SDK features" message.
 
@@ -229,10 +194,7 @@ Remote drivers stream their own game with (token and fingerprint are on their pr
     shutil.rmtree(work, ignore_errors=True)
     n = sum(len(fs) for _d, _s, fs in os.walk(OUT))
     print(f"Done: {OUT}  ({n} files)\n      {zip_path}  ({os.path.getsize(zip_path) / 1e6:.1f} MB)")
-    who = buyer or ("everyone (public build, pages not sealed)" if public else "nobody in particular (stock copy)")
-    print(f"Built for: {who}   hidden build tag: {tag}")
-    if buyer:
-        record_build(buyer, tag, ".exe", zip_path)
+    print(f"Public build, update channel (build tag): {tag}")
 
 
 if __name__ == "__main__":

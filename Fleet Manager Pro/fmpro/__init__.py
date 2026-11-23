@@ -46,30 +46,6 @@ except OSError:
     VERSION = BUILT_VERSION
 
 
-class _PagesLoader:
-    """Jinja loader for a buyer copy: the few pages needed before activation are plain; every other page is
-    decrypted with the key the licence server put in this PC's signed licence (no valid licence, no pages)."""
-
-    def __new__(cls, plain):
-        from jinja2 import BaseLoader, TemplateNotFound
-        from . import licensing
-
-        class Loader(BaseLoader):
-            def get_source(self, environment, name):
-                if name in plain:
-                    return plain[name], None, lambda: True
-                blob = licensing.SEALED_PAGES.get(name)
-                key = licensing.LICENCE.page_key() if licensing.LICENCE and blob else None
-                if not key:
-                    raise TemplateNotFound(name)
-                return licensing.unseal(key, bytes.fromhex(blob)).decode("utf-8"), None, lambda: True
-
-            def list_templates(self):
-                return sorted(set(plain) | set(licensing.SEALED_PAGES))
-
-        return Loader()
-
-
 class _RecordId(IntegerConverter):
     """Record numbers in addresses: anything SQLite can't hold doesn't exist, so it's a 404 rather than a crash."""
     def __init__(self, url_map, *args, **kw):
@@ -78,6 +54,8 @@ class _RecordId(IntegerConverter):
 
 
 def create_app(data_dir=None, start_telemetry=True, check_licence=True):
+    """check_licence=True is the real program: background backups, online syncs and the updater start (the name
+    is kept from when copies were licensed; tests pass False for their many throwaway apps)."""
     from . import db, auth, pages, api, licensing, compliance_views
     from .telemetry.service import HUB
 
@@ -87,17 +65,12 @@ def create_app(data_dir=None, start_telemetry=True, check_licence=True):
     logs.setup(data_dir)
     tracelog.setup(data_dir)                # logs/debug.log: everything, for troubleshooting
     db.init(os.path.join(data_dir, "fleet.db"))
-    # The build tag must be known before the licence is loaded or checked: a check sent without it gets a lease
-    # with no key for this copy's sealed pages, and the copy shows "not activated" until the next check.
-    emb = licensing.load_build()            # buyer copies: pages compiled in, most of them sealed to the licence
-    licensing.LICENCE = licensing.Licence(os.path.join(data_dir, "licence.json"))
+    emb = licensing.load_build()            # a built copy: pages compiled in, and its build tag (update channel)
     if check_licence:                       # the real program (the tests make many throwaway apps)
         tracelog.system_report(data_dir)
         tracelog.start_heartbeat()
         from . import insights
         insights.start_auto_backup()           # a daily copy of the company database in data/backups
-    if check_licence:
-        licensing.LICENCE.start()
         from . import recruit
         recruit.start()
         from . import global_board
@@ -110,7 +83,8 @@ def create_app(data_dir=None, start_telemetry=True, check_licence=True):
     from . import howto
     howto.install(app)                      # the "How to use this page" panel at the top of each page
     if emb is not None:
-        app.jinja_loader = _PagesLoader(getattr(emb, "TEMPLATES", {}))
+        from jinja2 import DictLoader
+        app.jinja_loader = DictLoader(getattr(emb, "TEMPLATES", {}))
     app.session_interface = _Sessions()
     key_file = os.path.join(data_dir, "secret.key")
     if not os.path.exists(key_file):

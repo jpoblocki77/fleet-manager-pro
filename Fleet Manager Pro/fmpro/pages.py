@@ -8,7 +8,7 @@ import time
 
 from flask import Blueprint, current_app, abort, flash, make_response, redirect, render_template, request, url_for
 
-from . import RES, bank, db, economy, licensing, updater
+from . import RES, bank, db, economy, licensing, online_id, updater
 from .auth import PASSWORD_RULE, ROLES, game_scope, game_sql, can, create_user, login_required, role_level, user, valid_password
 from .telemetry import layout
 from .telemetry.reader import field_count
@@ -1516,7 +1516,7 @@ def leaderboard_global_settings():
     db.audit(user()["id"], "global leaderboard", f"joined={join} drivers={share}")
     err = global_board.sync()        # leaving deletes the company's entry on the server straight away
     if err:
-        flash(f"Saved, but the licence server couldn't be reached ({err}). It is tried again every 10 minutes.", "error")
+        flash(f"Saved, but the Fleet Manager server couldn't be reached ({err}). It is tried again every 10 minutes.", "error")
     else:
         flash("Your company is on the global leaderboard." if join else "Your company has left the global leaderboard.",
               "success")
@@ -1757,37 +1757,18 @@ def settings():
         flash("Settings saved.", "success")
         return redirect(url_for("pages.settings", tab=section or None))
     tab = request.args.get("tab", "company")
+    tab = "about" if tab == "licence" else tab            # the old Licence tab (links in older guides)
     if tab == "data" and not can("owner"):
         abort(403)
     from .ops import CLEAR_CONFIRM, DISSOLVE_CONFIRM, data_counts
     from .auth import current_units
     return render_template("settings.html", tab=tab, drivers=users_list(), uf=unit_settings_view(current_units()),
                            data_counts=data_counts() if tab == "data" else None, clear_confirm=CLEAR_CONFIRM, dissolve_confirm=DISSOLVE_CONFIRM,
-                           lic=licensing.LICENCE.status(),
+                           about={"company_id": online_id.company_id(), "server": licensing.server_url()},
                            status=HUB.local_status, plugin=plugin_status(),
                            frames=HUB.sampler.frames if HUB.sampler else 0,
                            audit=db.q("""SELECT a.*, u.display_name FROM audit_log a LEFT JOIN users u ON u.id=a.user_id
                                          ORDER BY a.created_at DESC LIMIT 50"""))
-
-
-@bp.route("/settings/licence", methods=["POST"])
-@login_required(role="admin")
-def licence_action():
-    lic = licensing.LICENCE
-    if request.form.get("action") == "check":
-        lic.check()
-        flash("Licence checked online." if lic.online else "Couldn't reach the licence server - the current "
-              "licence keeps working until it expires.", "success" if lic.online else "error")
-    elif request.form.get("action") == "deactivate":
-        if not can("owner"):
-            abort(403)
-        err = lic.deactivate()
-        if err:
-            flash(f"Couldn't deactivate: {err}", "error")
-        else:
-            db.audit(user()["id"], "licence deactivated", lic.machine)
-            return redirect(url_for("auth.activate"))
-    return redirect(url_for("pages.settings", tab="licence"))
 
 
 @bp.route("/settings/update", methods=["POST"])

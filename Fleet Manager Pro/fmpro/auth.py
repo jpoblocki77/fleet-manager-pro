@@ -12,7 +12,7 @@ import time
 from flask import Blueprint, abort, flash, g, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from . import db, economy, licensing
+from . import db, economy
 
 log = logging.getLogger("fmpro.auth")
 
@@ -154,12 +154,12 @@ def install(app):
             return
         if ep == "auth.eula":                      # the licence agreement can always be read
             return
-        if not licensing.licensed() and ep != "auth.activate":
+        if not agreed() and ep not in ("auth.agree", "auth.activate"):
             if request.path.startswith("/api/"):
-                return {"ok": False, "error": "Fleet Manager Pro isn't activated on this PC."}, 403
-            return redirect(url_for("auth.activate"))
+                return {"ok": False, "error": "Accept the Fleet Manager Pro licence agreement on this PC first."}, 403
+            return redirect(url_for("auth.agree"))
         initialized = db.setting("initialized") == "1"
-        if not initialized and ep not in ("auth.setup", "auth.activate", "static"):
+        if not initialized and ep not in ("auth.setup", "auth.agree", "auth.activate", "static"):
             return redirect(url_for("auth.setup"))
         if request.method == "POST" and ep not in ("api.agent_frame",):
             sent = request.form.get("csrf") or request.headers.get("X-CSRF", "")
@@ -264,26 +264,31 @@ def _throttled(ip, name):
     return pair >= LOCK_AFTER or total >= PER_PC_LIMIT
 
 
-@bp.route("/activate", methods=["GET", "POST"])
-def activate():
-    lic = licensing.LICENCE
+def agreed():
+    """True once someone on this PC has accepted the licence agreement (kept in the company database)."""
+    return bool(db.setting("eula_accepted"))
+
+
+@bp.route("/agree", methods=["GET", "POST"])
+def agree():
+    """The licence agreement, shown once before anything else (Fleet Manager Pro needs no key)."""
+    if agreed():
+        return redirect(url_for("pages.dashboard"))
     error = None
     if request.method == "POST":
-        if request.form.get("action") == "retry":
-            lic.check()
-        elif request.form.get("agree") != "1":
-            error = "Tick the box to agree to the licence agreement before activating."
+        if request.form.get("agree") != "1":
+            error = "Tick the box to agree to the licence agreement before continuing."
         else:
-            error = lic.activate(request.form.get("key", ""))
-            if lic.ok:
-                db.set_setting("eula_accepted", f"{time.strftime('%Y-%m-%d %H:%M:%S')} key {lic.key or ''}")
-                db.audit(session.get("uid"), "licence agreement accepted", lic.key or "")
-        if lic.ok:
-            db.audit(session.get("uid"), "licence activated", lic.key or "")
+            db.set_setting("eula_accepted", time.strftime("%Y-%m-%d %H:%M:%S"))
+            db.audit(session.get("uid"), "licence agreement accepted", "")
             return redirect(url_for("pages.dashboard"))
-    elif lic.ok:
-        return redirect(url_for("pages.dashboard"))
-    return render_template("activate.html", error=error, st=lic.status())
+    return render_template("agree.html", error=error, blocks=eula_blocks(eula_text()))
+
+
+@bp.route("/activate", methods=["GET", "POST"])
+def activate():
+    """Old address of the activation screen (bookmarks, old guides): there's no activation any more."""
+    return redirect(url_for("auth.agree"))
 
 
 def eula_text():
@@ -291,7 +296,7 @@ def eula_text():
     for p in (os.path.join(RES, "fmpro", "EULA.txt"), os.path.join(os.path.dirname(os.path.abspath(__file__)), "EULA.txt")):
         if os.path.isfile(p):
             return open(p, encoding="utf-8").read()
-    return "The licence agreement file is missing from this copy. Contact whoever gave you your licence key."
+    return "The licence agreement file is missing from this copy. Reinstall Fleet Manager Pro to get it back."
 
 
 def eula_blocks(text):
@@ -304,7 +309,7 @@ def eula_blocks(text):
             t = line.strip()
             if not blocks:
                 blocks.append(["title", t])
-            elif re.match(r"^\d+\.\s+[A-Z][A-Z ]+$", t):
+            elif re.match(r"^\d+\.\s+[A-Z][A-Z '&-]+$", t):
                 blocks.append(["head", t])
                 cur = None
             elif re.match(r"^[a-z]\)\s", t):

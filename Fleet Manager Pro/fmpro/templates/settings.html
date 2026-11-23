@@ -6,7 +6,7 @@
 {%- endmacro %}
 {% block content %}
 <div class="page-head"><div><h1>Settings</h1><p>Company, economy, telemetry and integrations.</p></div></div>
-<div class="tabs">{% for t, l in [('company','Company'),('economy','Economy'),('telemetry','Telemetry'),('compliance','Compliance'),('integrations','Discord'),('recruitment','Recruitment'),('licence','Licence'),('audit','Audit log')] + ([('data','Clear data')] if can('owner') else []) %}
+<div class="tabs">{% for t, l in [('company','Company'),('economy','Economy'),('telemetry','Telemetry'),('compliance','Compliance'),('integrations','Discord'),('recruitment','Recruitment'),('about','About'),('audit','Audit log')] + ([('data','Clear data')] if can('owner') else []) %}
   <a class="{{ 'on' if tab == t }}" href="?tab={{ t }}">{{ l }}</a>{% endfor %}</div>
 
 {% if tab == 'company' %}
@@ -181,32 +181,27 @@
   <div class="field"><label>Text shown on the application page</label><textarea name="recruitment_text" maxlength="1000">{{ S.recruitment_text }}</textarea></div>
   <button class="btn primary">Save</button></form>
 
-{% elif tab == 'licence' %}
+{% elif tab == 'about' %}
 <div class="grid g2">
-<div class="card accent"><div class="card-head"><h2>Licence</h2><span class="right badge {{ 'ok' if lic.licensed else 'bad' }}">{{ 'active' if lic.licensed else 'locked' }}</span></div>
+<div class="card accent"><div class="card-head"><h2>About Fleet Manager Pro</h2><span class="right badge ok">free</span></div>
   <dl class="kv">
-    <dt>Product</dt><dd>Fleet Manager Pro {{ VERSION }}</dd>
-    <dt>Licensed to</dt><dd>{{ lic.name or '—' }}{% if lic.email %} <span class="muted small">{{ lic.email }}</span>{% endif %}</dd>
-    <dt>Licence key</dt><dd class="mono">{% if not lic.key %}—{% elif can('owner') %}{{ lic.key }}{% else %}{{ lic.key[:8] }}-····-····-···· <span class="faint small">(owner only)</span>{% endif %}</dd>
-    <dt>This PC</dt><dd>{% if lic.slot %}PC {{ lic.slot }} of {{ lic.slots }}{% else %}—{% endif %}</dd>
-    <dt>Machine ID</dt><dd class="mono">{{ lic.machine_id }}</dd>
-    <dt>Last online check</dt><dd>{{ lic.last_check|replace('T', ' ') if lic.last_check else 'never' }}{% if lic.online == false %} <span class="badge warn">offline</span>{% endif %}</dd>
-    <dt>Works offline until</dt><dd>{{ (lic.expires or '—')|replace('T', ' ')|replace('Z', ' UTC') }}</dd>
-    <dt>Licence server</dt><dd class="mono small">{{ lic.server }}</dd>
+    <dt>Version</dt><dd>Fleet Manager Pro {{ VERSION }}</dd>
+    <dt>Licence agreement</dt><dd>{% if S.eula_accepted %}accepted {{ S.eula_accepted[:16] }}{% else %}—{% endif %} · <a href="/licence-agreement">read it</a></dd>
+    <dt>Online company ID</dt><dd class="mono">{{ about.company_id or 'made at the first online sync' }}</dd>
+    <dt>Fleet Manager server</dt><dd class="mono small">{{ about.server }}</dd>
   </dl>
-  <p class="small muted">Checked at start-up and every 6 hours. Without internet it keeps working until the date above.</p>
-  <form method="post" action="/settings/licence" class="row">{{ csrf() }}
-    <button class="btn" name="action" value="check">Check now</button>
-    {% if can('owner') %}<button class="btn danger" name="action" value="deactivate" data-confirm="Deactivate Fleet Manager Pro on this PC? It frees this PC's slot so the key can be used on another PC. This PC locks until activated again.">Deactivate this PC</button>{% endif %}
-  </form>
+  <p class="small muted">Fleet Manager Pro needs no licence key and works fully offline. The server is only used for updates,
+    your online Apply page, the Global Leaderboard and the VTC Finder. The company ID is how the server knows your company;
+    it lives in your company's data, so it moves with it.</p>
 </div>
 <div class="card"><h2>Moving to another PC</h2>
-  <p class="muted">Each purchase works on 2 PCs. To move, click <b>Deactivate this PC</b> here, then activate on the new PC with the same key.
-  If the old PC is gone (broken, reinstalled, sold), ask whoever gave you your licence key to release it.</p>
-  <p class="muted">Your company data lives in the <code>data</code> folder — copy it to the new PC to keep everything.</p>
+  <p class="muted">Install Fleet Manager Pro on the new PC, then copy your <code>data</code> folder over (close Fleet Manager Pro
+    on both PCs first). Everything comes with it: your company, members, history, your Apply page and your place on the
+    Global Leaderboard. <b>READ ME - Your Data.txt</b> next to the program explains where the folder is.</p>
+  <p class="muted">Run your company on one PC at a time: two copies of the same data would both answer for it online.</p>
 </div>
 <div class="card"><div class="card-head"><h2>Updates</h2></div>
-  <p class="muted">Checking for and installing new versions has its own page now: <a href="/updates">Updates</a>.</p>
+  <p class="muted">Checking for and installing new versions has its own page: <a href="/updates">Updates</a>.</p>
 </div>
 </div>
 
@@ -215,7 +210,7 @@
   <h2>Clear all company data</h2>
   <p>Deletes every job, ledger entry, expense, contract, truck, trailer, garage, loan, logbook line, inspection, event,
     message, achievement, learned map road and audit line. Use it to start the company over, e.g. after testing.</p>
-  <p class="muted"><b>Kept:</b> your Owner account and password, company settings, and the licence (no re-activation needed).
+  <p class="muted"><b>Kept:</b> your Owner account and password, and company settings.
     A full backup of the database is saved to <code>data\backups</code> first, so this can be undone by restoring that file.</p>
   <table style="max-width:460px;margin:10px 0"><tbody>{% for label, n in data_counts if n %}<tr><td>{{ label|capitalize }}</td><td class="num">{{ '{:,}'.format(n) }}</td></tr>
   {% else %}<tr><td class="empty">There is nothing to clear.</td></tr>{% endfor %}</tbody></table>

@@ -686,11 +686,6 @@ class LocalSampler(threading.Thread):
                     trailer_leasing.process()
                     cdl.process()
                     economy.process_upkeep()
-                from .. import licensing
-                if not licensing.licensed():
-                    self.hub.local_status = "locked — Fleet Manager Pro isn't activated"
-                    self.halt.wait(3)
-                    continue
                 mode = db.setting("telemetry_mode", "auto")
                 uid = local_user()
                 if mode == "off" or not uid:

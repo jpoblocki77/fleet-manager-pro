@@ -10,7 +10,7 @@
 
 <div class="grid g4" style="margin-bottom:16px">
   <div class="card stat"><div class="label">Version</div><div class="value">{{ health.version }}</div><div class="sub">running for {{ health.uptime|dur }}</div></div>
-  <div class="card stat"><div class="label">Licence</div><div class="value {{ 'pos' if health.licence else 'neg' }}">{{ 'Active' if health.licence else 'Locked' }}</div><div class="sub">{{ health.licence_reason or 'checked online' }}</div></div>
+  <div class="card stat"><div class="label">Online features</div><div class="value {{ 'pos' if health.company_id else '' }}">{{ 'Connected' if health.company_id else 'Not yet' }}</div><div class="sub mono">{{ health.company_id or 'starts within 10 minutes' }}</div></div>
   <div class="card stat"><div class="label">Database</div><div class="value {{ 'pos' if health.db_check == 'ok' else 'neg' }}">{{ 'Healthy' if health.db_check == 'ok' else 'Problem' }}</div><div class="sub">{{ size(health.db_size) }} · {{ '{:,}'.format(health.jobs) }} jobs · {{ health.members }} members</div></div>
   <div class="card stat"><div class="label">Game connection</div><div class="value small-value">{{ health.telemetry.split(' — ')[0]|capitalize }}</div><div class="sub">{{ health.live }} driver{{ '' if health.live == 1 else 's' }} live now</div></div>
 </div>
@@ -36,7 +36,7 @@
     <form method="get" class="right row" style="gap:6px">
       <select name="log">{% for f in files %}<option value="{{ f.name }}" {{ 'selected' if f.name == sel }}>{{ f.name }} ({{ size(f.size) }})</option>{% endfor %}</select>
       <input name="q" value="{{ q }}" placeholder="Filter lines" style="width:160px"><button class="btn sm">Filter</button></form></div>
-  <p class="small muted" style="padding:0 18px">Newest first, last 400 lines. Passwords, tokens and licence keys are hidden in every log, so you can safely send them for support.</p>
+  <p class="small muted" style="padding:0 18px">Newest first, last 400 lines. Passwords and tokens are hidden in every log, so you can safely send them for support.</p>
   <pre class="logview">{% for ln in lines %}<span class="{{ 'lv-err' if ' ERROR ' in ln or ' CRITICAL ' in ln else 'lv-warn' if ' WARNING ' in ln else 'lv-dbg' if ' DEBUG ' in ln else '' }}">{{ ln }}</span>
 {% else %}<span class="faint">Nothing to show.</span>{% endfor %}</pre>
 </div>

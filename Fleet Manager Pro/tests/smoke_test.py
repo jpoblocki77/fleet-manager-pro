@@ -104,7 +104,7 @@ def run(label, extra):
         seen, todo = set(), ["/"]
         if st in (302, 303) and hdr.get("Location"):
             todo.append(re.sub(r"^https?://[^/]+", "", hdr["Location"]))
-        for p in ("/login", "/setup", "/register", "/activate", "/static/css/app.css"):
+        for p in ("/login", "/setup", "/register", "/agree", "/activate", "/static/css/app.css"):
             todo.append(p)
         while todo and len(seen) < 25:
             p = todo.pop(0)
@@ -121,8 +121,8 @@ def run(label, extra):
                         todo.append(href)
         check(len(seen) >= 3, f"opened {len(seen)} pages")
         st, h, _b = get(op, base + "/this-page-does-not-exist")
-        check(st == 404 or (st in (302, 303) and "/activate" in (h.get("Location") or "")),
-              f"an unknown page is a 404 (or, with no licence yet, sends you to activation) ({st})")
+        check(st == 404 or (st in (302, 303) and "/agree" in (h.get("Location") or "")),
+              f"an unknown page is a 404 (or, before the licence agreement is accepted, sends you to it) ({st})")
         check(proc.poll() is None, "the app is still running after the page tour")
     finally:
         proc.terminate()

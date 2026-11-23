@@ -216,7 +216,7 @@ GUIDES = {
         "The Telemetry tab installs the game plugin; the Licence tab moves this copy to another PC.",
     ],
     "updates": [
-        "New versions come from your licence server. Press Check for updates to look now.",
+        "New versions come from the Fleet Manager server. Press Check for updates to look now.",
         "Update now installs the new version; the app closes and reopens by itself. Your data is never touched.",
         "Turn on automatic updates to install them as soon as nobody is driving.",
     ],

@@ -282,7 +282,7 @@ def _tail(path, lines=400):
 @bp.route("/system")
 @login_required(role="admin")
 def system():
-    from . import licensing
+    from . import online_id
     from .telemetry.service import HUB
     files = _log_files()
     sizes = {f["name"]: f["size"] for f in files}
@@ -294,13 +294,12 @@ def system():
     if q:
         lines = [ln for ln in lines if q.lower() in ln.lower()]
     lines = list(reversed(lines))[:400]
-    lic = licensing.LICENCE
     health = {
         "version": VERSION, "uptime": time.time() - STARTED,
         "db_size": os.path.getsize(db.DB_PATH) if os.path.exists(db.DB_PATH) else 0,
         "db_check": db.val("PRAGMA quick_check"),
         "telemetry": HUB.local_status, "live": len(HUB.all_live()),
-        "licence": bool(lic and lic.ok), "licence_reason": getattr(lic, "reason", "") if lic else "",
+        "company_id": online_id.company_id(),
         "jobs": db.val("SELECT COUNT(*) FROM jobs", (), 0), "members": db.val("SELECT COUNT(*) FROM users WHERE status!='removed'", (), 0),
     }
     backups = list_backups()

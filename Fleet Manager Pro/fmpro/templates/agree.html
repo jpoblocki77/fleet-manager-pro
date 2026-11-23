@@ -1,0 +1,22 @@
+{% extends "auth_base.html" %}
+{% block title %}Licence agreement{% endblock %}
+{% block authclass %}wide{% endblock %}
+{% block content %}
+<h1>Welcome to Fleet Manager Pro</h1>
+<p class="muted">Fleet Manager Pro is free. Please read the licence agreement and accept it to continue.</p>
+{% if error %}<div class="flash error">{{ error }}</div>{% endif %}
+<div class="eula eula-box" tabindex="0" role="region" aria-label="Licence agreement">
+  {% for kind, t in blocks %}
+  {% if kind == 'title' %}<h2>{{ t|title|replace('Fleet Manager Pro - ', 'Fleet Manager Pro · ') }}</h2>
+  {% elif kind == 'head' %}<h3>{{ t }}</h3>
+  {% elif kind == 'item' %}<p class="item">{{ t }}</p>
+  {% else %}<p>{{ t }}</p>{% endif %}
+  {% endfor %}
+</div>
+<form method="post" style="margin-top:14px">
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+  <label class="check"><input type="checkbox" name="agree" value="1" required> <span>I have read and agree to the licence agreement</span></label>
+  <button class="btn primary" style="width:100%">Agree and continue</button>
+</form>
+<p class="small muted" style="margin-top:10px">You can read it again any time: <a href="/licence-agreement" target="_blank" rel="noopener">Licence agreement</a>.</p>
+{% endblock %}

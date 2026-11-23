@@ -11,7 +11,7 @@ import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from fmpro import create_app, db, licensing  # noqa: E402
+from fmpro import create_app, db  # noqa: E402
 from fmpro.auth import create_user  # noqa: E402
 
 FAILS = []
@@ -23,9 +23,7 @@ def main():
     tmp = tempfile.mkdtemp(prefix="fmp-fuzz-")
     app = create_app(tmp, start_telemetry=False, check_licence=False)
     app.testing = False                                # a crash becomes a 500 the scan can count
-    licensing.licensed = lambda: True                  # this scan is about the pages, not the licence
-    import fmpro.auth as _auth
-    _auth.licensing.licensed = lambda: True
+    db.set_setting("eula_accepted", "fuzz test")      # this scan is about the pages, not the agreement screen
     c = app.test_client()
     c.get("/setup")
     with c.session_transaction() as s:

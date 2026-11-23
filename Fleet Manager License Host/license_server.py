@@ -1449,6 +1449,7 @@ class Server:
                                              body.get("currency"), body.get("stats"), body.get("drivers"))
             companies, drivers = self.store.leaderboard()
             return {"ok": True, "you": me, "companies": companies, "drivers": drivers,
+                    "company_id": owner if CID_RX.match(owner) else None,
                     "page_url": f"{self.cfg['apply_base_url'].rstrip('/')}/leaderboard"}
         if path == "/v1/update":
             if body.get("product") != PRODUCT:

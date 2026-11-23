@@ -5,7 +5,7 @@
 {% set avail = UPDATE and UPDATE.available %}
 {% set auto_up = S.get('auto_update') == '1' %}
 <div class="page-head">
-  <div><h1>Updates</h1><p>New versions of Fleet Manager Pro come from your licence server. Your <code>data</code> folder is never touched by an update.</p></div>
+  <div><h1>Updates</h1><p>New versions of Fleet Manager Pro come from the Fleet Manager server. Your <code>data</code> folder is never touched by an update.</p></div>
   <div class="actions"><form method="post" action="/settings/update">{{ csrf() }}<button class="btn" name="action" value="check">{{ icon('download') }}Check for updates</button></form></div>
 </div>
 
@@ -48,7 +48,7 @@
       {% if auto_up %}<button class="btn ghost" name="action" value="auto_off">Turn off automatic updates</button>
       {% else %}<button class="btn primary" name="action" value="auto_on" data-confirm="Install new versions automatically? Fleet Manager Pro will close and reopen by itself when an update arrives, but only while nobody is driving.">Install updates automatically</button>{% endif %}
     </form>
-    <p class="hint">Every update is signed by your licence server and checked before it's installed, so a tampered download is refused.</p>
+    <p class="hint">Every update is signed by the Fleet Manager server and checked before it's installed, so a tampered download is refused.</p>
   </div>
 </div>
 {% endblock %}

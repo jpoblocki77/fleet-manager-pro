@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(HERE))
 sys.path.insert(0, HERE)
 
 from e2e_test import start_licence_server  # noqa: E402
-from fmpro import create_app, db, licensing  # noqa: E402
+from fmpro import create_app, db  # noqa: E402
 from fmpro.auth import create_user  # noqa: E402
 from fmpro.telemetry.service import HUB  # noqa: E402
 
@@ -57,21 +57,26 @@ class Browser:
 
 def main():
     srv, lic_folder = start_licence_server()
-    key = srv.store.new_purchase("Sec Test", "", product="Fleet Manager Pro")
     tmp = tempfile.mkdtemp(prefix="fmp-sec-")
     app = create_app(tmp, start_telemetry=False, check_licence=False)
     app.testing = True
-    lic = licensing.LICENCE
 
     anon = Browser(app)
-    print("Locked until licensed")
-    check(anon.get("/").headers.get("Location", "").endswith("/activate"), "unlicensed: pages redirect to /activate")
-    check(anon.get("/api/live").status_code == 403, "unlicensed: API refused")
+    print("Closed until the licence agreement is accepted (no licence key)")
+    check(anon.get("/").headers.get("Location", "").endswith("/agree"), "pages redirect to the licence agreement")
+    check(anon.get("/activate").headers.get("Location", "").endswith("/agree"), "the old /activate address goes there too")
+    check(anon.get("/api/live").status_code == 403, "the API is refused until then")
     check(anon.c.post("/api/agent/frame", json={"frame": None}, headers={"X-Agent-Token": "x"}).status_code == 403,
-          "unlicensed: agent endpoint refused")
-    anon.get("/activate")
-    anon.post("/activate", {"key": key, "agree": "1"})
-    check(lic.ok, "activated for the rest of the tests")
+          "and the agent endpoint")
+    check(b"Agree and continue" in anon.get("/agree").data and anon.get("/licence-agreement").status_code == 200,
+          "the agreement screen and the agreement itself can be read")
+    anon.c.post("/agree", data={"agree": "1"})
+    check(not db.setting("eula_accepted"), "accepting needs the page's security token")
+    anon.post("/agree", {})
+    check(not db.setting("eula_accepted"), "and the tick box")
+    anon.post("/agree", {"agree": "1"})
+    check(db.setting("eula_accepted"), "accepted for the rest of the tests")
+    check(not os.path.exists(os.path.join(tmp, "licence.json")), "no licence file is made or needed")
 
     anon.get("/setup")
     anon.post("/setup", {"company_name": "SecCo", "username": "boss", "password": "ownerpw1", "password2": "ownerpw1"})
@@ -83,7 +88,7 @@ def main():
     anon = Browser(app)
 
     print("Unauthenticated access")
-    public = {"/login", "/apply", "/activate", "/setup", "/overlay", "/licence-agreement"}
+    public = {"/login", "/apply", "/agree", "/activate", "/setup", "/overlay", "/licence-agreement"}
     gets = sorted({str(r) for r in app.url_map.iter_rules() if "GET" in r.methods and "<" not in str(r)
                    and not str(r).startswith("/static")})
     leaks = []
@@ -100,7 +105,7 @@ def main():
     posts = sorted({str(r) for r in app.url_map.iter_rules() if "POST" in r.methods and "<" not in str(r)})
     open_posts = []
     for url in posts:
-        if url in ("/login", "/apply", "/setup", "/activate", "/api/agent/frame", "/logout"):
+        if url in ("/login", "/apply", "/setup", "/agree", "/activate", "/api/agent/frame", "/logout"):
             continue
         anon.get("/login")
         r = anon.post(url, {})
@@ -240,9 +245,11 @@ def main():
     check(drv.post("/settings", {"section": "economy", "dvir_repair_per_defect": "0", "repair_cost_per_pct": "0"}).status_code == 403
           and db.setting("dvir_repair_per_defect") == before_r, "drivers can't change repair prices")
     check(mgr.post("/finance/loan", {"plan": "standard", "amount": "50000"}).status_code == 403, "only the owner takes loans")
-    check(key.encode() not in mgr.get("/settings?tab=licence").data and key.encode() in boss.get("/settings?tab=licence").data,
-          "purchase key is shown to the owner only")
-    check(mgr.post("/settings/licence", {"action": "deactivate"}).status_code == 403 and lic.ok, "only the owner can deactivate the licence")
+    about_ = mgr.get("/settings?tab=licence").data
+    check(b"Online company ID" in about_ and b"online_secret" not in about_
+          and (db.setting("online_secret") or "zz-none").encode() not in about_,
+          "the old Licence tab opens About, which never shows the company secret")
+    check(boss.post("/settings/licence", {"action": "deactivate"}).status_code in (404, 405), "there's nothing to deactivate any more")
 
     print("Cross-site request forgery")
     n = db.val("SELECT COUNT(*) FROM announcements")
@@ -689,25 +696,6 @@ def main():
     check(pinned, "agent refuses a server whose certificate doesn't match its pin")
     front.close()
     back.close()
-
-    print("Licence")
-    lease = dict(lic.lease)
-    check(licensing.lease_problem(dict(lease, expires="2099-01-01T00:00:00Z"), lic.machine, key) is not None, "edited expiry date rejected")
-    check(licensing.lease_problem(dict(lease, sig="00" * 64), lic.machine, key) is not None, "forged signature rejected")
-    with open(os.path.join(tmp, "licence.json")) as f:
-        saved = json.load(f)
-    saved["lease"]["expires"] = "2099-01-01T00:00:00Z"
-    p2 = os.path.join(tmp, "tampered.json")
-    with open(p2, "w") as f:
-        json.dump(saved, f)
-    check(not licensing.Licence(p2).ok, "tampered licence file doesn't unlock")
-    lic.lease = None
-    lic._evaluate()
-    page = anon.get("/activate").data
-    check(key.encode() not in page, "locked activation screen doesn't reveal the purchase key")
-    check(boss.get("/").status_code == 302 and boss.get("/api/live").status_code == 403, "a lost licence locks signed-in users too")
-    lic.check()
-    check(lic.ok, "licence restored")
 
     HUB.live.clear()
     db.close_all()

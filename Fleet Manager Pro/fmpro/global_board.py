@@ -1,4 +1,4 @@
-"""Global leaderboard: every Fleet Manager Pro company ranked together on the licence server.
+"""Global leaderboard: every Fleet Manager Pro company ranked together on the Fleet Manager server.
 
 Every few minutes this copy sends its company name and totals (distance, revenue, deliveries, tonnage, average score,
 XP, realism, drivers who delivered) for the last week / month / year / all time, per game, and gets back every company
@@ -18,7 +18,7 @@ GAMES = ("all", "ats", "ets2")
 # the order of the numbers the server stores for each period and game
 METRICS = ("km", "revenue", "jobs", "mass", "score", "xp", "realism", "drivers")
 TOP_DRIVERS = 10
-MANUAL_GAP = 30                     # seconds between "Update now" presses: the licence server's request limit is per address
+MANUAL_GAP = 30                     # seconds between "Update now" presses: the Fleet Manager server's request limit is per address
 _lock = threading.Lock()
 _last_manual = 0.0
 
@@ -78,14 +78,11 @@ def joined():
 
 def sync():
     """Send this company's totals and fetch the whole board. Returns an error message, or None."""
-    if not licensing.licensed():
-        return "Fleet Manager Pro isn't activated, so the global leaderboard is off."
     with _lock:
-        lic = licensing.LICENCE
         join = joined()
         share = db.setting("global_board_drivers", "0") == "1"
         stats, drivers = collect(share) if join else ({}, {})
-        body = dict(online_id.identity(), key=lic.key, machine=lic.machine, product=licensing.PRODUCT, join=join,
+        body = online_id.body(product=licensing.PRODUCT, join=join,
                     company=(db.setting("company_name", "") or "").strip()[:60],
                     currency=(db.setting("currency", "$") or "")[:3], stats=stats, drivers=drivers)
         if len(json.dumps(body)) > 9500:                    # the server takes at most 10,000 bytes
@@ -95,6 +92,7 @@ def sync():
                 body["drivers"] = {}
         try:
             d = licensing._post("/v1/leaderboard", body, timeout=15)
+            online_id.note_reply(body, d)
         except licensing.ServerRefused as e:
             db.set_setting("global_board_error", e.message[:300])
             return e.message

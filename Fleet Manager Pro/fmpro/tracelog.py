@@ -263,14 +263,8 @@ def _report_db():
 def _report_licence():
     try:
         from . import licensing
-        lic = licensing.LICENCE
-        if not lic:
-            log.info("licence: not loaded")
-            return
-        log.info("licence: ok=%s reason=%s key=%s build tag=%s lease=%s", getattr(lic, "ok", None),
-                 getattr(lic, "reason", ""), logs.mask_key(getattr(lic, "key", "")), licensing.BUILD_TAG,
-                 {k: v for k, v in (getattr(lic, "lease", None) or {}).items() if k in ("slot", "expires", "build", "product")}
-                 if isinstance(getattr(lic, "lease", None), dict) else "-")
+        from . import online_id
+        log.info("build tag=%s company ID=%s", licensing.BUILD_TAG or "-", online_id.company_id() or "-")
     except Exception as e:
         log.info("licence: couldn't read (%s)", e)
 

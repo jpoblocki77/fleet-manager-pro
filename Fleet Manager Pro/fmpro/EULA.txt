@@ -1,48 +1,52 @@
 FLEET MANAGER PRO - END USER LICENCE AGREEMENT
 Copyright (c) 2026 Jeff Poblocki. All rights reserved.
 
-Please read this agreement before activating Fleet Manager Pro. By ticking "I agree" on the Activate screen, or by
-installing, activating or using the software, you agree to these terms. If you don't agree, don't activate or use it.
+Please read this agreement before using Fleet Manager Pro. By ticking "I agree" when Fleet Manager Pro first starts,
+or by installing or using the software, you agree to these terms. If you don't agree, don't install or use it.
 
 1. WHO THIS IS BETWEEN
-   This agreement is between you (the buyer, or the company you bought it for) and Jeff Poblocki ("the seller"),
-   the author and owner of Fleet Manager Pro ("the software").
+   This agreement is between you (the person using the software, or the company you use it for) and Jeff Poblocki
+   ("the author"), the author and owner of Fleet Manager Pro ("the software").
 
 2. WHAT YOU MAY DO
-   For each purchase key you bought, the seller gives you a personal, non-exclusive, non-transferable licence to:
-   a) install and run the software on up to 2 computers at a time (the limit the licence server enforces);
+   The software is free. The author gives you a personal, non-exclusive, free licence to:
+   a) install and run the software on your own computers;
    b) let the drivers and staff of your own virtual trucking company sign in to it and use it, including from
       other PCs on your network or over the internet;
-   c) make backup copies of the software and of your own data for your own use.
-   You are buying a licence to use the software, not the software itself.
+   c) make backup copies of the software and of your own data for your own use;
+   d) give other people an unchanged copy of the software, free of charge and with this agreement included.
+   You receive a licence to use the software, not the software itself.
 
 3. WHAT YOU MAY NOT DO
    Unless the law where you live allows it in spite of this agreement, you may not:
-   a) copy, share, upload, sell, rent, lend, sub-license or give away the software, its purchase key or any part
-      of it, or make it available for others to download;
+   a) sell, rent, lease or sub-license the software or any part of it, charge anyone for it, or bundle it with
+      something you sell;
    b) reverse engineer, decompile, disassemble or otherwise try to recover the software's source code, or help
       anyone else do so;
-   c) change the software, or make other programs based on it;
-   d) remove, bypass or tamper with the licence check, activation, machine limit, or any copy protection, or use
-      a key you didn't buy;
-   e) remove or change the copyright notices, this agreement, or the seller's name in the software;
-   f) use the software to break the law or anyone else's rights.
+   c) change the software, share a changed copy, or make other programs based on it;
+   d) remove, bypass or tamper with the software's update checks or other protections, or pass off a changed or
+      unofficial copy as Fleet Manager Pro;
+   e) remove or change the copyright notices, this agreement, or the author's name in the software;
+   f) use the software, or its online features, to break the law or anyone else's rights.
 
 4. OWNERSHIP
-   The software, including its code, design, pages, graphics and documentation, is owned by the seller and is
+   The software, including its code, design, pages, graphics and documentation, is owned by the author and is
    protected by copyright law and international treaties. All rights not expressly given to you are kept by the
-   seller.
+   author.
 
 5. YOUR DATA
    Your company data (drivers, jobs, money, logs and so on) stays on your own computer, in the data folder, and
-   belongs to you. Back it up: the seller can't recover it for you.
+   belongs to you. Back it up: the author can't recover it for you.
 
-6. ONLINE ACTIVATION
-   The software checks its licence online when you activate it, at start-up and every few hours. For this it
-   sends the seller's licence server your purchase key, a machine ID (a code made from your PC, not your name)
-   and the product name. Without internet it keeps working for a limited time after the last check. If a key is
-   refunded, charged back, shared or used against this agreement, the seller may revoke it, and the software
-   then stops working on the computers that use it.
+6. ONLINE FEATURES
+   The software needs no licence key and no activation, and works without internet. Some features use the Fleet
+   Manager server: checking for and downloading updates; your company's online Apply page; the Global Leaderboard;
+   and the VTC Finder. For these it sends the server your company's own ID (a random code made by the software,
+   not your name), a machine ID (a code made from your PC, not your name) and the product name, plus what you
+   choose to publish: for example your company name, profile and totals, and the applications people send you.
+   The Apply page, the Global Leaderboard and the VTC Finder can each be switched off in the software. The author
+   may remove content from, or block a company from, the online features if they are misused or used against this
+   agreement. The online features may change or stop at any time.
 
 7. OTHER PEOPLE'S SOFTWARE
    The software includes components made by others (for example Python, Flask, Waitress, cryptography and the
@@ -51,20 +55,20 @@ installing, activating or using the software, you agree to these terms. If you d
    Truck Simulator 2 are trademarks of SCS Software; other names belong to their owners.
 
 8. UPDATES AND SUPPORT
-   The seller may offer updates, but doesn't have to. Updates are covered by this agreement unless they come with
-   a new one.
+   The author may offer updates and help, but doesn't have to. Updates are covered by this agreement unless they
+   come with a new one.
 
 9. NO WARRANTY
-   The software is provided "as is", without any warranty of any kind, express or implied, including warranties
-   of merchantability, fitness for a particular purpose and non-infringement. The seller doesn't promise that it
-   will be free of errors or work without interruption. Some places don't allow these limits, so they may not all
-   apply to you.
+   The software is provided free and "as is", without any warranty of any kind, express or implied, including
+   warranties of merchantability, fitness for a particular purpose and non-infringement. The author doesn't promise
+   that it will be free of errors or work without interruption. Some places don't allow these limits, so they may
+   not all apply to you.
 
 10. LIMIT OF LIABILITY
-   As far as the law allows, the seller is not liable for any indirect, incidental, special or consequential
-   damages, or for lost data, profits or game progress, arising from the use of, or inability to use, the
-   software, even if told such damage was possible. The seller's total liability is limited to the amount you
-   paid for the licence.
+   As far as the law allows, the author is not liable for any direct, indirect, incidental, special or
+   consequential damages, or for lost data, profits or game progress, arising from the use of, or inability to
+   use, the software or its online features, even if told such damage was possible. The software is free, so as
+   far as the law allows, the author's total liability is nothing.
 
 11. ENDING THIS AGREEMENT
    This agreement lasts until it ends. It ends automatically if you break it. When it ends you must stop using the
@@ -75,4 +79,5 @@ installing, activating or using the software, you agree to these terms. If you d
    applies. Not enforcing a term straight away doesn't mean giving it up. Nothing in this agreement takes away
    rights that consumer law where you live gives you and that can't be taken away by agreement.
 
-Questions about this agreement: contact the seller where you bought the software.
+Questions about this agreement: contact the author through the Fleet Manager Pro website,
+http://fleetmanager.servehttp.com:8080

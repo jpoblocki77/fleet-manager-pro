@@ -2,11 +2,13 @@
 
     python tests/e2e_test.py
 """
+import json
 import os
 import re
 import shutil
 import sys
 import tempfile
+import types
 import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -91,8 +93,7 @@ def main():
         d["csrf"] = token()
         return c.post(url, data=d, **kw)
 
-    print("Licence")
-    lic = licensing.LICENCE
+    print("Licence agreement (no licence key: Fleet Manager Pro is free)")
     check(pro_key.startswith("FMP-") and default_key.startswith("FMP-"), f"the server issues Fleet Manager Pro keys only ({pro_key})")
     try:
         srv.store.new_purchase("Classic", "", product="Fleet Manager")
@@ -100,53 +101,47 @@ def main():
     except Exception as e:
         check(getattr(e, "code", "") == "bad_product", "classic Fleet Manager keys can't be made any more")
     r = c.get("/")
-    check(r.status_code == 302 and "/activate" in r.headers["Location"], "locked until activated")
-    check(c.get("/api/live").status_code == 403, "API locked until activated")
-    c.get("/activate")
-    r = post("/activate", {"key": old_key, "agree": "1"})
-    check(b"original Fleet Manager" in r.data and not lic.ok, "classic FM key refused by Pro")
+    check(r.status_code == 302 and "/agree" in r.headers["Location"], "closed until the licence agreement is accepted")
+    check(c.get("/api/live").status_code == 403, "the API too")
+    check("/agree" in c.get("/activate").headers.get("Location", ""), "the old Activate address goes to the agreement")
+    r = c.get("/licence-agreement")
+    check(r.status_code == 200 and b"Jeff Poblocki" in r.data and b"reverse engineer" in r.data,
+          "the licence agreement can be read first")
+    page_ = c.get("/agree").data
+    check(b'name="agree"' in page_ and b"reverse engineer" in page_ and b'name="key"' not in page_
+          and b"Agree and continue" in page_, "the agreement screen shows the whole agreement and asks for no key")
+    r = post("/agree", {})
+    check(not db.setting("eula_accepted") and b"Tick the box" in r.data, "continuing without ticking I agree is refused")
+    r = post("/agree", {"agree": "1"})
+    check(r.status_code == 302 and db.setting("eula_accepted")
+          and db.val("SELECT COUNT(*) FROM audit_log WHERE action='licence agreement accepted'", (), 0) == 1,
+          "accepting it is recorded, once")
+    check("/agree" not in c.get("/agree").headers.get("Location", "/agree"), "and the screen isn't shown again")
+    check(not os.path.exists(os.path.join(tmp, "licence.json")), "no licence file is made")
+    # The server still answers older copies (they move over through their next update), so it still checks keys.
+    lic = types.SimpleNamespace(key=pro_key.upper(), machine=licensing.machine_id())   # this company's older, activated copy
     try:
         licensing._post("/v1/activate", {"key": old_key, "machine": lic.machine, "product": "Fleet Manager Pro"})
-        check(False, "server refuses FM key for Pro")
+        check(False, "the server refuses an FM key for Pro")
     except licensing.ServerRefused as e:
-        check(e.code in ("bad_key", "wrong_product"), "server refuses FM key for Pro")
+        check(e.code in ("bad_key", "wrong_product"), "the server refuses an FM key for Pro")
     try:   # a copy of the original app (sends no product) trying a Pro key
         licensing._post("/v1/activate", {"key": pro_key, "machine": lic.machine})
         check(False, "original app can't use a Pro key")
     except licensing.ServerRefused as e:
         check(e.code == "bad_product", "original app can't use a Pro key (requests must name Fleet Manager Pro)")
     check(not srv.store.active(pro_key) and not srv.store.active(old_key), "refused keys used no PC slot")
-    try:
-        licensing._post("/v1/activate", {"key": old_key, "machine": lic.machine})
-        check(False, "classic Fleet Manager keys no longer activate anything")
-    except licensing.ServerRefused as e:
-        check(e.code == "bad_product", "classic Fleet Manager keys no longer activate anything")
-    r = c.get("/licence-agreement")
-    check(r.status_code == 200 and b"Jeff Poblocki" in r.data and b"reverse engineer" in r.data,
-          "the licence agreement can be read before activating")
-    check(b'name="agree"' in c.get("/activate").data and b"/licence-agreement" in c.get("/activate").data,
-          "the Activate screen has an I agree tick box linking the agreement")
-    r = post("/activate", {"key": pro_key.lower()})
-    check(not lic.ok and b"agree to the licence agreement" in r.data and not srv.store.active(pro_key),
-          "activating without ticking I agree is refused (no PC slot used)")
-    r = post("/activate", {"key": pro_key.lower(), "agree": "1"})
-    check(r.status_code == 302 and lic.ok, "Pro key activates this PC")
-    check("key " + pro_key.upper() in (db.setting("eula_accepted") or "")
-          and db.val("SELECT COUNT(*) FROM audit_log WHERE action='licence agreement accepted'", (), 0) == 1,
-          "the agreement acceptance is recorded with the key")
-    check(os.path.exists(os.path.join(tmp, "licence.json")), "licence saved")
-    lease = dict(lic.lease)
-    check(licensing.lease_problem(dict(lease, slots=99), lic.machine, pro_key) is not None, "tampered lease rejected")
-    check(licensing.lease_problem(dict(lease, product="Fleet Manager"), lic.machine, pro_key) is not None,
-          "lease for the other product rejected")
-    check(licensing.lease_problem(lease, "FMID-AAAA-AAAA-AAAA-AAAA", pro_key) is not None, "lease for another PC rejected")
+    d_old = licensing._post("/v1/activate", {"key": pro_key, "machine": lic.machine, "product": "Fleet Manager Pro"})
+    check(d_old.get("lease", {}).get("machine") == lic.machine, "an older copy still activates on the server")
+    with open(os.path.join(tmp, "licence.json"), "w", encoding="utf-8") as fh:     # what that older copy left behind
+        json.dump({"product": "Fleet Manager Pro", "key": lic.key, "machine": lic.machine, "lease": d_old["lease"]}, fh)
     for m in ("FMID-BBBB-BBBB-BBBB-BBBB", "FMID-CCCC-CCCC-CCCC-CCCC"):
         try:
             licensing._post("/v1/activate", {"key": pro_key, "machine": m, "product": "Fleet Manager Pro"})
             second_ok = True
         except licensing.ServerRefused as e:
             second_ok = e.code
-    check(second_ok == "slots_full", "third PC refused (2 PCs per purchase)")
+    check(second_ok == "slots_full", "older copies: third PC refused (2 PCs per purchase)")
     srv.store.deactivate(pro_key, "FMID-BBBB-BBBB-BBBB-BBBB", "Fleet Manager Pro")
 
     print("Setup")
@@ -2712,7 +2707,7 @@ def main():
     adm("/v1/admin/vtc_hide", {"key": online_id.company_id(), "hidden": True})
     check(web(f"/vtc/{code}")[0] == 404 and "Crimson" not in web("/vtcs?open=all")[1], "a hidden company is gone at once")
     post("/vtc-profile", dict(form, about="Edited while hidden"))
-    check(web(f"/vtc/{code}")[0] == 404 and "hidden by the owner of the licence server" in c.get("/vtc-profile").get_data(as_text=True),
+    check(web(f"/vtc/{code}")[0] == 404 and "hidden by the owner of the Fleet Manager server" in c.get("/vtc-profile").get_data(as_text=True),
           "it stays hidden when edited, and the app says so")
     post("/vtc-profile", {k: v for k, v in form.items() if k != "listed"})
     check(srv.store.db.execute("SELECT hidden FROM vtc_profiles WHERE key=?", (online_id.company_id(),)).fetchone()[0] == 1, "unlisting doesn't lift the hide switch")
@@ -3705,23 +3700,18 @@ def main():
         bks = os.listdir(os.path.join(os.path.dirname(db.DB_PATH), "backups"))
         check(any(b.startswith("fleet-before-clear") for b in bks), "a backup is saved before erasing")
 
-    print("Licence lifecycle")
+    print("Settings > About (was Licence)")
     c.get("/login")
     post("/login", {"username": "boss", "password": "secret12"})
     c.get("/")
-    check(c.get("/settings?tab=licence").status_code == 200 and b"Test Buyer" in c.get("/settings?tab=licence").data,
-          "licence tab shows the buyer")
+    about_ = c.get("/settings?tab=licence").data
+    check(b"Online company ID" in about_ and online_id.company_id().encode() in about_ and pro_key.encode() not in about_
+          and b"Deactivate" not in about_, "the old Licence tab opens About: version, agreement and company ID, no key")
     real = os.environ["FMP_LICENSE_SERVER"]
     os.environ["FMP_LICENSE_SERVER"] = "http://127.0.0.1:9"          # server unreachable
-    lic.check()
-    check(lic.ok and lic.online is False, "offline: keeps working on the current lease")
+    check(c.get("/").status_code == 200 and global_board.sync() and c.get("/").status_code == 200,
+          "with the server unreachable everything keeps working (only the online sync fails)")
     os.environ["FMP_LICENSE_SERVER"] = real
-    import datetime as _dt
-    lic.seen = (_dt.datetime.now(_dt.timezone.utc) + _dt.timedelta(days=3)).isoformat(timespec="seconds")
-    lic._evaluate()
-    check(not lic.ok and lic.reason == licensing.CLOCK_BACK, "clock set back locks")
-    lic.seen = None
-    lic.check()
     print("Company ID on the server (online features without a licence key)")
     from fmpro import tracelog as _tl
     with srv.hits_lock:
@@ -3854,29 +3844,24 @@ def main():
     left_ = adm.purchases()
     check(len(d_) == 2 and not any(p.get("revoked") for p in left_) and len(left_) == n_before - 3,
           f"Delete ALL revoked removes only revoked purchases ({len(d_)} deleted)")
-    check(any(p["key"] == pro_key for p in left_) and lic.ok, "other buyers' purchases and this PC's licence are untouched")
+    check(any(p["key"] == pro_key for p in left_), "other buyers' purchases are untouched")
     try:
         adm.delete("FMP-ZZZZ-ZZZZ-ZZZZ-ZZZZ")
         check(False, "deleting an unknown key is refused")
     except _lt.LicenceError as e:
         check("doesn't exist" in str(e), "deleting an unknown key is refused")
     srv.store.revoke(pro_key, True)
-    lic.check()
-    check(not lic.ok and "revoked" in (lic.reason or ""), "revoked purchase locks at next check")
-    check(c.get("/").status_code == 302, "app locked after revoke")
+    check(c.get("/").status_code == 200 and c.get("/jobs").status_code == 200,
+          "revoking the old purchase doesn't lock the app (there's no licence any more)")
+    check(recruit.sync()[1] is not None, "but it does block the company that came from it online")
     srv.store.revoke(pro_key, False)
-    post("/activate", {"action": "retry"})
-    check(lic.ok, "restored purchase unlocks")
-    c.get("/settings?tab=licence")
-    r = post("/settings/licence", {"action": "deactivate"})
-    check(r.status_code == 302 and not lic.ok and not srv.store.active(pro_key), "deactivate frees this PC's slot")
+    check(recruit.sync()[1] is None, "until it's restored")
 
-    print("Sealed pages and hidden buyer ID (buyer copies)")
-    with srv.hits_lock:                    # a fresh minute for the licence server's request limit
+    print("Build tags (update channels) and older buyer copies")
+    with srv.hits_lock:                    # a fresh minute for the server's request limit
         srv.hits.clear()
     import importlib
     import subprocess
-    from jinja2 import TemplateNotFound
     root_ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     sys.path.insert(0, os.path.join(root_, "tools"))
     import seal_pages
@@ -3885,147 +3870,54 @@ def main():
     _pub, master_ = seal_pages.master_from_hostkey(os.path.join(lic_folder, "host_key.json"))
     k_seal = srv.store.new_purchase("Sealed Buyer", "sealed@example.com", product="Fleet Manager Pro")
     tag_ = seal_pages.build_tag(master_, k_seal)
-    tmp2 = tempfile.mkdtemp(prefix="fmp-sealed-")
-    orig_lease, orig_licensed = srv.lease, licensing.licensed
-    try:
-        n_plain, n_sealed = seal_pages.seal_templates(fm_, master_, tag_)
-        importlib.invalidate_caches()
-        sys.modules.pop("fmpro._embedded_templates", None)
-        sealed_src = open(emb_, encoding="utf-8").read().split("SEALED =", 1)[1]
-        base_html = open(os.path.join(fm_, "templates", "base.html"), encoding="utf-8").read()
-        check(n_plain == 5 and n_sealed > 20 and base_html[:80] not in sealed_src and "{% block" not in sealed_src,
-              f"only the {n_plain} pre-activation pages are readable; {n_sealed} pages are encrypted")
-        check(re.fullmatch(r"FMPB(-[A-Z2-7]{4}){4}", tag_) and k_seal.split("-", 1)[1][:4] not in tag_,
-              f"the hidden buyer ID is a build tag that doesn't give away the key ({tag_})")
-        app2 = create_app(tmp2, start_telemetry=False, check_licence=False)
-        app2.testing = True
-        c2 = app2.test_client()
-        lic2 = licensing.LICENCE
-        check(licensing.BUILD_TAG == tag_, "the copy knows its build tag")
+    check(re.fullmatch(r"FMPB(-[A-Z2-7]{4}){4}", tag_) and k_seal.split("-", 1)[1][:4] not in tag_,
+          f"an older buyer copy's build tag doesn't give away the key ({tag_})")
+    check(adm.whose(tag_)["key"] == k_seal, "License Manager still identifies whose older copy a build tag is")
+    check(adm.whose(seal_pages.build_tag(master_, "STOCK")) == "STOCK" and adm.whose("FMPB-AAAA-AAAA-AAAA-AAAA") is None,
+          "stock copies and unknown tags are told apart")
 
-        def post2(url, data):
-            with c2.session_transaction() as s_:
-                tok = s_.get("csrf")
-            return c2.post(url, data=dict(data, csrf=tok))
-
-        r = c2.get("/activate")
-        check(r.status_code == 200 and b"licence key" in r.data.lower(), "the activate screen works before unlocking")
-        check(c2.get("/licence-agreement").status_code == 200, "the licence agreement can be read before unlocking")
-        # a crack that skips the licence check still has no pages
-        licensing.licensed = lambda: True
-        try:
-            app2.jinja_env.get_template("dashboard.html")
-            cracked = False
-        except TemplateNotFound:
-            cracked = True
-        licensing.licensed = orig_licensed
-        check(cracked, "a cracked copy that skips the licence check has no pages to show")
-        # a server that doesn't hand out page keys (not updated yet): the licence is fine but the pages stay locked
-        srv.lease = lambda p, act, build=None: orig_lease(p, act)
-        r = post2("/activate", {"key": k_seal, "agree": "1"})
-        check(not lic2.ok and lic2.reason == licensing.PAGES_LOCKED, "without the server's page key the copy stays locked")
-        srv.lease = orig_lease
-        r = post2("/activate", {"key": k_seal, "agree": "1"})
-        check(lic2.ok and lic2.page_key() is not None, "the licence server unlocks the pages with the activation")
-        t_ = app2.jinja_env.get_template("setup.html")
-        src_setup = open(os.path.join(fm_, "templates", "setup.html"), encoding="utf-8").read()
-        check(app2.jinja_loader.get_source(app2.jinja_env, "setup.html")[0] == src_setup and t_ is not None,
-              "sealed pages decrypt exactly once unlocked")
-        check(licensing.lease_page_key(lic2.lease, "FMID-ZZZZ-ZZZZ-ZZZZ-ZZZZ") is None,
-              "the page key in licence.json only works on this PC")
-        check(licensing.lease_problem(dict(lic2.lease, unlock="00" * 32), lic2.machine, k_seal) is not None,
-              "changing the page key breaks the licence signature")
-        off = licensing.Licence(lic2.path)
-        check(off.ok and off.page_key() is not None, "pages stay unlocked offline (from the saved licence)")
-        other_build = seal_pages.build_tag(master_, "STOCK")
-        d_ = licensing._post("/v1/check", {"key": k_seal, "machine": lic2.machine, "product": "Fleet Manager Pro",
-                                           "build": other_build})
-        check(licensing.lease_page_key(d_["lease"], lic2.machine) is None, "another copy's page key doesn't fit this copy")
-        licensing._post("/v1/check", lic2._body())
-        # restart: the background licence check can run the moment the licence is loaded, so the build tag must
-        # already be known then (it used to be loaded later, and the copy showed "not activated" until a retry)
-        orig_init = licensing.Licence.__init__
-
-        def init_and_check(self_, path_):
-            orig_init(self_, path_)
-            self_.check()                       # the licence thread winning the race
-
-        licensing.BUILD_TAG = None                 # a fresh start: nothing loaded yet
-        licensing.Licence.__init__ = init_and_check
-        try:
-            create_app(tmp2, start_telemetry=False, check_licence=False)
-        finally:
-            licensing.Licence.__init__ = orig_init
-        lic3 = licensing.LICENCE
-        check(lic3.ok and lic3.lease.get("build") == tag_ and lic3.page_key() is not None,
-              "a licence check right at start-up sends the build tag, so the copy opens unlocked")
-        # leak tracing
-        check(adm.whose(tag_)["key"] == k_seal, "License Manager identifies whose copy a build tag is")
-        check(adm.whose(other_build) == "STOCK" and adm.whose("FMPB-AAAA-AAAA-AAAA-AAAA") is None,
-              "stock copies and unknown tags are told apart")
-        k_other = srv.store.new_purchase("Other Buyer", "", product="Fleet Manager Pro")
-        licensing._post("/v1/activate", {"key": k_other, "machine": "FMID-DDDD-DDDD-DDDD-DDDD",
-                                         "product": "Fleet Manager Pro", "build": tag_})
-        rows_ = {p["key"]: p for p in adm.purchases()}
-        flagged = [a.get("build_owner") for a in rows_[k_other]["pcs"]]
-        check(flagged and k_seal in (flagged[0] or ""), "a copy used with someone else's key is flagged as a leak")
-        check(not any(a.get("build_owner") for a in rows_[k_seal]["pcs"]), "the buyer's own PCs aren't flagged")
-        out_ = subprocess.run([sys.executable, os.path.join(root_, "run.py"), "--build-tag"], capture_output=True,
-                              text=True, cwd=root_, timeout=60).stdout.strip()
-        check(out_ == tag_, "the copy shows its build tag with --build-tag")
-    finally:
-        srv.lease, licensing.licensed = orig_lease, orig_licensed
-        if os.path.exists(emb_):
-            os.remove(emb_)
-        for f_ in os.listdir(os.path.join(fm_, "__pycache__")) if os.path.isdir(os.path.join(fm_, "__pycache__")) else []:
-            if f_.startswith("_embedded_templates"):
-                os.remove(os.path.join(fm_, "__pycache__", f_))
-        sys.modules.pop("fmpro._embedded_templates", None)
-        import fmpro as _fmpro
-        if hasattr(_fmpro, "_embedded_templates"):
-            delattr(_fmpro, "_embedded_templates")
-        licensing.load_build()
-        licensing.LICENCE = lic
-    check(not os.path.exists(emb_) and licensing.BUILD_TAG is None, "the developer copy is left unsealed")
-
-    print("Public build (one build for everyone, pages not sealed, one update channel)")
-    with srv.hits_lock:
-        srv.hits.clear()
+    print("Public build (one build for everyone, no key, one update channel)")
     pub_tag = seal_pages.build_tag(master_, seal_pages.PUBLIC_BUILD)
     tmp3 = tempfile.mkdtemp(prefix="fmp-public-")
     pub_dir = os.path.join(srv.updates_dir(), pub_tag)
+    old_dir = os.path.join(srv.updates_dir(), tag_)
     try:
         n_open = seal_pages.open_templates(fm_, pub_tag)
         importlib.invalidate_caches()
         sys.modules.pop("fmpro._embedded_templates", None)
         n_all = sum(len(fs) for _d, _s, fs in os.walk(os.path.join(fm_, "templates")))
-        check(n_open == n_all and "SEALED = {}" in open(emb_, encoding="utf-8").read(),
-              f"the public build carries all {n_open} pages unsealed")
+        src_ = open(emb_, encoding="utf-8").read()
+        check(n_open == n_all and "SEALED" not in src_ and "CHECK" not in src_, f"the public build carries all {n_open} pages")
         check(re.fullmatch(r"FMPB(-[A-Z2-7]{4}){4}", pub_tag) and pub_tag != seal_pages.build_tag(master_, "STOCK"),
               f"the public build has its own valid build tag ({pub_tag})")
         app3 = create_app(tmp3, start_telemetry=False, check_licence=False)
         app3.testing = True
-        c3 = app3.test_client()
-        lic3p = licensing.LICENCE
-        check(licensing.BUILD_TAG == pub_tag and not licensing.SEALED_PAGES, "the public copy knows its update channel")
-        check(app3.jinja_env.get_template("dashboard.html") is not None, "every page is there without any page key")
-        check(c3.get("/activate").status_code == 200, "the public copy opens on the activate screen")
-        with c3.session_transaction() as s_:
-            tok3 = s_.get("csrf")
-        k_pub = srv.store.new_purchase("Public User", "", product="Fleet Manager Pro")
-        r3 = c3.post("/activate", data={"key": k_pub, "agree": "1", "csrf": tok3})
-        check(lic3p.ok and lic3p.reason is None,
-              f"a public copy activates without being locked out for page keys ({lic3p.reason} / {r3.status_code})")
-        # updates: one folder serves every public copy, whoever's key it was activated with
+        check(licensing.BUILD_TAG == pub_tag, "the public copy knows its update channel")
+        check(app3.jinja_env.get_template("dashboard.html") is not None, "every page is there")
+        # updates: one folder serves every public copy
         os.makedirs(pub_dir, exist_ok=True)
         with zipfile.ZipFile(os.path.join(pub_dir, "Fleet Manager Pro 99.0.0.zip"), "w") as z_:
             z_.writestr("Fleet Manager Pro/VERSION", "99.0.0")
         offer = srv.update_manifest(pub_tag, "1.0.0")
         check(offer.get("update") and offer["manifest"]["build"] == pub_tag and offer["manifest"]["version"] == "99.0.0",
-              "the licence server offers the public update to a public copy")
-        check(not srv.update_manifest(tag_, "1.0.0").get("update"), "a buyer's own copy isn't offered the public build")
+              "the server offers the public update to a public copy")
+        check(not srv.update_manifest(tag_, "1.0.0").get("update"), "an older buyer copy isn't offered it by accident")
+        # an older buyer copy moves over: the same package published to its own channel
+        os.makedirs(old_dir, exist_ok=True)
+        shutil.copy2(os.path.join(pub_dir, "Fleet Manager Pro 99.0.0.zip"), old_dir)
+        offer2 = srv.update_manifest(tag_, "1.5.28-beta")
+        check(offer2.get("update") and offer2["manifest"]["build"] == tag_ and offer2["manifest"]["sha256"] == offer["manifest"]["sha256"],
+              "publishing the public package to an older copy's channel offers it there, signed for that copy")
+        from fmpro import updater as _upd
+        licensing.BUILD_TAG = tag_
+        check(_upd._manifest_ok(offer2["manifest"]) is None, "and the older copy's updater accepts it")
+        licensing.BUILD_TAG = pub_tag
+        out_ = subprocess.run([sys.executable, os.path.join(root_, "run.py"), "--build-tag"], capture_output=True,
+                              text=True, cwd=root_, timeout=60).stdout.strip()
+        check(out_ == pub_tag, "the copy shows its build tag with --build-tag")
     finally:
         shutil.rmtree(pub_dir, ignore_errors=True)
+        shutil.rmtree(old_dir, ignore_errors=True)
         if os.path.exists(emb_):
             os.remove(emb_)
         for f_ in os.listdir(os.path.join(fm_, "__pycache__")) if os.path.isdir(os.path.join(fm_, "__pycache__")) else []:
@@ -4036,12 +3928,10 @@ def main():
         if hasattr(_fmpro, "_embedded_templates"):
             delattr(_fmpro, "_embedded_templates")
         licensing.load_build()
-        licensing.LICENCE = lic
         shutil.rmtree(tmp3, ignore_errors=True)
     check(not os.path.exists(emb_) and licensing.BUILD_TAG is None, "the developer copy is left without a build tag")
 
     db.close_all()
-    shutil.rmtree(tmp2, ignore_errors=True)
     shutil.rmtree(tmp, ignore_errors=True)
     srv.store.db.close()
     shutil.rmtree(lic_folder, ignore_errors=True)

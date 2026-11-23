@@ -1,4 +1,4 @@
-"""VTC Finder: the company's public profile, shown by the licence server where drivers search for a company to join.
+"""VTC Finder: the company's public profile, shown by the Fleet Manager server where drivers search for a company to join.
 
 The Owner or a Manager writes the profile here (Company, VTC Profile). It is sent with the recruitment sync and is only
 public once "List my company" is ticked. The name, tag, motto and colours come from Settings, Company."""
@@ -14,7 +14,7 @@ from .auth import current_units, login_required, user
 
 bp = Blueprint("vtc", __name__)
 
-# The licence server keeps the same lists (VTC_* in license_server.py; the tests check they match).
+# The Fleet Manager server keeps the same lists (VTC_* in license_server.py; the tests check they match).
 GAMES = {"ats": "American Truck Simulator", "ets2": "Euro Truck Simulator 2", "both": "ATS and ETS2"}
 REGIONS = {"world": "Worldwide", "na": "North America", "sa": "South America", "eu": "Europe", "as": "Asia",
            "oc": "Oceania", "af": "Africa"}
@@ -31,7 +31,7 @@ LINKS = {"discord": "Discord invite", "website": "Website", "truckersmp": "Truck
 LINK_HELP = {"discord": "The Discord invite must start with https://discord.gg/ or https://discord.com/invite/",
              "website": "The website must be a full address starting with https://",
              "truckersmp": "The TruckersMP page must start with https://truckersmp.com/"}
-NEEDS_UPDATE = ("Your licence server needs updating before companies can be listed. Everything else keeps working; "
+NEEDS_UPDATE = ("The Fleet Manager server needs updating before companies can be listed. Everything else keeps working; "
                 "your profile is saved and will be sent once the server is up to date.")
 _LINK_RX = re.compile(r"https://[A-Za-z0-9.\-]+(?:/[A-Za-z0-9\-._~!$&'()*+,;=:@%/]*)?"
                       r"(?:\?[A-Za-z0-9\-._~!$&'()*+,;=:@%/?]*)?(?:#[A-Za-z0-9\-._~!$&'()*+,;=:@%/?]*)?")
@@ -48,7 +48,7 @@ def clean_text(v, limit, lines=False):
 
 
 def link_ok(kind, v):
-    """The same rule as the licence server: https, and the right site for Discord and TruckersMP."""
+    """The same rule as the Fleet Manager server: https, and the right site for Discord and TruckersMP."""
     if len(v) > LIMITS["link"] or not _LINK_RX.fullmatch(v):
         return False
     u = urllib.parse.urlsplit(v)
@@ -127,7 +127,7 @@ def listed():
 
 
 def payload():
-    """What is sent to the licence server. Not listed: only the questions for the Apply form leave this PC."""
+    """What is sent to the Fleet Manager server. Not listed: only the questions for the Apply form leave this PC."""
     p = load()
     if not listed():
         return {"listed": False, "questions": p["questions"]}
@@ -139,7 +139,7 @@ def payload():
 
 
 def status():
-    """What the licence server last said about this company: {url, finder, listed, hidden, visible, stored, at}."""
+    """What the Fleet Manager server last said about this company: {url, finder, listed, hidden, visible, stored, at}."""
     try:
         d = json.loads(db.setting("vtc_status", "") or "{}")
     except ValueError:
@@ -170,11 +170,11 @@ def why_not():
     if not load()["about"]:
         out.append("“About the company” is empty.")
     if s.get("hidden"):
-        out.append("It was hidden by the owner of the licence server. Contact whoever gave you your licence key.")
+        out.append("It was hidden by the owner of the Fleet Manager server. Contact whoever gave you your licence key.")
     if s.get("old_server"):
         out.append(NEEDS_UPDATE)
     elif not out and not s.get("visible"):
-        out.append("It hasn't reached the licence server yet. Save again, or wait up to 10 minutes.")
+        out.append("It hasn't reached the Fleet Manager server yet. Save again, or wait up to 10 minutes.")
     return out
 
 

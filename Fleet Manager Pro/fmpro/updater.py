@@ -1,7 +1,7 @@
 """Fleet Manager Pro - in-app updater (notify, then one-click install).
 
 How it works
-* On start-up, and once a day after that, the app asks the licence server (over the same TLS-pinned channel
+* On start-up, and once a day after that, the app asks the Fleet Manager server (over the same TLS-pinned channel
   licensing uses) whether a newer build exists for THIS copy's hidden build tag.
 * The server answers with an Ed25519-signed manifest: the new version, the package's SHA-256 and its filename.
   Nothing is trusted unless the manifest is signed by the very key that signs licences (verified with the
@@ -119,7 +119,7 @@ def _manifest_ok(m):
     except (ValueError, TypeError):
         genuine = False
     if not genuine:
-        return "The update isn't signed by the official licence server, so it was ignored."
+        return "The update isn't signed by the official Fleet Manager server, so it was ignored."
     if m.get("product") != licensing.PRODUCT:
         return "The update is for a different product."
     if (m.get("build") or "") != (licensing.BUILD_TAG or ""):
