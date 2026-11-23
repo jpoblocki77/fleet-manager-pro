@@ -15,7 +15,7 @@
     <div class="field"><label>Name / nickname *</label><input name="name" required maxlength="48" value="{{ f.name if f }}"></div>
     <div class="field"><label>Contact (email or Discord) *</label><input name="contact" required maxlength="100" value="{{ f.contact if f }}"></div>
     <div class="field"><label>Discord username</label><input name="discord" maxlength="64" value="{{ f.discord if f }}"></div>
-    <div class="field"><label>Age</label><input name="age" type="number" min="0" max="120" value="{{ f.age if f }}"></div>
+    <div class="field"><label>Age *</label><input name="age" type="number" min="16" max="120" required value="{{ f.age if f }}"></div>
     <div class="field"><label>Country</label><input name="country" maxlength="48" value="{{ f.country if f }}"></div>
     <div class="field"><label>Games</label><label class="check"><input type="checkbox" name="games" value="ats" checked> ATS</label><label class="check"><input type="checkbox" name="games" value="ets2"> ETS2</label></div>
   </div>

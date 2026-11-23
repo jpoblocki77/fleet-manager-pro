@@ -9,6 +9,8 @@
 </div>
 
 {% set real_flags = (j.flags or '').split(',')|reject('in', ['', 'joined-late', 'demo'])|list %}
+{# the money on a job is for its own driver and for Dispatchers and up #}
+{% set money = can('dispatcher') or j.user_id == current_user().id %}
 {% if can('admin') and (j.status == 'pending_review' or real_flags) %}
 <div class="card accent" style="margin-bottom:16px">
   <div class="between"><div><b>Needs review.</b> <span class="muted">{% if j.status == 'pending_review' and j.source == 'manual' %}Manual job — approve to pay it out.{% elif j.status == 'pending_review' %}Pay is on hold{% if real_flags == ['no-licence'] %} — the driver had no valid driver's licence when this load started{% elif real_flags %} — anti-cheat flagged: {{ real_flags|join(', ') }}{% else %} (remote driver){% endif %}. Approve to pay it out.{% elif real_flags == ['no-licence'] %}The driver had no valid driver's licence when this load started.{% else %}Anti-cheat flagged: {{ real_flags|join(', ') }}.{% endif %}</span></div>
@@ -19,8 +21,9 @@
 </div>{% endif %}
 
 <div class="grid g4" style="margin-bottom:16px">
-  {{ stat('Revenue', (j.revenue or j.income)|money, ('Offered ' ~ (j.income|money) ~ ' − ' ~ (j.deduction|money) ~ ' ' ~ j.deduction_reason) if j.deduction else 'Offered ' ~ (j.income|money)) }}
+  {% if money %}{{ stat('Revenue', (j.revenue or j.income)|money, ('Offered ' ~ (j.income|money) ~ ' − ' ~ (j.deduction|money) ~ ' ' ~ j.deduction_reason) if j.deduction else 'Offered ' ~ (j.income|money)) }}
   {{ stat('Profit', j.profit|money, 'after costs & driver pay') }}
+  {% else %}{{ stat('Revenue', '—', 'only for the driver and dispatchers') }}{{ stat('Profit', '—', 'only for the driver and dispatchers') }}{% endif %}
   {{ stat('Distance', j.driven_km|dist(1), 'planned ' ~ (j.planned_km|dist)) }}
   {{ stat('Score', j.score if j.status == 'delivered' else '—', (j.xp ~ ' XP earned') if j.xp else '') }}
 </div>
@@ -33,11 +36,12 @@
     <ul class="feed">{% for e in events %}
       <li><span class="ic">{{ {'started':'🚚','delivered':'✅','cancelled':'❌','fine':'🚨','toll':'🛣️','ferry':'⛴️','train':'🚆','refuel':'⛽','adblue':'💧'}.get(e.kind, '•') }}</span>
         <div><b style="text-transform:capitalize">{{ e.kind }}</b> <span class="muted">{{ e.detail }}</span><div class="small faint">{{ e.created_at|dt('%b %d %H:%M:%S') }}</div></div>
-        {% if e.amount %}<span class="right" style="margin-left:auto">{{ e.amount|money }}</span>{% endif %}</li>
+        {% if e.amount and money %}<span class="right" style="margin-left:auto">{{ e.amount|money }}</span>{% endif %}</li>
     {% else %}<li class="muted">No events recorded.</li>{% endfor %}</ul>
   </div>
   <div class="stack">
-    <div class="card"><h2>Costs</h2><dl class="kv">
+    {% if not money %}<div class="card"><h2>Costs</h2><p class="muted">Only {{ j.display_name }} and dispatchers can see what this job earned and cost.</p></div>
+    {% else %}<div class="card"><h2>Costs</h2><dl class="kv">
       {% if j.deduction %}<dt style="text-transform:capitalize">{{ j.deduction_reason }}{% if j.deduction_reason == 'cargo damage' %} ({{ j.cargo_damage|pct(1) }}){% endif %}</dt>
         <dd class="neg">−{{ j.deduction|money }} <span class="small faint">taken off the pay by the game</span></dd>{% endif %}
       <dt>Driver pay</dt><dd>{{ j.driver_pay|money }}</dd>
@@ -45,7 +49,7 @@
       <dt>Tolls</dt><dd>{{ j.tolls|money }}</dd><dt>Fines</dt><dd>{{ j.fines|money }}{% if j.driver_fines %} <span class="small muted">({{ j.driver_fines|money }} paid by the driver)</span>{% endif %}</dd>
       <dt>Ferry / train</dt><dd>{{ j.ferry|money }} / {{ j.train|money }}</dd>
       {% if j.penalty %}<dt>Cancellation penalty</dt><dd class="neg">{{ j.penalty|money }}</dd>{% endif %}
-    </dl></div>
+    </dl></div>{% endif %}
     <div class="card"><h2>Driving</h2><dl class="kv">
       <dt>Cargo</dt><dd>{{ j.cargo }} · {{ j.cargo_mass|mass }}</dd>
       <dt>Trailer</dt><dd>{{ j.trailer_name or '—' }}</dd>

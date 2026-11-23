@@ -284,7 +284,7 @@ def main():
     print("Stored script injection (XSS)")
     a2 = Browser(app)
     a2.get("/apply")
-    a2.post("/apply", {"name": XSS, "contact": XSS, "experience": XSS, "message": XSS, "discord": XSS})
+    a2.post("/apply", {"age": "30", "name": XSS, "contact": XSS, "experience": XSS, "message": XSS, "discord": XSS})
     drv.post("/messages", {"body": XSS})
     drv.post(f"/drivers/{drv_id}/edit", {"display_name": XSS, "bio": XSS, "country": XSS, "color": '"><script>'})
     drv.post("/jobs/new", {"cargo": XSS, "source_city": XSS, "destination_city": XSS, "driven_km": "10", "revenue": "10", "notes": XSS})
@@ -387,6 +387,18 @@ def main():
     csv_text = boss.get("/api/export/jobs.csv").get_data(as_text=True)
     check("'=cmd|" in csv_text and ",=cmd" not in csv_text and ",+SUM" not in csv_text and ",@x" not in csv_text,
           "formula cells are neutralised in the CSV export")
+    mine = drv.get("/api/export/jobs.csv").get_data(as_text=True)
+    import csv as _csv, io as _io
+    rows = list(_csv.DictReader(_io.StringIO(mine)))
+    check(drv.get("/api/export/jobs.csv").status_code == 200 and "=cmd" not in mine and "+SUM" not in mine
+          and all(r["driver"] == db.val("SELECT display_name FROM users WHERE id=?", (drv_id,)) for r in rows),
+          "a driver's CSV export holds only their own deliveries")
+    check(mgr.get("/api/export/jobs.csv").get_data(as_text=True).count("=cmd") == 1, "a manager's export holds every driver")
+    bj = db.val("SELECT id FROM jobs WHERE cargo LIKE '%cmd%' ORDER BY id DESC LIMIT 1")
+    page = drv.get(f"/jobs/{bj}").get_data(as_text=True)
+    check("only for the driver and dispatchers" in page and "Driver pay" not in page, "a driver can't see another driver's job money")
+    check("Driver pay" in mgr.get(f"/jobs/{bj}").get_data(as_text=True), "a manager can")
+    check("Only the driver and dispatchers see" in drv.get("/jobs").get_data(as_text=True), "the Logbook hides other drivers' money from a driver")
 
     print("Numbers")
     bal = db.val("SELECT SUM(amount) FROM ledger WHERE account='company'")

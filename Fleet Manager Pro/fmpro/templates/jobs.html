@@ -14,6 +14,7 @@
   {% if not game_scope() %}<div><label>Game</label><select name="game"><option value="">All</option><option value="ats" {{ 'selected' if a.game=='ats' }}>ATS</option><option value="ets2" {{ 'selected' if a.game=='ets2' }}>ETS2</option></select></div>{% endif %}
   <button class="btn navy">Filter</button>
 </form>
+{% set see_all = can('dispatcher') %}
 <div class="card flush"><div class="table-wrap"><table>
   <thead><tr><th>#</th><th>Driver</th><th>Route</th><th>Cargo</th><th class="num">Distance</th><th class="num">Revenue</th><th class="num">Profit</th><th class="num">Score</th><th>Status</th><th>Date</th></tr></thead>
   <tbody>
@@ -24,8 +25,9 @@
     <td>{{ j.source_city or '?' }} → {{ j.destination_city or '?' }}<div class="small faint">{{ j.game|upper }} · {{ j.source }}</div></td>
     <td>{{ j.cargo }}<div class="small faint">{{ j.cargo_mass|mass }}</div></td>
     <td class="num">{{ j.driven_km|dist }}</td>
+    {% if not (see_all or j.user_id == current_user().id) %}<td class="num faint" title="Only the driver and dispatchers see a job's money">—</td><td class="num faint">—</td>{% else %}
     <td class="num">{{ (j.revenue or j.income)|money }}{% if j.deduction %}<div class="small neg" title="Offered {{ j.income|money }}, the game took {{ j.deduction|money }} off for {{ j.deduction_reason }}">−{{ j.deduction|money }} {{ 'damage' if j.deduction_reason == 'cargo damage' else 'late' if j.deduction_reason == 'late delivery' else 'deducted' }}</div>{% endif %}</td>
-    <td class="num {{ 'pos' if j.profit > 0 else 'neg' if j.profit < 0 }}">{{ j.profit|money if j.status == 'delivered' else '—' }}</td>
+    <td class="num {{ 'pos' if j.profit > 0 else 'neg' if j.profit < 0 }}">{{ j.profit|money if j.status == 'delivered' else '—' }}</td>{% endif %}
     <td class="num">{{ j.score if j.status == 'delivered' else '—' }}</td>
     <td>{{ status(j.status) }}{% set rf = (j.flags or '').split(',')|reject('in', ['', 'joined-late', 'demo'])|list %}{% if rf %} <span class="badge flag" title="{{ rf|join(', ') }}">flag</span>{% elif 'demo' in (j.flags or '') %} <span class="badge info">demo</span>{% endif %}</td>
     <td class="small muted">{{ j.started_at|dt('%b %d %H:%M') }}</td>

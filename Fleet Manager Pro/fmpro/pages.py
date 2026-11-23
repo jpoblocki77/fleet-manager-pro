@@ -1174,6 +1174,9 @@ def apply():
         if recent > 30:
             return render_template("apply.html", error="Too many applications right now, try later.", f=request.form)
         age = int(num("age", 0, 120))
+        from .recruit import MIN_AGE
+        if age < MIN_AGE:
+            return render_template("apply.html", error=f"You must be at least {MIN_AGE} to apply.", f=request.form)
         db.insert("applications", name=name, contact=contact, discord=txt("discord", 64), age=age or None,
                   country=txt("country", 48), games=",".join(g for g in request.form.getlist("games") if g in ("ats", "ets2")),
                   experience=txt("experience", 1000), message=txt("message", 2000), created_at=time.time())

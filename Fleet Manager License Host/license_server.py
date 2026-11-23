@@ -90,6 +90,7 @@ PRODUCT = "Fleet Manager Pro"                   # this server only licenses Flee
 PRODUCTS = {"Fleet Manager Pro": "FMP"}         # product -> purchase key prefix
 LEGACY = "Fleet Manager"                        # records made before Pro existed (no product stored)
 SLOTS_PER_PURCHASE = 2
+MIN_AGE = 16                                    # youngest applicant the Apply page takes
 MACHINE_RX = re.compile(r"^FMID-[A-Z2-7]{4}-[A-Z2-7]{4}-[A-Z2-7]{4}-[A-Z2-7]{4}$")
 KEY_RX = re.compile(r"^FMP-[A-Z2-7]{4}-[A-Z2-7]{4}-[A-Z2-7]{4}-[A-Z2-7]{4}$")
 
@@ -732,7 +733,8 @@ class Store:
         if not data["name"] or not data["contact"]:
             raise LicenceError("missing", "Please fill in your name and how to contact you.")
         data["games"] = data["games"] if data["games"] in ("ats", "ets2", "both") else ""
-        data["age"] = data["age"] if data["age"].isdecimal() else ""
+        if not data["age"].isdecimal() or not MIN_AGE <= int(data["age"]) <= 99:
+            raise LicenceError("age", f"You must be at least {MIN_AGE} to apply. Please enter your age.")
         data["via"] = "finder" if form.get("via") == "finder" else "link"
         answers = []
         for q in page["questions"]:
@@ -1259,7 +1261,7 @@ class Server:
 <form method="post" autocomplete="on">
   <label>Your name / driver name *<input name="name" maxlength="80" required></label>
   <label>How can we contact you? (Discord, email) *<input name="contact" maxlength="120" required></label>
-  <div class="two"><label>Age<input name="age" type="number" min="10" max="99"></label>
+  <div class="two"><label>Age *<input name="age" type="number" min="{MIN_AGE}" max="99" required></label>
   <label>Country<input name="country" maxlength="60"></label></div>
   <label>Game<select name="games"><option value="ats">American Truck Simulator</option>
     <option value="ets2">Euro Truck Simulator 2</option><option value="both">Both</option></select></label>

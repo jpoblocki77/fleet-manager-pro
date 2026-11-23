@@ -2300,7 +2300,7 @@ def main():
         db.set_setting("discord_webhook", "https://discord.example/api/webhooks/company")
         db.set_setting("webhook_applications", "")
         c.get("/apply")
-        post("/apply", {"name": "Applicant Ann", "contact": "ann@example.com", "games": "ats"})
+        post("/apply", {"age": "30", "name": "Applicant Ann", "contact": "ann@example.com", "games": "ats"})
         check(db.val("SELECT COUNT(*) FROM applications", (), 0) == 1, "public application")
         check(sent_hooks and sent_hooks[-1][0].endswith("/company") and "Applicant Ann" in sent_hooks[-1][1] and "(ATS)" in sent_hooks[-1][1],
               "a new application is posted to the company webhook when it has no channel of its own")
@@ -2308,14 +2308,18 @@ def main():
         db.set_setting("webhook_on_event", "0")
         sent_hooks.clear()
         c.get("/apply")
-        post("/apply", {"name": "Applicant Bob", "contact": "bob@example.com", "games": "ets2"})
+        post("/apply", {"age": "30", "name": "Applicant Bob", "contact": "bob@example.com", "games": "ets2"})
         check(len(sent_hooks) == 1 and sent_hooks[0][0].endswith("/staff") and "Applicant Bob" in sent_hooks[0][1],
               "with its own webhook, applications go to that channel only (even with event posts off)")
         db.set_setting("webhook_on_application", "0")
         sent_hooks.clear()
         c.get("/apply")
-        post("/apply", {"name": "Applicant Cal", "contact": "cal@example.com"})
+        post("/apply", {"age": "30", "name": "Applicant Cal", "contact": "cal@example.com"})
         check(not sent_hooks, "switching application posts off stops them")
+        n_apps = db.val("SELECT COUNT(*) FROM applications", (), 0)
+        c.get("/apply")
+        post("/apply", {"age": "15", "name": "Young Yan", "contact": "yan@example.com"})
+        check(db.val("SELECT COUNT(*) FROM applications", (), 0) == n_apps, "the Apply page refuses applicants under 16")
         _eco.webhook("event", "an event")
         check(not sent_hooks, "event posts follow their own switch")
     finally:
@@ -2408,21 +2412,26 @@ def main():
     st, page = web(f"/apply/{code}")
     check(st == 200 and "Crimson &lt;Line&gt; &amp; Co" in page and "<Line>" not in page and 'name="contact"' in page,
           "the public Apply page shows the company (escaped) and the form")
-    st, page = web(f"/apply/{code}", {"name": "Road Runner", "contact": "runner#0001", "age": "29", "country": "USA",
+    st, page = web(f"/apply/{code}", {"age": "30", "name": "Road Runner", "contact": "runner#0001", "age": "29", "country": "USA",
                                       "games": "both", "experience": "500 h ATS", "message": "<script>alert(9)</script>"})
     check(st == 200 and "was sent" in page, "an applicant can apply from anywhere")
     _st, page_ = web(f"/apply/{code}")
     check(f'name="{sys.modules["license_server"].HONEYPOT}"' in page_ and 'name="website"' not in page_ and "Website" not in page_,
           "the hidden anti-bot box has a name and label browsers don't autofill")
-    web(f"/apply/{code}", {"name": "Bot", "contact": "spam", sys.modules["license_server"].HONEYPOT: "http://spam"})
+    web(f"/apply/{code}", {"age": "30", "name": "Bot", "contact": "spam", sys.modules["license_server"].HONEYPOT: "http://spam"})
     check(srv.store.db.execute("SELECT COUNT(*) FROM applications").fetchone()[0] == 1, "bots filling the hidden field are ignored")
-    web(f"/apply/{code}", {"name": "Autofill Al", "contact": "al#0002", "website": "https://al.example.com"})
+    web(f"/apply/{code}", {"age": "30", "name": "Autofill Al", "contact": "al#0002", "website": "https://al.example.com"})
     check(srv.store.db.execute("SELECT COUNT(*) FROM applications").fetchone()[0] == 2,
           "an applicant whose browser autofilled a website is no longer thrown away")
     srv.store.db.execute("DELETE FROM applications WHERE id=(SELECT MAX(id) FROM applications)")
     srv.store.db.commit()
     st, _ = web(f"/apply/{code}", {"name": "", "contact": ""})
     check(st == 400, "name and contact are required")
+    st, page = web(f"/apply/{code}", {"name": "Young Yan", "contact": "y#0009", "age": "15"})
+    check(st == 400 and "at least 16" in page, "applicants under 16 are refused online")
+    st, _ = web(f"/apply/{code}", {"name": "No Age", "contact": "n#0010"})
+    check(st == 400, "the online form needs an age")
+    srv.apply_hits.pop("127.0.0.1", None)              # those two count towards the hourly limit
     new, err = recruit.sync()
     ra = db.one("SELECT * FROM applications WHERE remote_id IS NOT NULL ORDER BY id DESC LIMIT 1")
     check(new == 1 and ra["name"] == "Road Runner" and ra["games"] == "ats,ets2" and ra["source"] == "online" and ra["age"] == 29,
@@ -2432,12 +2441,12 @@ def main():
     # regression: the server used to reuse number 1 once its list was empty, and the app then took every later
     # application for the one it already had and told the server to delete it
     first_rid = ra["remote_id"]
-    st, page = web(f"/apply/{code}", {"name": "Second Sam", "contact": "sam#0003", "games": "ats"})
+    st, page = web(f"/apply/{code}", {"age": "30", "name": "Second Sam", "contact": "sam#0003", "games": "ats"})
     new2, _e = recruit.sync()
     sam = db.one("SELECT remote_id FROM applications WHERE name='Second Sam'")
     check(new2 == 1 and sam and sam["remote_id"] != first_rid and sam["remote_id"] > 1_000_000,
           "a second application gets a new number and is collected (numbers are never reused)")
-    st, page = web(f"/apply/{code}", {"name": "Third Tia", "contact": "tia#0004"})
+    st, page = web(f"/apply/{code}", {"age": "30", "name": "Third Tia", "contact": "tia#0004"})
     new3, _e = recruit.sync()
     check(new3 == 1 and db.val("SELECT COUNT(*) FROM applications WHERE name='Third Tia'") == 1, "and so is the next one")
     # an older server that reuses a number: a different person with an old number is still saved
@@ -2479,11 +2488,11 @@ def main():
     db.set_setting("recruitment_open", "0")
     recruit.sync()
     st, page = web(f"/apply/{code}")
-    st2, _ = web(f"/apply/{code}", {"name": "Late", "contact": "x"})
+    st2, _ = web(f"/apply/{code}", {"age": "30", "name": "Late", "contact": "x"})
     check("isn't taking applications" in page and st2 == 404, "closing recruitment closes the online page")
     db.set_setting("recruitment_open", "1")
     recruit.sync()
-    codes = [web(f"/apply/{code}", {"name": f"Spam {i}", "contact": "x"}, ip="127.0.0.1" if i == 0 else None)[0] for i in range(6)]
+    codes = [web(f"/apply/{code}", {"age": "30", "name": f"Spam {i}", "contact": "x"}, ip="127.0.0.1" if i == 0 else None)[0] for i in range(6)]
     check(codes[:5] == [200] * 5 and codes[5] == 429, f"at most 5 applications per address per hour ({codes})")
     check(web("/apply/zzzzzzzz")[0] == 404 and web("/apply/../../v1/health")[0] == 404, "unknown or odd links get a 404")
     try:
@@ -2649,9 +2658,9 @@ def main():
     st, pub = web(f"/apply/{code}?via=finder")
     q1, q2 = lsv.vtc_question_id("Why <us>?"), lsv.vtc_question_id("Do you have a mic?")
     check("Why &lt;us&gt;?" in pub and f'name="{q1}"' in pub and f'<select name="{q2}"' in pub and 'name="via" value="finder"' in pub, "the Apply form has the company's questions")
-    st, pub = web(f"/apply/{code}?via=finder", {"name": "Quinn", "contact": "q#1", q1: "<u>Nice</u>", q2: "yes", "q_unknown": "x", "via": "finder"})
+    st, pub = web(f"/apply/{code}?via=finder", {"age": "30", "name": "Quinn", "contact": "q#1", q1: "<u>Nice</u>", q2: "yes", "q_unknown": "x", "via": "finder"})
     check(st == 200 and "/vtcs" in pub, "after applying there's a way back to the finder")
-    web(f"/apply/{code}", {"name": "Lin", "contact": "l#1", q2: "maybe", "via": "hacked"})
+    web(f"/apply/{code}", {"age": "30", "name": "Lin", "contact": "l#1", q2: "maybe", "via": "hacked"})
     recruit.sync()
     qa = db.one("SELECT * FROM applications WHERE name='Quinn'")
     la = db.one("SELECT * FROM applications WHERE name='Lin'")
@@ -2694,7 +2703,7 @@ def main():
     db.set_setting("recruitment_open", "0")
     recruit.sync()
     st, pub = web(f"/vtc/{code}")
-    check(st == 200 and "Not taking applications" in pub and "via=finder" not in pub and web(f"/apply/{code}", {"name": "x", "contact": "y"})[0] == 404,
+    check(st == 200 and "Not taking applications" in pub and "via=finder" not in pub and web(f"/apply/{code}", {"age": "30", "name": "x", "contact": "y"})[0] == 404,
           "a closed company shows its profile but can't be applied to")
     db.set_setting("recruitment_open", "1")
     recruit.sync()

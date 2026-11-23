@@ -106,6 +106,8 @@ def live():
 def live_all():
     out = []
     want = request.args.get("game") if request.args.get("game") in ("ats", "ets2") else game_scope()
+    from .auth import can
+    me, see_pay = user()["id"], can("dispatcher")
     for uid, e in HUB.all_live().items():
         v = e["frame"]["values"]
         if want and v["game"] != want:
@@ -114,6 +116,8 @@ def live_all():
         if not u:
             continue
         job = _job_info(uid)
+        if job and uid != me and not see_pay:          # another driver's pay is theirs and the dispatchers'
+            job = {k: v for k, v in job.items() if k != "income"}
         trail = db.q("SELECT x, z FROM job_points WHERE job_id=? ORDER BY t", (job["id"],)) if job else []
         out.append({"user": u, "x": v["x"], "z": v["z"], "heading": v["heading"], "speed_kmh": v["speed_kmh"],
                     "truck": f"{v['truck_brand']} {v['truck_name']}".strip(), "game": v["game"],
@@ -252,13 +256,17 @@ def notifications():
 @bp.route("/export/jobs.csv")
 @login_required
 def export_jobs():
-    rows = db.q("""SELECT j.id, u.display_name driver, j.game, j.status, j.source, j.cargo, j.cargo_mass,
+    # a driver gets their own deliveries; the whole company's money is for Dispatchers and up
+    from .auth import can
+    mine = "" if can("dispatcher") else " WHERE j.user_id=?"
+    rows = db.q(f"""SELECT j.id, u.display_name driver, j.game, j.status, j.source, j.cargo, j.cargo_mass,
                    j.source_city, j.source_company, j.destination_city, j.destination_company, j.planned_km, j.driven_km,
                    j.revenue, j.driver_pay, j.fuel_used, j.fuel_cost, j.tolls, j.fines, j.ferry, j.train, j.profit,
                    j.cargo_damage, j.max_speed, j.avg_speed, j.score, j.xp, j.flags,
                    datetime(j.started_at, 'unixepoch', 'localtime') started,
                    datetime(j.finished_at, 'unixepoch', 'localtime') finished
-                   FROM jobs j JOIN users u ON u.id=j.user_id ORDER BY j.id""")
+                   FROM jobs j JOIN users u ON u.id=j.user_id{mine} ORDER BY j.id""",  # nosec B608  # only a fixed condition is added; the id is a ? parameter
+                () if not mine else (user()["id"],))
     buf = io.StringIO()
     w = csv.writer(buf)
     if rows:

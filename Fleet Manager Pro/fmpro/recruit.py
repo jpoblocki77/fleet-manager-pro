@@ -9,6 +9,8 @@ import time
 
 from . import db, economy, licensing, vtc_profile
 
+MIN_AGE = 16                        # youngest driver a company may take on
+log = logging.getLogger("fmpro.recruit")
 EVERY = 10 * 60                     # seconds between collections
 _lock = threading.Lock()
 
@@ -102,6 +104,9 @@ def waiting(u):
 
 def _store(a, rid):
     age = str(a.get("age") or "")
+    if age.isdecimal() and int(age) < MIN_AGE:      # an older licence server still lets younger applicants through
+        log.info("online application %s skipped: under %s", rid, MIN_AGE)
+        return
     games = a.get("games") if a.get("games") in ("ats", "ets2") else ("ats,ets2" if a.get("games") == "both" else "")
     db.insert("applications", name=str(a.get("name") or "")[:48] or "(no name)", contact=str(a.get("contact") or "")[:100],
               age=int(age) if age.isdecimal() and 0 < int(age) < 120 else None, country=str(a.get("country") or "")[:48],
