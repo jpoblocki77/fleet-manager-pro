@@ -4,9 +4,11 @@ Fleet Manager Pro is free, so there is one build: the public copy. This
   1. builds it once at the current Fleet Manager Pro\VERSION,
   2. publishes it to the public update channel AND to every older buyer copy's channel (so they move over),
   3. makes the installer (Build Output\Installers\Public\Fleet Manager Pro Setup.exe) and puts a copy in the
-     website's downloads folder (..\..\Website\downloads) when that folder is there,
+     website's downloads folder (..\..\Website\downloads) when that folder is there, writes the new version,
+     size and SHA-256 fingerprint into the website's index.html, and rebuilds Website.zip,
   4. packs  Build Output\updates-for-cloud-<version>-<date>.zip  - everything the cloud server needs.
-Then upload that zip's updates\ folder to the server's License Host folder (and the website, for the new download).
+Then upload that zip's updates\ folder to the server's License Host folder (and the website, for the new download),
+and send the new Setup to Microsoft (microsoft.com/wdsi/filesubmission) so Defender stops flagging it.
 
     python "Ship Update.py" --notes "Fixes the map."          everything above
     python "Ship Update.py" --dry-run                          just show what it would do
@@ -21,6 +23,7 @@ import argparse
 import csv
 import datetime
 import glob
+import hashlib
 import os
 import re
 import shutil
@@ -38,7 +41,9 @@ UPDATES = os.path.join(HOST, "updates")
 PUBLISH = os.path.join(HOST, "publish_update.py")
 CSV_PATH = os.path.join(DEV, "Buyer Builds (PRIVATE).csv")
 SETUP = os.path.join(BUILD_OUTPUT, "Installers", "Public", "Fleet Manager Pro Setup.exe")
-WEBSITE_DOWNLOAD = os.path.join(os.path.dirname(os.path.dirname(DEV)), "Website", "downloads")
+WEBSITE = os.path.join(os.path.dirname(os.path.dirname(DEV)), "Website")
+WEBSITE_DOWNLOAD = os.path.join(WEBSITE, "downloads")
+WDSI = "https://www.microsoft.com/en-us/wdsi/filesubmission"
 KEY_RX = re.compile(r"^FMP-[A-Z2-7]{4}(-[A-Z2-7]{4}){3}$")
 
 
@@ -92,6 +97,43 @@ def publish(zip_path, target, notes):
     if notes:
         cmd += ["--notes", notes]
     return None if run(cmd, HOST) == 0 else "publish failed"
+
+
+def sha256(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def update_website(ver, setup, site=WEBSITE):
+    """Write the version, download size and SHA-256 into the <!--fmp:ver/mb/sha--> markers of the website's
+    index.html, then rebuild Website.zip (same file list) when it's there. Returns the SHA-256."""
+    digest = sha256(setup)
+    mb = f"{os.path.getsize(setup) / 1e6:.1f}"
+    index = os.path.join(site, "index.html")
+    with open(index, encoding="utf-8", newline="") as fh:
+        s = fh.read()
+    for name, value in (("ver", ver), ("mb", mb), ("sha", digest)):
+        s, n = re.subn(r"(<!--fmp:%s-->).*?(<!--/fmp:%s-->)" % (name, name),
+                       lambda m, v=value: m.group(1) + v + m.group(2), s)
+        if not n:
+            raise RuntimeError(f"index.html has no <!--fmp:{name}--> marker")
+    with open(index, "w", encoding="utf-8", newline="") as fh:
+        fh.write(s)
+    zpath = os.path.join(site, "Website.zip")
+    if os.path.isfile(zpath):
+        with zipfile.ZipFile(zpath) as z:
+            names = [i.filename for i in z.infolist() if not i.is_dir()]
+        tmp = zpath + ".tmp"
+        with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as z:
+            for n in names:
+                src = os.path.join(site, *n.split("/"))
+                if os.path.isfile(src):
+                    z.write(src, n)
+        os.replace(tmp, zpath)
+    return digest
 
 
 def pack_cloud(ver, tags):
@@ -181,6 +223,13 @@ def main():
         if setup_ok and os.path.isdir(WEBSITE_DOWNLOAD):
             shutil.copy2(SETUP, os.path.join(WEBSITE_DOWNLOAD, os.path.basename(SETUP)))
             print(f"    copied to the website: {WEBSITE_DOWNLOAD}")
+            try:
+                update_website(ver, SETUP)
+                print(f"    website index.html updated (version {ver}, size, SHA-256) and Website.zip rebuilt")
+            except Exception as e:
+                failed.append(("website index.html", f"error: {e}"))
+        if setup_ok:
+            print(f"    SHA-256 {sha256(SETUP)}")
 
     print("\n[4] Cloud upload zip")
     cloud = None
@@ -200,7 +249,10 @@ def main():
         print(f"   1. Upload {os.path.basename(cloud)} to the cloud server and unzip it into the")
         print("      License Host folder there (it only adds files under updates\\).")
     if setup_ok and os.path.isdir(WEBSITE_DOWNLOAD):
-        print("   2. Upload the website's downloads\\Fleet Manager Pro Setup.exe (the new download for new users).")
+        print("   2. Upload the website's index.html and downloads\\Fleet Manager Pro Setup.exe (the new download).")
+    if setup_ok:
+        print(f"   *. Send the new Setup to Microsoft so Defender doesn't flag it: {WDSI}")
+        print(f"      (choose 'Software developer', then 'Incorrectly detected'; file: {SETUP})")
     print("   3. Commit the release notes (Fleet Manager License Host\\updates\\...\\notes-*.txt) and push.")
     if failed or setup_ok is False:
         sys.exit(1)

@@ -115,7 +115,8 @@ def main():
            "--include-data-files=" + os.path.join(stage, "fmpro", "EULA.txt") + "=fmpro/EULA.txt",
            "--include-data-files=" + os.path.join(stage, "VERSION") + "=VERSION",
            f"--product-name={NAME}", f"--file-version={numver}", f"--product-version={numver}",
-           f"--file-description={NAME}",
+           f"--file-description={NAME} - virtual trucking company manager",
+           "--company-name=Jeff Poblocki", "--copyright=Copyright (c) 2026 Jeff Poblocki. All rights reserved.",
            os.path.join(stage, "run.py")]
     print("Compiling with Nuitka (this takes a few minutes)...")
     r = subprocess.run(cmd, cwd=stage, capture_output=True, text=True)  # nosec B603  # fixed argument list, no shell
