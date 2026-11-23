@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from fmpro import create_app, db  # noqa: E402
 from fmpro.telemetry import demo, reader, service  # noqa: E402
+from fmpro import online_id  # noqa: E402
 
 FAILS = []
 
@@ -2708,17 +2709,17 @@ def main():
             check(False, f"{pth} needs the admin token")
         except lsv.LicenceError as e:
             check(e.status == 401, f"{pth} needs the admin token")
-    adm("/v1/admin/vtc_hide", {"key": lic.key, "hidden": True})
+    adm("/v1/admin/vtc_hide", {"key": online_id.company_id(), "hidden": True})
     check(web(f"/vtc/{code}")[0] == 404 and "Crimson" not in web("/vtcs?open=all")[1], "a hidden company is gone at once")
     post("/vtc-profile", dict(form, about="Edited while hidden"))
     check(web(f"/vtc/{code}")[0] == 404 and "hidden by the owner of the licence server" in c.get("/vtc-profile").get_data(as_text=True),
           "it stays hidden when edited, and the app says so")
     post("/vtc-profile", {k: v for k, v in form.items() if k != "listed"})
-    check(srv.store.db.execute("SELECT hidden FROM vtc_profiles WHERE key=?", (lic.key,)).fetchone()[0] == 1, "unlisting doesn't lift the hide switch")
-    adm("/v1/admin/vtc_hide", {"key": lic.key, "hidden": False})
-    check(adm("/v1/admin/vtc_clear", {"key": lic.key})["cleared"] == 3, "reports can be cleared")
+    check(srv.store.db.execute("SELECT hidden FROM vtc_profiles WHERE key=?", (online_id.company_id(),)).fetchone()[0] == 1, "unlisting doesn't lift the hide switch")
+    adm("/v1/admin/vtc_hide", {"key": online_id.company_id(), "hidden": False})
+    check(adm("/v1/admin/vtc_clear", {"key": online_id.company_id()})["cleared"] == 3, "reports can be cleared")
     check(web(f"/vtc/{code}")[0] == 404, "an unlisted company isn't shown")
-    kept = srv.store.db.execute("SELECT data FROM vtc_profiles WHERE key=?", (lic.key,)).fetchone()[0]
+    kept = srv.store.db.execute("SELECT data FROM vtc_profiles WHERE key=?", (online_id.company_id(),)).fetchone()[0]
     check("carefully" not in kept and "Why <us>?" in kept, "only its Apply questions are kept on the server")
     check("Why &lt;us&gt;?" in web(f"/apply/{code}")[1], "and the shared Apply link still asks them")
     post("/vtc-profile", form)
@@ -2764,7 +2765,7 @@ def main():
     db.set_setting("vtc_listed", "0")
     db.set_setting("vtc_profile", "")
     recruit.push_profile()
-    check(srv.store.db.execute("SELECT COUNT(*) FROM vtc_profiles WHERE key=?", (lic.key,)).fetchone()[0] == 0 and web(f"/vtc/{code}")[0] == 404,
+    check(srv.store.db.execute("SELECT COUNT(*) FROM vtc_profiles WHERE key=?", (online_id.company_id(),)).fetchone()[0] == 0 and web(f"/vtc/{code}")[0] == 404,
           "an emptied profile leaves nothing on the server")
     srv.store.delete_purchase("FMP-TEST-VTC0-0001-AAAA")
     check(web(f"/vtc/{a1}")[0] == 404 and srv.store.db.execute("SELECT COUNT(*) FROM vtc_profiles WHERE key LIKE '%VTC0-0001%'").fetchone()[0] == 0,
@@ -2786,7 +2787,7 @@ def main():
         srv.hits.clear()
     import json as _gj
     store_ = srv.store
-    lbrow = lambda: store_.db.execute("SELECT * FROM leaderboard WHERE key=?", (lic.key,)).fetchone()  # noqa: E731
+    lbrow = lambda: store_.db.execute("SELECT * FROM leaderboard WHERE key=?", (online_id.company_id(),)).fetchone()  # noqa: E731
     check(db.setting("global_board") == "1" and db.setting("global_board_drivers") == "0",
           "a company joins the global board by default, without its drivers' names")
     err = global_board.sync()
@@ -2807,7 +2808,8 @@ def main():
     store_.activate(k_g, "FMID-GGGG-GGGG-GGGG-GGGG", "", "Fleet Manager Pro")
     junk = {"week": {"all": [1e30, -5, "x", None, 500, True]}, "month": {"all": [999999, 5000, 40, 300.55, 88.88, 70, 1, 3]},
             "all": {"all": [999999, 5000, 40, 300, 88, 70, 1, 3], "ats": "nope"}, "evil": {"all": [1]}, "year": []}
-    pid_g = store_.leaderboard_sync(k_g, "FMID-GGGG-GGGG-GGGG-GGGG", "Fleet Manager Pro", True,
+    pid_g = store_.leaderboard_sync(store_.company_owner({"key": k_g, "machine": "FMID-GGGG-GGGG-GGGG-GGGG"}, "",
+                                                         "Fleet Manager Pro"), True,
                                     "<b>Rival</b>   Haulage", "€€€€", junk,
                                     {"month": [{"name": "<i>Speedy</i>", "v": [5000, 1, 2, 3, 99, 5, 6, 1]}] * 30,
                                      "all": "bad"})
@@ -3720,12 +3722,103 @@ def main():
     check(not lic.ok and lic.reason == licensing.CLOCK_BACK, "clock set back locks")
     lic.seen = None
     lic.check()
+    print("Company ID on the server (online features without a licence key)")
+    from fmpro import tracelog as _tl
+    with srv.hits_lock:
+        srv.hits.clear()
+    me_id = online_id.identity()
+    check(online_id.ID_RX.match(me_id["company_id"]) and len(me_id["company_secret"]) >= 32
+          and online_id.identity() == me_id and online_id.company_id() == me_id["company_id"],
+          f"the company has one lasting server ID ({me_id['company_id']})")
+    check(_tl.SECRET_COL.search("online_secret") and not _tl.SECRET_COL.search("online_company_id"),
+          "the debug log hides the company secret")
+    st2 = srv.store
+    cid_row = st2.db.execute("SELECT * FROM companies WHERE cid=?", (me_id["company_id"],)).fetchone()
+    check(cid_row is not None and cid_row["from_key"] == lic.key and cid_row["secret"] != me_id["company_secret"],
+          "the app's syncs registered it, took over its key's data, and the server keeps only a hash of the secret")
+    # an older copy's data moves to the company ID the first time it syncs with one
+    k_m = st2.new_purchase("Moving Co", "", product="Fleet Manager Pro")
+    m_m = "FMID-MMMM-MMMM-MMMM-MMMM"
+    st2.activate(k_m, m_m, "", "Fleet Manager Pro")
+    old_body = {"key": k_m, "machine": m_m, "product": "Fleet Manager Pro", "company": "Moving Co", "open": True}
+    code_m = srv.handle("POST", "/v1/recruit", dict(old_body), {}, "127.0.0.1")["code"]
+    srv.handle("POST", "/v1/leaderboard", dict(old_body, join=True, currency="$",
+                                               stats={"all": {"all": [10, 20, 1, 1, 90, 5, 9, 1]}}, drivers={}), {}, "127.0.0.1")
+    pid_m = st2.db.execute("SELECT pid FROM leaderboard WHERE key=?", (k_m,)).fetchone()[0]
+    cid_m = {"company_id": "FMC-MOVE-MOVE-MOVE-MOVE", "company_secret": "s" * 40}
+    r_m = srv.handle("POST", "/v1/recruit", dict(old_body, **cid_m), {}, "127.0.0.1")
+    check(r_m["code"] == code_m and r_m["company_id"] == cid_m["company_id"]
+          and st2.db.execute("SELECT COUNT(*) FROM recruit WHERE key=?", (k_m,)).fetchone()[0] == 0
+          and st2.db.execute("SELECT pid FROM leaderboard WHERE key=?", (cid_m["company_id"],)).fetchone()[0] == pid_m,
+          "the Apply page and board entry move to the company ID and keep their addresses")
+    check(st2.recruit_page(code_m) is not None and any(c_["id"] == pid_m for c_ in st2.leaderboard()[0]),
+          "and stay visible")
+    no_key = {k_: v_ for k_, v_ in old_body.items() if k_ not in ("key", "machine")}
+    check(srv.handle("POST", "/v1/recruit", dict(no_key, **cid_m), {}, "127.0.0.1")["code"] == code_m,
+          "after that the company ID alone is enough")
+    for bad_, why_ in ((dict(cid_m, company_secret="x" * 40), "a wrong secret"),
+                       (dict(cid_m, company_secret="short"), "a short secret"),
+                       ({"company_id": "FMC-BAD", "company_secret": "s" * 40}, "a malformed ID")):
+        try:
+            srv.handle("POST", "/v1/recruit", dict(no_key, **bad_), {}, "127.0.0.1")
+            check(False, f"{why_} is refused")
+        except lsv.LicenceError as e:
+            check(e.code == "bad_company", f"{why_} is refused")
+    # a second PC of the same purchase gets its own company (the data already moved)
+    cid_2 = {"company_id": "FMC-TWOO-TWOO-TWOO-TWOO", "company_secret": "t" * 40}
+    m_2 = "FMID-NNNN-NNNN-NNNN-NNNN"
+    st2.activate(k_m, m_2, "", "Fleet Manager Pro")
+    code_2 = srv.handle("POST", "/v1/recruit", dict(old_body, machine=m_2, **cid_2), {}, "127.0.0.1")["code"]
+    check(code_2 != code_m and st2.recruit_page(code_m) is not None, "a second company with the same key starts its own page")
+    # a stolen key can't take a company's data: claiming needs an activated PC of that purchase
+    k_x = st2.new_purchase("Victim Co", "", product="Fleet Manager Pro")
+    st2.activate(k_x, "FMID-XXXX-XXXX-XXXX-XXXX", "", "Fleet Manager Pro")
+    code_x = srv.handle("POST", "/v1/recruit", {"key": k_x, "machine": "FMID-XXXX-XXXX-XXXX-XXXX", "product": "Fleet Manager Pro",
+                                                 "company": "Victim", "open": True}, {}, "127.0.0.1")["code"]
+    srv.handle("POST", "/v1/recruit", dict(no_key, key=k_x, machine="FMID-YYYY-YYYY-YYYY-YYYY",
+                                           company_id="FMC-THIF-THIF-THIF-THIF", company_secret="u" * 40), {}, "127.0.0.1")
+    check(st2.db.execute("SELECT key FROM recruit WHERE code=?", (code_x,)).fetchone()[0] == k_x,
+          "a key without its activated PC doesn't take anyone's data")
+    # blocking
+    srv.handle("POST", "/v1/admin/revoke", {"key": cid_m["company_id"], "revoked": True},
+               {"Authorization": f"Bearer {srv.cfg['admin_token']}"}, "127.0.0.1", peer="127.0.0.1")
+    blocked = st2.recruit_page(code_m) is None and not any(c_["id"] == pid_m for c_ in st2.leaderboard()[0])
+    try:
+        srv.handle("POST", "/v1/recruit", dict(no_key, **cid_m), {}, "127.0.0.1")
+        refused = False
+    except lsv.LicenceError as e:
+        refused = e.code == "revoked"
+    check(blocked and refused, "License Manager can block a company ID: its pages go and its syncs are refused")
+    st2.revoke(cid_m["company_id"], False)
+    check(st2.recruit_page(code_m) is not None, "and unblock it")
+    st2.revoke(k_m)
+    check(st2.recruit_page(code_m) is None and st2.recruit_page(code_2) is None and st2.recruit_page(code_x) is not None,
+          "revoking a purchase blocks every company that came from it, and no one else")
+    st2.revoke(k_m, False)
+    check(st2.recruit_page(code_m) is not None and st2.recruit_page(code_2) is not None, "restoring the purchase restores them")
+    # a flood of new IDs from one address is stopped
+    st2.NEW_COMPANIES_PER_IP = 2
+    codes_ = []
+    for i_ in range(3):
+        try:
+            st2.company_owner({"company_id": f"FMC-FLDA-FLDA-FLDA-FLD{'ABC'[i_]}", "company_secret": "f" * 40}, "10.9.9.9")
+            codes_.append(200)
+        except lsv.LicenceError as e:
+            codes_.append(e.status)
+    del st2.NEW_COMPANIES_PER_IP
+    check(codes_ == [200, 200, 429], f"one address can only make so many new companies a day ({codes_})")
+    for tb in ("recruit", "leaderboard", "vtc_profiles"):
+        st2.db.execute(f"DELETE FROM {tb} WHERE key LIKE 'FMC-%' AND key != ?", (me_id["company_id"],))  # nosec B608
+    st2.db.execute("DELETE FROM companies WHERE cid != ?", (me_id["company_id"],))
+    st2.db.commit()
+
     print("Licence server: delete purchases")
     import license_tool as _lt
     adm = _lt.Admin(folder=lic_folder, url=os.environ["FMP_LICENSE_SERVER"])
     k_act = adm.new_purchase("Delete Active", "a@example.com")
     srv.store.activate(k_act, "FMID-CCCC-CCCC-CCCC-CCCC", "", "Fleet Manager Pro")
-    srv.store.recruit_sync(k_act, "FMID-CCCC-CCCC-CCCC-CCCC", "Fleet Manager Pro", "Del Co", "", True, [])
+    srv.store.recruit_sync(srv.store.company_owner({"key": k_act, "machine": "FMID-CCCC-CCCC-CCCC-CCCC"}, "",
+                                                   "Fleet Manager Pro"), "Del Co", "", True, [])
     code_ = srv.store.db.execute("SELECT code FROM recruit WHERE key=?", (k_act,)).fetchone()[0]
     srv.store.db.execute("INSERT INTO applications(code, created, data) VALUES(?,?,?)", (code_, "x", "{}"))
     srv.store.db.commit()

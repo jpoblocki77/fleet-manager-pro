@@ -9,7 +9,7 @@ import logging
 import threading
 import time
 
-from . import db, licensing
+from . import db, licensing, online_id
 
 EVERY = 10 * 60                     # seconds between updates
 DAY = 86400
@@ -85,9 +85,9 @@ def sync():
         join = joined()
         share = db.setting("global_board_drivers", "0") == "1"
         stats, drivers = collect(share) if join else ({}, {})
-        body = {"key": lic.key, "machine": lic.machine, "product": licensing.PRODUCT, "join": join,
-                "company": (db.setting("company_name", "") or "").strip()[:60],
-                "currency": (db.setting("currency", "$") or "")[:3], "stats": stats, "drivers": drivers}
+        body = dict(online_id.identity(), key=lic.key, machine=lic.machine, product=licensing.PRODUCT, join=join,
+                    company=(db.setting("company_name", "") or "").strip()[:60],
+                    currency=(db.setting("currency", "$") or "")[:3], stats=stats, drivers=drivers)
         if len(json.dumps(body)) > 9500:                    # the server takes at most 10,000 bytes
             for per in drivers:
                 drivers[per] = drivers[per][:5]

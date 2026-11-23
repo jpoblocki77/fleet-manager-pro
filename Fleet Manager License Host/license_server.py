@@ -20,6 +20,10 @@ Public API (used by Fleet Manager and Fleet Manager Pro):
   POST /v1/leaderboard {key, machine, product, join, company, currency, stats, drivers}   (Fleet Manager Pro)
                        posts this company's totals to the global leaderboard (join=false leaves it) and returns
                        every company on it, plus the best drivers of companies that share driver names
+                       /v1/recruit and /v1/leaderboard also take  company_id + company_secret  (the company's own
+                       server ID, made by the app) in place of key + machine: the first use registers it, and while
+                       key + machine are still sent and valid, that purchase's Apply page, board entry and VTC
+                       profile move over to the company ID.
   POST /v1/update      {product, build, version}   newest build for this copy -> Ed25519-signed manifest
                        (version, sha256, file) or {update: false}. Packages live in  updates/<BUILD TAG>/ .
   GET  /v1/update/file?build=<tag>&name=<zip>   download a package (its SHA-256 is pinned by the signed manifest)
@@ -133,6 +137,7 @@ def admin_peer_ok(peer):
 
 
 BUILD_RX = re.compile(r"^FMPB-[A-Z2-7]{4}(-[A-Z2-7]{4}){3}$")
+CID_RX = re.compile(r"^FMC-[A-Z2-7]{4}(-[A-Z2-7]{4}){3}$")      # a company's own server ID (made by the app)
 
 
 def unlock_master(private_hex):
@@ -323,6 +328,8 @@ class Store:
                 CREATE TABLE IF NOT EXISTS vtc_reports(id INTEGER PRIMARY KEY, code TEXT NOT NULL, reason TEXT,
                   note TEXT DEFAULT '', created TEXT);
                 CREATE INDEX IF NOT EXISTS ix_vtc_reports_code ON vtc_reports(code);
+                CREATE TABLE IF NOT EXISTS companies(cid TEXT PRIMARY KEY, secret TEXT NOT NULL, created TEXT,
+                  last_seen TEXT, last_ip TEXT, from_key TEXT, revoked TEXT);
             """)
             self._never_reuse_application_ids()
             for table, col, decl in (("purchases", "revoked", "TEXT"), ("activations", "last_seen", "TEXT"),
@@ -436,9 +443,74 @@ class Store:
     APP_FIELDS = {"name": 80, "contact": 120, "age": 3, "country": 60, "games": 20, "experience": 400, "message": 1500}
     MAX_PENDING = 300
 
-    def recruit_sync(self, key, machine, product, company, intro, is_open, ack, ip="", profile=None):
+    # ---- a company's own server ID: recruitment, the board and the VTC Finder without a licence key
+    COMPANY_TABLES = ("recruit", "leaderboard", "vtc_profiles")
+    NEW_COMPANIES_PER_IP = 20         # new company IDs one address may register a day
+    _new_ids = None
+
+    def _new_company_allowed(self, ip):
+        t = time.monotonic()
+        if self._new_ids is None:
+            self._new_ids = {}
+        recent = [x for x in self._new_ids.get(ip, []) if t - x < 86400]
+        if len(recent) >= self.NEW_COMPANIES_PER_IP:
+            raise LicenceError("busy", "Too many new companies from this address today. Try again tomorrow.", 429)
+        recent.append(t)
+        self._new_ids[ip] = recent
+        if len(self._new_ids) > 10_000:
+            self._new_ids = {a: v for a, v in self._new_ids.items() if v and t - v[-1] < 86400}
+
+    def company_owner(self, body, ip="", product=None):
+        """Who is syncing: the company ID (registered on first use) or, from an older app, the purchase key.
+        A valid key + machine sent with a company ID hands that purchase's online data over to the company ID."""
+        cid = str(body.get("company_id") or "").strip().upper()
+        if not cid:
+            p, _act = self.check(body.get("key"), body.get("machine"), ip, product)   # only an activated PC
+            return p["key"]
+        secret = body.get("company_secret")
+        if not CID_RX.match(cid) or not isinstance(secret, str) or not 32 <= len(secret) <= 128:
+            raise LicenceError("bad_company", "This company's server ID isn't valid.")
+        digest = hashlib.sha256(secret.encode()).hexdigest()
         with self.lock:
-            p, _act = self.check(key, machine, ip, product)          # only an activated PC of the purchase
+            row = self.db.execute("SELECT secret, revoked FROM companies WHERE cid=?", (cid,)).fetchone()
+            if row:
+                if not hmac.compare_digest(row["secret"], digest):
+                    raise LicenceError("bad_company", "This company's server ID belongs to another company.", 403)
+                if row["revoked"]:
+                    raise LicenceError("revoked", "This company has been blocked from the online features.", 403)
+                self.db.execute("UPDATE companies SET last_seen=?, last_ip=? WHERE cid=?", (iso(now()), ip, cid))
+            else:
+                self._new_company_allowed(ip)
+                self.db.execute("INSERT INTO companies(cid, secret, created, last_seen, last_ip) VALUES(?,?,?,?,?)",
+                                (cid, digest, iso(now()), iso(now()), ip))
+            if body.get("key"):
+                try:
+                    p, _act = self.check(body.get("key"), body.get("machine"), ip, product)
+                except LicenceError:
+                    p = None
+                if p:
+                    self._claim(cid, p["key"])
+            self.db.commit()
+        return cid
+
+    def _claim(self, cid, key):
+        """Move a purchase's Apply page, board entry and VTC profile to the company ID (each only when the company
+        ID has none of its own yet). The Apply and profile addresses stay the same."""
+        moved = False
+        for table in self.COMPANY_TABLES:
+            has = {k: self.db.execute(f"SELECT 1 FROM {table} WHERE key=?", (k,)).fetchone()  # nosec B608  # fixed table names
+                   for k in (key, cid)}
+            if has[key] and not has[cid]:
+                self.db.execute(f"UPDATE {table} SET key=? WHERE key=?", (cid, key))  # nosec B608  # fixed table names
+                moved = True
+        self.db.execute("UPDATE companies SET from_key=COALESCE(from_key, ?) WHERE cid=?", (key, cid))
+        if moved:
+            self._vtc_cache = None
+
+    def recruit_sync(self, owner, company, intro, is_open, ack, profile=None):
+        """owner: the company ID or purchase key from company_owner()."""
+        with self.lock:
+            p = {"key": owner}
             row = self.db.execute("SELECT code FROM recruit WHERE key=?", (p["key"],)).fetchone()
             if row:
                 code = row[0]
@@ -506,9 +578,9 @@ class Store:
             cutoff = iso(now() - dt.timedelta(days=self.VTC_STALE_DAYS))
             rows = self.db.execute(
                 "SELECT c.code, c.company, c.open, v.data, v.created, c.updated, l.stats, l.updated lb_updated "
-                "FROM vtc_profiles v JOIN recruit c ON c.key=v.key JOIN purchases p ON p.key=v.key "
+                "FROM vtc_profiles v JOIN recruit c ON c.key=v.key LEFT JOIN purchases p ON p.key=v.key LEFT JOIN companies co ON co.cid=v.key "
                 "LEFT JOIN leaderboard l ON l.key=v.key AND l.updated>=? "
-                "WHERE v.listed=1 AND v.hidden=0 AND p.revoked IS NULL AND c.updated>=?", (cutoff, cutoff)).fetchall()
+                "WHERE v.listed=1 AND v.hidden=0 AND (p.key IS NOT NULL OR co.cid IS NOT NULL) AND p.revoked IS NULL AND co.revoked IS NULL AND c.updated>=?", (cutoff, cutoff)).fetchall()
             out = []
             for r in rows:
                 d = json.loads(r["data"])
@@ -653,10 +725,11 @@ class Store:
                 drv[per] = out
         return clean, drv
 
-    def leaderboard_sync(self, key, machine, product, join, company, currency, stats, drivers, ip=""):
-        """Store (or, when leaving, delete) this company's totals. Returns its public board id, or None."""
+    def leaderboard_sync(self, owner, join, company, currency, stats, drivers):
+        """Store (or, when leaving, delete) this company's totals. Returns its public board id, or None.
+        owner: the company ID or purchase key from company_owner()."""
         with self.lock:
-            p, _act = self.check(key, machine, ip, product)          # only an activated PC of the purchase
+            p = {"key": owner}
             row = self.db.execute("SELECT pid FROM leaderboard WHERE key=?", (p["key"],)).fetchone()
             clean, drv = self.lb_clean(stats, drivers)
             company = " ".join(str(company or "").split())[:60]
@@ -681,7 +754,7 @@ class Store:
         cutoff = iso(now() - dt.timedelta(days=self.LB_STALE_DAYS))
         with self.lock:
             rows = self.db.execute("SELECT l.pid, l.company, l.currency, l.stats, l.drivers, l.updated FROM leaderboard l "
-                                   "JOIN purchases p ON p.key=l.key WHERE p.revoked IS NULL AND l.updated>=? "
+                                   "LEFT JOIN purchases p ON p.key=l.key LEFT JOIN companies co ON co.cid=l.key WHERE (p.key IS NOT NULL OR co.cid IS NOT NULL) AND p.revoked IS NULL AND co.revoked IS NULL AND l.updated>=? "
                                    "ORDER BY l.updated DESC LIMIT ?", (cutoff, self.LB_MAX)).fetchall()
         companies, drivers = [], {}
         for r in rows:
@@ -717,9 +790,9 @@ class Store:
     def recruit_page(self, code):
         if not re.fullmatch(r"[a-z2-9]{8}", code or ""):
             return None
-        r = self.db.execute("SELECT r.company, r.intro, r.open, p.revoked, v.data FROM recruit r JOIN purchases p ON p.key=r.key "
-                            "LEFT JOIN vtc_profiles v ON v.key=r.key WHERE r.code=?", (code,)).fetchone()
-        if not r or r["revoked"]:
+        r = self.db.execute("SELECT r.company, r.intro, r.open, v.data FROM recruit r LEFT JOIN purchases p ON p.key=r.key LEFT JOIN companies co ON co.cid=r.key "
+                            "LEFT JOIN vtc_profiles v ON v.key=r.key WHERE r.code=? AND (p.key IS NOT NULL OR co.cid IS NOT NULL) AND p.revoked IS NULL AND co.revoked IS NULL", (code,)).fetchone()
+        if not r:
             return None
         d = dict(r)
         d["questions"] = json.loads(d.pop("data") or "{}").get("questions") or []
@@ -788,9 +861,17 @@ class Store:
             return freed
 
     def revoke(self, key, revoked=True):
+        """Revoke (or restore) a purchase, or block a company ID (FMC-...) from the online features. Revoking a
+        purchase also blocks the company IDs that took over its online data."""
+        when = iso(now()) if revoked else None
         with self.lock:
-            self.purchase(key)
-            self.db.execute("UPDATE purchases SET revoked=? WHERE key=?", (iso(now()) if revoked else None, key))
+            if CID_RX.match(key or ""):
+                if not self.db.execute("UPDATE companies SET revoked=? WHERE cid=?", (when, key)).rowcount:
+                    raise LicenceError("not_found", "No company has that ID.", 404)
+            else:
+                self.purchase(key)
+                self.db.execute("UPDATE purchases SET revoked=? WHERE key=?", (when, key))
+                self.db.execute("UPDATE companies SET revoked=? WHERE from_key=?", (when, key))
             self.db.commit()
             self._vtc_cache = None
 
@@ -951,8 +1032,8 @@ class Server:
         if path == "/v1/update":
             m = (result or {}).get("manifest") or {}
             return f"  build={body.get('build') or '-'} has={body.get('version')} offer={m.get('version') or 'none'}"
-        if path in ("/v1/recruit", "/v1/leaderboard"):
-            return f"  key={body.get('key')}"
+        if path in ("/v1/recruit", "/v1/leaderboard"):            # never the company secret
+            return f"  company={body.get('company_id') or '-'} key={body.get('key') or '-'}"
         if path.startswith("/v1/admin/"):
             return f"  {path.rsplit('/', 1)[-1]} key={body.get('key') or '-'}"
         return ""
@@ -1352,19 +1433,20 @@ class Server:
         if path == "/v1/recruit":
             if body.get("product") != "Fleet Manager Pro":
                 raise LicenceError("bad_product", "Recruitment is a Fleet Manager Pro feature.")
-            code, pending = self.store.recruit_sync(body.get("key"), body.get("machine"), body.get("product"),
-                                                    body.get("company"), body.get("intro"), bool(body.get("open", True)),
-                                                    body.get("ack") if isinstance(body.get("ack"), list) else [], ip,
+            owner = self.store.company_owner(body, ip, body.get("product"))
+            code, pending = self.store.recruit_sync(owner, body.get("company"), body.get("intro"),
+                                                    bool(body.get("open", True)),
+                                                    body.get("ack") if isinstance(body.get("ack"), list) else [],
                                                     body.get("profile") if isinstance(body.get("profile"), dict) else None)
             return {"ok": True, "code": code, "apply_url": f"{self._base()}/apply/{code}", "applications": pending,
                     "profile_url": f"{self._base()}/vtc/{code}", "finder_url": f"{self._base()}/vtcs",
-                    "profile": self.store.vtc_status(str(body.get("key") or "").strip().upper())}
+                    "profile": self.store.vtc_status(owner), "company_id": owner if CID_RX.match(owner) else None}
         if path == "/v1/leaderboard":
             if body.get("product") != "Fleet Manager Pro":
                 raise LicenceError("bad_product", "The global leaderboard is a Fleet Manager Pro feature.")
-            me = self.store.leaderboard_sync(body.get("key"), body.get("machine"), body.get("product"),
-                                             body.get("join") is True, body.get("company"), body.get("currency"),
-                                             body.get("stats"), body.get("drivers"), ip)
+            owner = self.store.company_owner(body, ip, body.get("product"))
+            me = self.store.leaderboard_sync(owner, body.get("join") is True, body.get("company"),
+                                             body.get("currency"), body.get("stats"), body.get("drivers"))
             companies, drivers = self.store.leaderboard()
             return {"ok": True, "you": me, "companies": companies, "drivers": drivers,
                     "page_url": f"{self.cfg['apply_base_url'].rstrip('/')}/leaderboard"}

@@ -7,7 +7,7 @@ import logging
 import threading
 import time
 
-from . import db, economy, licensing, vtc_profile
+from . import db, economy, licensing, online_id, vtc_profile
 
 MIN_AGE = 16                        # youngest driver a company may take on
 log = logging.getLogger("fmpro.recruit")
@@ -17,9 +17,11 @@ _lock = threading.Lock()
 
 def _body():
     lic = licensing.LICENCE
-    return {"key": lic.key, "machine": lic.machine, "product": licensing.PRODUCT,
-            "company": db.setting("company_name", "") or "", "intro": (db.setting("recruitment_text", "") or "")[:600],
-            "open": db.setting("recruitment_open") == "1", "ack": []}
+    # the company's own server ID; key + machine still go along so the server can move this company's Apply page
+    # and profile over to it (and an older server, which only knows keys, keeps working)
+    return dict(online_id.identity(), key=lic.key, machine=lic.machine, product=licensing.PRODUCT,
+                company=db.setting("company_name", "") or "", intro=(db.setting("recruitment_text", "") or "")[:600],
+                open=db.setting("recruitment_open") == "1", ack=[])
 
 
 def push_profile():
