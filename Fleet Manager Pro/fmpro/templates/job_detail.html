@@ -31,7 +31,7 @@
     {% else %}<p class="muted">No GPS trail for this job{% if j.source == 'manual' %} (logged manually){% endif %}.</p>{% endif %}
     <h3 style="margin-top:16px">Timeline</h3>
     <ul class="feed">{% for e in events %}
-      <li><span class="ic">{{ {'started':'🚚','delivered':'✅','cancelled':'❌','fine':'🚨','toll':'🛣️','ferry':'⛴️','train':'🚆','refuel':'⛽'}.get(e.kind, '•') }}</span>
+      <li><span class="ic">{{ {'started':'🚚','delivered':'✅','cancelled':'❌','fine':'🚨','toll':'🛣️','ferry':'⛴️','train':'🚆','refuel':'⛽','adblue':'💧'}.get(e.kind, '•') }}</span>
         <div><b style="text-transform:capitalize">{{ e.kind }}</b> <span class="muted">{{ e.detail }}</span><div class="small faint">{{ e.created_at|dt('%b %d %H:%M:%S') }}</div></div>
         {% if e.amount %}<span class="right" style="margin-left:auto">{{ e.amount|money }}</span>{% endif %}</li>
     {% else %}<li class="muted">No events recorded.</li>{% endfor %}</ul>

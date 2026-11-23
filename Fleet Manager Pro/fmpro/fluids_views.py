@@ -8,7 +8,7 @@ import time
 
 from flask import Blueprint, jsonify, render_template, request
 
-from . import db
+from . import db, fuel_prices
 from .auth import current_units, login_required, user
 from .telemetry import fluids
 from .telemetry.service import HUB, local_user
@@ -48,9 +48,11 @@ def data():
     hist = fluids.history(uid, seconds)
     shown, step = fluids.bars(hist, seconds, now)
     out = {"user_id": uid, "online": bool(e), "units": current_units(), "server_time": now, "range": rng,
-           "window_s": seconds, "sample_s": step, "history": shown, "summary": fluids.summary(hist),
-           "refuel_log": fluids.refuel_log(hist)}
+           "window_s": seconds, "sample_s": step, "history": shown, "summary": {**fluids.summary(hist), **fuel_prices.totals(uid, seconds)},
+           "refuel_log": fuel_prices.fills(uid, seconds)}
     if e:
         v = e["frame"]["values"]
         out["live"] = {k: v.get(k) for k in _LIVE_KEYS}
+        price, place, source = fuel_prices.diesel(v.get("game"), v.get("x") or 0, v.get("z") or 0)
+        out["prices"] = {"fuel": price, "place": place, "source": source, "adblue": fuel_prices.adblue()}
     return jsonify(out)

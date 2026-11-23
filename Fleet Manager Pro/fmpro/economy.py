@@ -100,7 +100,8 @@ def settle_job(job_id):
     route = f"{job['source_city']} → {job['destination_city']}"
     km = job["driven_km"] or job["planned_km"] or 0
     revenue = job["revenue"] or job["income"] or 0
-    fuel_cost = round(job["fuel_used"] * db.setting_f("fuel_price", 1.25), 2)
+    from . import bank, fuel_prices
+    fuel_cost = round(job["fuel_used"] * fuel_prices.last_paid(job["user_id"]), 2)
     pay_rate = db.val("SELECT pay_per_km FROM users WHERE id=?", (job["user_id"],))
     if pay_rate is None:
         pay_rate = db.setting_f("driver_pay_per_km", 0.4)
@@ -128,7 +129,6 @@ def settle_job(job_id):
     # Fuel is charged to the ledger when the driver actually refuels; fuel_cost here is the
     # job's share of fuel burnt, used for per-job profit only.
     post("driver pay", -driver_pay, f"Driver pay job #{job_id}", job_id=job_id)
-    from . import bank
     bank.earn(job["user_id"], driver_pay, f"Pay for {route}", job_id)      # reaches the driver's bank account on payday
 
     profit = revenue + contract_bonus - fuel_cost - driver_pay - job["tolls"] - (job["fines"] - (job["driver_fines"] or 0)) - job["ferry"] - job["train"]

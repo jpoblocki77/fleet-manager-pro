@@ -53,6 +53,17 @@
     : pct <= (warnFrac || 0.15) * 200 ? '<span class="badge warn">Getting low</span>' : '<span class="badge ok">OK</span>';
   const kv = (rows) => rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
 
+  const cents = (v) => FMP.cur + Number(v || 0).toLocaleString([], { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const perUnit = (p) => cents(imp ? p * 3.785411784 : p) + (imp ? "/gal" : "/L");
+  // the price where the truck is now, and what filling this tank to the top would cost
+  function priceRows(prices, price, room, isFuel) {
+    if (!prices) return [];
+    const where = isFuel ? (prices.source === "game" ? " in " + prices.place : " (company price)") : "";
+    const left = Math.max(0, room || 0);
+    return [[isFuel ? "Diesel price" : "Price", esc(perUnit(price) + where)],
+      ["Fill it up", left < 0.5 ? "Full" : `${esc(FMP.liq(left, isFuel ? 0 : 1))} for <b>${esc(cents(left * price))}</b>`]];
+  }
+
   function render(d) {
     const v = d.live;
     $("#fl-offline").style.display = v ? "none" : "";
@@ -67,8 +78,10 @@
       const hrs = v.speed_kmh > 5 && v.fuel_range > 0 ? v.fuel_range / v.speed_kmh : 0;
       $("#fl-fuel-kv").innerHTML = kv([["In the tank", FMP.liq(v.fuel)], ["Tank size", FMP.liq(v.fuel_capacity)],
         ["Range", v.fuel_range > 0 ? FMP.dist(v.fuel_range) : "—"], ["Average use", cons],
+        ...priceRows(d.prices, d.prices && d.prices.fuel, v.fuel_capacity - v.fuel, true),
         ["Empty in", hrs ? (hrs >= 1 ? fixed(hrs, 1) + " h" : Math.round(hrs * 60) + " min") + " at this speed" : "—"]]);
       $("#fl-ad-kv").innerHTML = kv([["In the tank", FMP.liq(v.adblue, 1)], ["Tank size", FMP.liq(v.adblue_capacity)],
+        ...priceRows(d.prices, d.prices && d.prices.adblue, v.adblue_capacity - v.adblue, false),
         ["Truck", esc(`${v.truck_brand || ""} ${v.truck_name || ""}`.trim() || "—")],
         ["Game", v.game === "ets2" ? "Euro Truck Simulator 2" : v.game === "ats" ? "American Truck Simulator" : "—"]]);
     }
@@ -85,7 +98,8 @@
     const stat = (label, value, sub) => `<div class="card stat"><div class="label">${label}</div><div class="value">${value}</div><div class="sub">${sub}</div></div>`;
     $("#fl-sum").innerHTML = stat("Fuel used", FMP.liq(s.fuel_used || 0), when) +
       stat("AdBlue used", FMP.liq(s.adblue_used || 0, 1), when) +
-      stat("Refuels", s.refuels || 0, when) + stat("AdBlue top-ups", s.topups || 0, when);
+      stat("Diesel bought", cents(s.fuel_cost), (s.refuels || 0) + " fill-ups " + when) +
+      stat("AdBlue bought", cents(s.adblue_cost), (s.topups || 0) + " fill-ups " + when);
     renderLog(d.refuel_log || [], when);
   }
 
@@ -98,11 +112,12 @@
     }
     const rows = log.map((e) => {
       const isFuel = e.kind === "fuel";
-      return `<tr><td>${esc(logWhen(e.t))}</td><td><i class="sw ${isFuel ? "fuel" : "adblue"}"></i>${isFuel ? "Fuel" : "AdBlue"}</td>` +
-        `<td class="num">+${esc(FMP.liq(e.added, isFuel ? 0 : 1))}</td><td class="num muted">${e.from_pct}% → ${e.to_pct}%</td></tr>`;
+      return `<tr><td>${esc(logWhen(e.t))}</td><td><i class="sw ${isFuel ? "fuel" : "adblue"}"></i>${isFuel ? "Diesel" : "AdBlue"}</td><td>${esc(e.place || "—")}</td>` +
+        `<td class="num">${esc(FMP.liq(e.litres, isFuel ? 0 : 1))}</td><td class="num">${esc(perUnit(e.price))}</td><td class="num"><b>${esc(cents(e.cost))}</b></td>` +
+        `<td class="num muted">${e.to_pct == null ? "—" : e.from_pct + "% → " + e.to_pct + "%"}</td></tr>`;
     }).join("");
-    $("#fl-log").innerHTML = `<table class="small"><thead><tr><th>When</th><th>Fluid</th><th class="num">Added</th>` +
-      `<th class="num">Level after</th></tr></thead><tbody>${rows}</tbody></table>`;
+    $("#fl-log").innerHTML = `<table class="small"><thead><tr><th>When</th><th>Fluid</th><th>Where</th><th class="num">Added</th><th class="num">Price</th><th class="num">Cost</th>` +
+      `<th class="num">Level</th></tr></thead><tbody>${rows}</tbody></table>`;
   }
 
   let busy = false;

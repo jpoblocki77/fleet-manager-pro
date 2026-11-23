@@ -323,6 +323,88 @@ def main():
           "a save loading (0 L, then full) isn't booked as a refuel")
     service.time = _time
 
+    print("Diesel and AdBlue prices and what each fill-up costs")
+    from fmpro import bank as fbank, economy as feco, fuel_prices as fp
+    db.set_setting("fuel_price_game", "1")
+    db.set_setting("adblue_price", "2")
+    check(fp._data()[0]["ats"]["Nevada"] > 1 and fp._data()[0]["ets2"]["Germany"] > 1 and len(fp._data()[0]["ats"]) >= 21, "the games' diesel prices are bundled")
+    _xy = {n: (x, z) for n, x, z in fp._data()[2]["ats"]}
+    check(all(fp.state_at("ats", *_xy[n]) == st for n, st in (("denver", "Colorado"), ("los angeles", "California"), ("houston", "Texas"))), "the state comes from the position")
+    _exy = {n: (x, z) for n, x, z in fp._data()[2]["ets2"]}
+    check(fp.state_at("ets2", *_exy["berlin"]) == "Germany" and fp.diesel("ets2", *_exy["berlin"])[2] == "game", "in Europe too")
+    check(fp.state_at("ats", 900000.0, 900000.0) == "" and fp.state_at("ats", 0.0, 0.0) == "" and fp.state_at("", 1.0, 1.0) == ""
+          and fp.diesel("ats", 900000.0, 900000.0) == (db.setting_f("fuel_price"), "", "company"), "nowhere near a city it is the company's price")
+    db.set_setting("fuel_price_game", "0")
+    check(fp.diesel("ats", *_xy["denver"])[::2] == (db.setting_f("fuel_price"), "company"), "the game's prices can be turned off")
+    db.set_setting("fuel_price_game", "1")
+    from fmpro.auth import create_user as _cu0
+    _cu0("pumpuser", "Pump User", "pumpuser12", role="driver")
+    pu = db.val("SELECT id FROM users WHERE username='pumpuser'")
+    service.time = clock
+    _real_fp_time = fp.time
+    fp.time = clock
+    clock.t = max(clock.t, _time.time())
+    t9 = service.JobTracker(pu)
+    dx, dz = _xy["denver"]
+    at = dict(base, fuel=400.0, fuel_capacity=600.0, adblue=40.0, adblue_capacity=80.0, x=dx, z=dz, speed=0.0, game_time_abs=70000)
+
+    def pump(f0, f1, a0, a1, paid=True, **kw):
+        for i in range(21):
+            clock.t += 0.3
+            feed(t9, dict(at, fuel=f0 + (f1 - f0) * i / 20, adblue=a0 + (a1 - a0) * i / 20, refuel=i > 0, **kw))
+        for _ in range(8):
+            clock.t += 3
+            feed(t9, dict(at, fuel=f1, adblue=a1, **kw))
+        if paid:
+            feed(t9, dict(at, fuel=f1, adblue=a1, refuel_paid=True, refuel_amount=f1 - f0, **kw))
+            clock.t += 1
+            feed(t9, dict(at, fuel=f1, adblue=a1, **kw))
+    co = feco.balance()
+    pump(400.0, 580.0, 40.0, 49.0)
+    fl_ = {x["kind"]: x for x in fp.fills(pu, 3600)}
+    colo = fp._data()[0]["ats"]["Colorado"]
+    check(len(fp.fills(pu, 3600)) == 2 and abs(fl_["fuel"]["cost"] - 180 * colo) < 0.02 and fl_["fuel"]["place"] == "Colorado"
+          and fl_["fuel"]["from_pct"] == 67 and fl_["fuel"]["to_pct"] == 97, f"a diesel fill-up costs the litres at Colorado's price ({fl_})")
+    check(abs(fl_["adblue"]["cost"] - 18) < 0.11 and abs(fl_["adblue"]["litres"] - 9) < 0.06 and fl_["adblue"]["from_pct"] == 50, "the AdBlue that went in with it is one fill-up at the company's price")
+    check(abs(co - feco.balance() - fl_["fuel"]["cost"] - fl_["adblue"]["cost"]) < 0.01 and fbank.balance(pu) == 0 and fbank.pending(pu) == 0
+          and db.val("SELECT COUNT(*) FROM ledger WHERE user_id=? AND account!='company'", (pu,), 0) == 0, "the company pays for the diesel and the AdBlue, the driver pays nothing")
+    check(abs(fp.last_paid(pu) - colo) < 1e-6 and fp.last_paid(987654) == db.setting_f("fuel_price"), "a job's fuel is costed at what the driver last paid")
+    tt = fp.totals(pu, 3600)
+    check((tt["refuels"], tt["topups"]) == (1, 1) and tt["fuel_cost"] == fl_["fuel"]["cost"], "and the totals match")
+    n9 = len(fp.fills(pu, 9e9))
+    at["game_time_abs"] = 69000                                       # an older save: more in both tanks
+    for f_, a_ in ((100.0, 10.0), (590.0, 75.0), (590.0, 75.0)):
+        clock.t += 1
+        feed(t9, dict(at, fuel=f_, adblue=a_, refuel_paid=a_ > 20, refuel_amount=490.0))
+    clock.t += 130
+    feed(t9, dict(at, fuel=590.0, adblue=75.0))
+    check([x for x in fp.fills(pu, 9e9) if x["kind"] == "adblue"] == [fl_["adblue"]], "a save or a level that leaps isn't an AdBlue fill-up")
+    n9 = len(fp.fills(pu, 9e9))
+    sw = dict(at, fuel_capacity=986.0, game_time_abs=70500)           # another truck, still showing the old one's level
+    for f_, a_, paid_ in ((23.3, 0.0, False), (23.3, 0.0, False), (851.1, 73.2, False), (851.1, 73.2, True), (851.1, 73.2, True)):
+        clock.t += 5
+        feed(t9, dict(sw, fuel=f_, adblue=a_, refuel_paid=paid_, refuel_amount=827.8))
+    clock.t += 130
+    feed(t9, dict(sw, fuel=851.1, adblue=73.2))
+    check(len(fp.fills(pu, 9e9)) == n9, "getting into another truck isn't a fill-up")
+    feed(t9, dict(sw, fuel=851.1, adblue=73.2, speed=15.0))       # it drives, then really fills
+    at = dict(sw)
+    pump(851.0, 951.0, 73.0, 78.0)
+    check(len(fp.fills(pu, 9e9)) == n9 + 2, "once it has driven its fill-ups count")
+    clock.t += 5
+    for i in range(6):
+        clock.t += 0.3
+        feed(t9, dict(sw, fuel=951.0, adblue=60.0 + i))
+    t9.feed(None)
+    check([x["kind"] for x in fp.fills(pu, 9e9)][0] == "adblue" and len(fp.fills(pu, 9e9)) == n9 + 3, "closing the game mid-fill still books what went in")
+    __import__("fmpro.cleanup", fromlist=["x"]).purge_member(pu)
+    check(db.val("SELECT COUNT(*) FROM fuel_fills WHERE user_id=?", (pu,), 0) == 0, "a fired driver's fill-ups go with them")
+    fp.time = _real_fp_time
+    service.time = _time
+    post("/settings", {"section": "economy", "units": "imperial", "adblue_price": "4.00", "has_fuel_price_game": "1"})
+    check(abs(fp.adblue() - 4 / 3.785411784) < 1e-6 and db.setting("fuel_price_game") == "0", "the AdBlue price and the switch are in Settings")
+    db.set_setting("fuel_price_game", "1")
+
     print("Compliance (ELD / HOS, DVIR, roadside inspections)")
     from fmpro import compliance
     from fmpro.auth import create_user
@@ -1751,11 +1833,11 @@ def main():
     h = _fl.history(fuid)
     check(h[-1]["f"] == 560.0 and h[-1]["a"] == 79.0, "a refuel shows on the graph at once, without waiting for the next bar")
     s = _fl.summary(h)
-    check(s["refuels"] == 1 and s["topups"] == 1 and 1.5 <= s["fuel_used"] <= 2.5,
-          f"the hour's totals count fuel used, refuels and top-ups ({s})")
+    check(1.5 <= s["fuel_used"] <= 2.5, f"the hour's totals count fuel used ({s})")
     d = c.get(f"/api/fluids?user={fuid}").get_json()
     check(d["online"] and d["live"]["fuel_capacity"] == 568.0 and round(d["live"]["fuel_pct"]) == 99 and d["live"]["adblue"] == 79.0
           and len(d["history"]) == len(h) and d["window_s"] == 3600, "the page gets the live levels and the hour's bars")
+    check(d["prices"]["fuel"] > 0 and d["prices"]["adblue"] == db.setting_f("adblue_price"), "with the price of both")
     check(set(d["live"]) <= set(__import__("fmpro.fluids_views", fromlist=["x"])._LIVE_KEYS),
           "only fuel and AdBlue readings are sent to the page")
     _clk.t += 2 * 3600
@@ -2865,7 +2947,7 @@ def main():
     for k_, v_ in (("fuel_price", 1.5), ("driver_pay_per_km", 0.5), ("xp_per_km", 1), ("xp_per_tonne", 2), ("speeding_tolerance_kmh", 8)):
         db.set_setting(k_, v_)
     page = sc.get("/settings?tab=economy").get_data(as_text=True)
-    check("Fuel price per gallon" in page and 'value="5.68"' in page, "imperial: fuel price shown per gallon (1.50/L = 5.68/gal)")
+    check("Diesel price per gallon" in page and 'value="5.68"' in page, "imperial: fuel price shown per gallon (1.50/L = 5.68/gal)")
     check("Driver pay per mile" in page and 'value="0.8"' in page, "imperial: driver pay shown per mile")
     check("XP per mile" in page and "XP per ton (2,000 lb)" in page and 'value="1.81"' in page, "imperial: XP per mile and per ton")
     check("Speeding tolerance (mph)" in page and 'value="5.0"' in page, "imperial: speeding tolerance in mph")
@@ -2893,7 +2975,7 @@ def main():
     db.ex("UPDATE users SET pay_per_km=NULL WHERE id=?", (pdrv,))
     db.set_setting("units", "metric")
     page = sc.get("/settings?tab=economy").get_data(as_text=True)
-    check("Fuel price per litre" in page and "Driver pay per km" in page and "Speeding tolerance (km/h)" in page
+    check("Diesel price per litre" in page and "Driver pay per km" in page and "Speeding tolerance (km/h)" in page
           and 'value="1.06"' in page, "metric: the same settings shown per litre, per km and km/h")
     sc.post("/settings", data=dict(form, units="metric", fuel_price="2", speeding_tolerance_kmh="12"))
     check(db.setting_f("fuel_price") == 2 and db.setting_f("speeding_tolerance_kmh") == 12, "metric values save as typed")

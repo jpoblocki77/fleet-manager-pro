@@ -331,7 +331,10 @@ costs; only Owners and Managers can sign, end or change leases.
   standard and the single-program (.exe) version, and a section on restoring and allowing Fleet Manager Pro if
   Microsoft Defender wrongly flags it (marked as temporary until the program is code-signed and cleared by Microsoft).
   The buyer readmes point to it.
-* **Settings in your units**: on Settings → Economy, fuel price, driver pay, XP per distance and weight, and the
+* **Diesel and AdBlue** (`fmpro/fuel_prices.py`): the company pays for every fill-up. Diesel is charged at the game's own
+  price in the state or country the truck is in (bundled; run `tools/build_fuel_prices.py` after a game update), or the
+  company's price where there is none. The games have no AdBlue price, so it is set on Settings → Economy.
+* **Settings in your units**: on Settings → Economy, diesel and AdBlue price, driver pay, XP per distance and weight, and the
   speeding tolerance show per gallon / mile / ton and in mph when your units are imperial (per litre / km / tonne
   and km/h for metric). Saving without changing a value keeps it exactly as it was.
 * **Source code protection**: both buyer copies are now compiled to native machine code with **Nuitka** instead of

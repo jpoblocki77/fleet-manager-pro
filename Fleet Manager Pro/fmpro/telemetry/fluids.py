@@ -37,7 +37,7 @@ def record(uid, frame):
         return
     v = frame.get("values") or {}
     cap, acap = _num(v, "fuel_capacity"), _num(v, "adblue_capacity")
-    if cap <= 0 and acap <= 0:                       # no truck yet (menus, loading)
+    if (cap <= 0 and acap <= 0) or (_num(v, "fuel") <= 0.01 and _num(v, "adblue") <= 0.01):   # no truck yet (menus, loading)
         return
     s = {"t": time.time(), "f": round(_num(v, "fuel"), 2), "fc": cap, "a": round(_num(v, "adblue"), 2), "ac": acap}
     with _lock:
@@ -86,37 +86,15 @@ def bars(samples, seconds, now=None):
 
 
 def summary(samples):
-    """Used fuel / AdBlue over the samples (drops only) and how many refuels / top-ups happened."""
-    out = {"fuel_used": 0.0, "adblue_used": 0.0, "refuels": 0, "topups": 0}
+    """Used fuel / AdBlue over the samples (drops only). A leap down is another truck or save being loaded."""
+    out = {"fuel_used": 0.0, "adblue_used": 0.0}
     for a, b in zip(samples, samples[1:]):
-        df, da = b["f"] - a["f"], b["a"] - a["a"]
-        if df < 0:
-            out["fuel_used"] += -df
-        elif df > max(1.0, b["fc"] * 0.01):
-            out["refuels"] += 1
-        if da < 0:
-            out["adblue_used"] += -da
-        elif da > max(0.5, b["ac"] * 0.01):
-            out["topups"] += 1
+        if a["fc"] != b["fc"] or (a["f"] - b["f"] > 5 and b["t"] - a["t"] < 60):
+            continue
+        out["fuel_used"] += max(0.0, a["f"] - b["f"])
+        out["adblue_used"] += max(0.0, a["a"] - b["a"])
     out["fuel_used"], out["adblue_used"] = round(out["fuel_used"], 1), round(out["adblue_used"], 2)
     return out
-
-
-def refuel_log(samples, limit=50):
-    """Each individual refuel / AdBlue top-up in the samples: an upward jump in a tank, the same jumps summary()
-    counts. Newest first, at most `limit`. Amounts are litres; from_pct/to_pct are the tank level either side of
-    the fill, so the page can show "18% -> 96%". The jump is saved the instant it happens (see record()), so the
-    pair of readings around it is tight."""
-    out = []
-    for a, b in zip(samples, samples[1:]):
-        if b["fc"] > 0 and b["f"] - a["f"] > max(1.0, b["fc"] * 0.01):
-            out.append({"t": b["t"], "kind": "fuel", "added": round(b["f"] - a["f"], 1), "cap": b["fc"],
-                        "from_pct": round(a["f"] / b["fc"] * 100), "to_pct": round(b["f"] / b["fc"] * 100)})
-        if b["ac"] > 0 and b["a"] - a["a"] > max(0.5, b["ac"] * 0.01):
-            out.append({"t": b["t"], "kind": "adblue", "added": round(b["a"] - a["a"], 1), "cap": b["ac"],
-                        "from_pct": round(a["a"] / b["ac"] * 100), "to_pct": round(b["a"] / b["ac"] * 100)})
-    out.sort(key=lambda e: e["t"], reverse=True)
-    return out[:limit]
 
 
 # ------------------------------------------------------------------------------------------------ alerts

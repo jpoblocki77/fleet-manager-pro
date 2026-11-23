@@ -7,7 +7,7 @@ import threading
 import time
 import urllib.request
 
-from .. import bank, cdl, compliance, db, economy, tracelog
+from .. import bank, cdl, compliance, db, economy, fuel_prices, tracelog
 from . import fluids, reader
 
 jlog = logging.getLogger("fmpro.jobs")
@@ -51,6 +51,8 @@ class JobTracker:
         self.pending_refuel = None
         self.fuel_hist = []          # (time, litres) over the last 2 minutes, same truck only
         self.fuel_truck = None
+        self.fuel_new = False        # another truck: its level isn't known until it has driven
+        self.adblue = fuel_prices.AdBlueMeter(user_id)
         self.refuel_start = None     # (time, truck, litres) when the game's "refuel started" flag rose
         self.truck_id = None
         self.lock = threading.Lock()
@@ -72,6 +74,7 @@ class JobTracker:
                 self.flush()
                 self.prev, self.last_t = None, None
                 self._licence(self.cdl.reset)
+                self.adblue.reset()
                 return
             v, trailers = frame["values"], frame.get("trailers", [])
             self.remote = frame.get("source") == "agent"
@@ -99,15 +102,26 @@ class JobTracker:
                     self._start(v, trailers, resume=True)
                 if self.job_id and v["on_job"]:
                     self._track(v, now)
-            truck = (v["truck_id"], v["license_plate"])
-            if truck != self.fuel_truck:
+            # A swapped truck shows the old truck's level for a while, then leaps to its own: the size of the tank
+            # is part of which truck it is, and its level only counts once it has driven.
+            truck = self._fuel_id(v)
+            same_truck = truck == self.fuel_truck
+            if not same_truck:
+                self.fuel_new = self.fuel_truck is not None
                 self.fuel_truck, self.fuel_hist = truck, []
+            elif self.prev and v["game_time_abs"] < self.prev["game_time_abs"]:    # an older save was loaded
+                self.fuel_hist, self.refuel_start = [], None
+            if abs(v["speed"]) > 2:
+                self.fuel_new = False
+            if self.fuel_new:
+                self.fuel_hist, self.refuel_start = [], None
+            self.adblue.feed(v, now, self.job_id, same_truck and not self.fuel_new)
             # While a save loads the game reports an empty tank for a moment, then the real level. Keep those
             # 0 L readings out, or a refuel event raised on load would look like a fill from empty.
             self.fuel_hist = [(t, f) for t, f in self.fuel_hist if now - t < 120] +                 ([(now, v["fuel"])] if v["fuel"] > 0.5 else [])
             # The game raises "refuel" when the pump starts and "refuel_paid" only when the driver closes the
             # pump screen, which can be minutes later - long after the 2-minute history forgot the low level.
-            if v.get("refuel") and not (self.prev or {}).get("refuel") and v["fuel"] > 0.5:
+            if v.get("refuel") and not (self.prev or {}).get("refuel") and v["fuel"] > 0.5 and not self.fuel_new:
                 self.refuel_start = (now, truck, min(f for _t, f in self.fuel_hist))
             self._licence(self.cdl.feed, v, self.job_id, now, self.demo)
             if not first:
@@ -116,6 +130,10 @@ class JobTracker:
             self._finish(v, now)
             self.prev = v
             self.last_t = None if v["paused"] else now
+
+    @staticmethod
+    def _fuel_id(v):
+        return v["truck_id"], v["license_plate"], v["fuel_capacity"]
 
     def _licence(self, fn, *args):
         """The licence and drivers test run on the side: a fault there must never stop jobs from being tracked."""
@@ -397,11 +415,11 @@ class JobTracker:
                     # being added. Only book it once the tank level actually rises.
                     base = min((f for _t, f in self.fuel_hist), default=v["fuel"])
                     rs = self.refuel_start
-                    if rs and rs[1] == (v["truck_id"], v["license_plate"]) and now - rs[0] < 1800:
+                    if rs and rs[1] == self._fuel_id(v) and now - rs[0] < 1800:
                         base = min(base, rs[2])
                     self.refuel_start = None
-                    self.pending_refuel = {"t": now, "litres": amount, "base": base, "detail": detail(v),
-                                           "truck": (v["truck_id"], v["license_plate"]), "x": v["x"], "z": v["z"],
+                    self.pending_refuel = {"t": now, "litres": amount, "base": base, "truck": self._fuel_id(v),
+                                           "game": v["game"], "x": v["x"], "z": v["z"],
                                            "job_id": self.job_id}
                     self.sig[kind] = sig
                     continue
@@ -425,7 +443,7 @@ class JobTracker:
         p = self.pending_refuel
         if not p:
             return
-        if (v["truck_id"], v["license_plate"]) != p["truck"] or now - p["t"] > 120:
+        if self._fuel_id(v) != p["truck"] or now - p["t"] > 120:
             self.pending_refuel = None      # truck swapped / nothing happened: phantom event
             jlog.debug("driver #%s: refuel event ignored (the tank didn't fill - the game raises it on load too)",
                        self.user_id)
@@ -434,11 +452,9 @@ class JobTracker:
             p["base"] = min(p["base"], v["fuel"])
         if v["fuel"] - p["base"] >= max(1.0, 0.5 * p["litres"]):
             self.pending_refuel = None
-            cost = round(p["litres"] * db.setting_f("fuel_price", 1.25), 2)
-            db.insert("job_events", job_id=p["job_id"], user_id=self.user_id, kind="refuel", amount=cost,
-                      detail=p["detail"], x=p["x"], z=p["z"], created_at=now)
-            economy.post("fuel", -cost, f"Refuel: {p['detail']} ({economy.user_name(self.user_id)})", job_id=p["job_id"])
-            jlog.info("driver #%s: refuel %.1f L booked as %.2f - %s", self.user_id, p["litres"], cost, p["detail"])
+            cap = v["fuel_capacity"]
+            fuel_prices.book(self.user_id, "fuel", p["litres"], p["game"], p["x"], p["z"], p["job_id"],
+                             round(p["base"] / cap * 100) if cap else None, round(v["fuel"] / cap * 100) if cap else None)
 
     def _finish(self, v, now):
         dsig = delivered_sig(v)

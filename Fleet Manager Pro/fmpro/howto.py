@@ -24,7 +24,9 @@ GUIDES = {
     "fluids": [
         "Drive with the game running and the tank bars and graph fill in on their own.",
         "Pick a range (1 hour, 6 hours, 24 hours or 7 days) to see how the levels changed; refuels show as jumps up.",
-        "Every fill-up is listed in the refuel log at the bottom: when it happened, how much went in and the level after.",
+        "Each tank shows the price where the truck is and what filling it up would cost.",
+        "Every fill-up is listed at the bottom with the price, what it cost, and where it was.",
+        ("admin", "Diesel uses the game's own price in each state; set the AdBlue price in Settings, Economy tab."),
         ("admin", "Pick a driver at the top to see their truck instead of your own."),
         "When fuel or AdBlue gets low you get a notification.",
         ("admin", "Turn the low-fluid notification off in Settings, Compliance tab."),

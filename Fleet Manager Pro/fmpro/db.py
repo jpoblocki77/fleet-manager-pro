@@ -196,7 +196,8 @@ DEFAULT_SETTINGS = {
     "fluid_alerts": "1",                # 1 = notify the driver and managers when fuel or AdBlue runs low
     "auto_update": "0",                 # 1 = install verified updates by themselves when nobody is driving
     "auto_backup": "1",                 # daily copy of fleet.db in data/backups (newest 14 kept)
-    "fuel_price": "1.25",               # per litre, used to cost fuel burnt on a job
+    "fuel_price": "1.25",               # per litre, where the game's own diesel price isn't known or isn't used
+    "fuel_price_game": "1", "adblue_price": "1.2",       # fuel_prices.py; AdBlue per litre
     "driver_pay_per_km": "0.40",        # paid to the driver from company revenue
     "driver_commission_pct": "0",       # optional % of revenue on top of per-km pay
     "xp_per_km": "1.0", "xp_per_tonne": "2.0",
@@ -269,11 +270,12 @@ def init(path):
     c.commit()
     backfill_map()
     backfill_deductions()
-    from . import cdl, leasing, personal_loans, trailer_leasing
+    from . import cdl, fuel_prices, leasing, personal_loans, trailer_leasing
     leasing.init()
     trailer_leasing.init()
     cdl.init()
     personal_loans.init()
+    fuel_prices.init()
     if setting("repair_cost_lowered") != "1":            # 0.02: 180 per 1% wear made repairs cost far too much
         if setting("repair_cost_per_pct") == "180":
             set_setting("repair_cost_per_pct", "40")

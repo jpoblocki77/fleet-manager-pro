@@ -16,7 +16,7 @@ bp = Blueprint("ops", __name__)
 
 DAY = 86400
 PERIODS = [("week", "7 days"), ("month", "30 days"), ("year", "Year"), ("all", "All time")]
-EXPENSE_CATEGORIES = ["fuel", "tolls", "fines", "repairs", "maintenance", "tyres", "cargo damage", "late delivery",
+EXPENSE_CATEGORIES = ["fuel", "adblue", "tolls", "fines", "repairs", "maintenance", "tyres", "cargo damage", "late delivery",
                       "insurance", "parking", "permits", "garage upkeep", "truck purchase", "trailer purchase",
                       "driver pay", "office", "other"]
 
@@ -301,7 +301,7 @@ CLEAR_TABLES = [("job_points", "route points"), ("job_events", "job events"), ("
                 ("events", "events"), ("announcements", "announcements"), ("messages", "messages"),
                 ("user_achievements", "achievements"), ("notifications", "notifications"),
                 ("applications", "applications"), ("road_points", "learned road points"),
-                ("map_places", "learned places"), ("login_failures", "failed sign-ins"), ("fluid_samples", "fuel & AdBlue readings"),
+                ("map_places", "learned places"), ("login_failures", "failed sign-ins"), ("fluid_samples", "fuel & AdBlue readings"), ("fuel_fills", "fill-ups"),
                 ("audit_log", "audit log lines")]
 
 

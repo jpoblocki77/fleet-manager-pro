@@ -1607,7 +1607,8 @@ def notifications_clear():
 # settings stored per metric unit but shown/typed in the viewer's units:
 # key -> (imperial value per stored metric value, decimals shown, imperial label, metric label)
 UNIT_SETTINGS = {
-    "fuel_price": (L_PER_GAL, 2, "Fuel price per gallon", "Fuel price per litre"),
+    "fuel_price": (L_PER_GAL, 2, "Diesel price per gallon", "Diesel price per litre"),
+    "adblue_price": (L_PER_GAL, 2, "AdBlue / DEF price per gallon", "AdBlue price per litre"),
     "driver_pay_per_km": (KM_PER_MI, 2, "Driver pay per mile", "Driver pay per km"),
     "xp_per_km": (KM_PER_MI, 2, "XP per mile", "XP per km"),
     "xp_per_tonne": (0.90718474, 2, "XP per ton (2,000 lb)", "XP per tonne"),
@@ -1628,7 +1629,7 @@ def unit_settings_view(units):
 SETTING_FIELDS = {
     "company_name": ("str", 64), "company_tag": ("str", 8), "company_motto": ("str", 120),
     "company_color": ("color", 7), "theme_navy": ("color", 7), "theme_accent": ("color", 7), "currency": ("str", 4), "units": ("choice", ("imperial", "metric")),
-    "default_game": ("choice", ("ats", "ets2")), "fuel_price": ("num", (0, 100)),
+    "default_game": ("choice", ("ats", "ets2")), "fuel_price": ("num", (0, 100)), "adblue_price": ("num", (0, 100)), "fuel_price_game": ("bool", None),
     "driver_pay_per_km": ("num", (0, 100)), "driver_commission_pct": ("num", (0, 100)),
     "xp_per_km": ("num", (0, 100)), "xp_per_tonne": ("num", (0, 100)), "speeding_tolerance_kmh": ("num", (0, 50)),
     "repair_cost_per_pct": ("num", (0, 100000)),

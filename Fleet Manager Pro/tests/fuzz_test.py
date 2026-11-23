@@ -72,7 +72,7 @@ def main():
         f"/fleet/truck/{tid}/delete": [], f"/fleet/trailer/{trl}/delete": [], "/fleet/clear-sold": [],
         "/drivers/9999/fire": ["confirm"], "/drivers/purge-former": [],
         "/cdl/driver/%d" % uid: ["action"], "/cdl/pay": [], "/bank/loan": ["plan", "amount"], "/bank/loan/1/payoff": [], "/cdl/test/start": [], "/cdl/test/cancel": [], "/cdl/issue-all": [],
-        "/compliance/status": ["status", "game"], "/settings": ["section", "repair_cost_per_pct", "fuel_price"],
+        "/compliance/status": ["status", "game"], "/settings": ["section", "repair_cost_per_pct", "fuel_price", "adblue_price"],
     }
     # valid values for each form; the scan swaps one field at a time for an odd value
     base = {
