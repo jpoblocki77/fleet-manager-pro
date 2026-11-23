@@ -170,7 +170,7 @@ def why_not():
     if not load()["about"]:
         out.append("“About the company” is empty.")
     if s.get("hidden"):
-        out.append("It was hidden by the owner of the licence server. Contact the seller.")
+        out.append("It was hidden by the owner of the licence server. Contact whoever gave you your licence key.")
     if s.get("old_server"):
         out.append(NEEDS_UPDATE)
     elif not out and not s.get("visible"):

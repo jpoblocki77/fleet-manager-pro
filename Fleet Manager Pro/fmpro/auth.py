@@ -291,7 +291,7 @@ def eula_text():
     for p in (os.path.join(RES, "fmpro", "EULA.txt"), os.path.join(os.path.dirname(os.path.abspath(__file__)), "EULA.txt")):
         if os.path.isfile(p):
             return open(p, encoding="utf-8").read()
-    return "The licence agreement file is missing from this copy. Contact the seller."
+    return "The licence agreement file is missing from this copy. Contact whoever gave you your licence key."
 
 
 def eula_blocks(text):

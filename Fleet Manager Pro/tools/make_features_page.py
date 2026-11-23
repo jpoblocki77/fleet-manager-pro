@@ -337,7 +337,7 @@ AREAS = [
           "Safest of all: close the app and copy the whole <b>data</b> folder. <b>READ ME - Your Data.txt</b> explains how to go back to a backup."]),
         ("logs", "Logs and health", "Admin &gt; System &amp; Backups", ADMIN,
          "Shows how this copy is doing and what it has been doing, for when you need help.",
-         ["Pick a log and type a word to filter it.", "Press <b>Download all logs</b> to send them to the seller."],
+         ["Pick a log and type a word to filter it.", "Press <b>Download all logs</b> to send them with a question about a problem."],
          ["Passwords, tokens and purchase keys are hidden in the logs."]),
         ("audit", "Audit log", "Settings &gt; Audit log", ADMIN,
          "A list of who changed what, and when.", ["Open the tab and read the newest lines."], []),

@@ -222,7 +222,7 @@ GUIDES = {
     ],
     "system": [
         "Back up now saves a copy of the company database; automatic backups are also made every day.",
-        "Logs show what the app has been doing. Filter them when you need to report a problem to the seller.",
+        "Logs show what the app has been doing. Filter them when you need to report a problem.",
     ],
 }
 
