@@ -60,8 +60,7 @@ def sync():
                     # once their list was empty, so the number alone used to drop every new application.
                     if not db.val("SELECT id FROM applications WHERE remote_id=? AND name=? AND contact=?",
                                   (rid, str(a.get("name") or "")[:48] or "(no name)", str(a.get("contact") or "")[:100])):
-                        _store(a, rid)
-                        new += 1
+                        new += _store(a, rid)
                     saved.append(rid)
                 db.set_setting("recruit_url", str(d.get("apply_url") or "")[:200])
                 db.set_setting("recruit_code", str(d.get("code") or "")[:16])
@@ -106,13 +105,14 @@ def _store(a, rid):
     age = str(a.get("age") or "")
     if age.isdecimal() and int(age) < MIN_AGE:      # an older licence server still lets younger applicants through
         log.info("online application %s skipped: under %s", rid, MIN_AGE)
-        return
+        return False
     games = a.get("games") if a.get("games") in ("ats", "ets2") else ("ats,ets2" if a.get("games") == "both" else "")
     db.insert("applications", name=str(a.get("name") or "")[:48] or "(no name)", contact=str(a.get("contact") or "")[:100],
               age=int(age) if age.isdecimal() and 0 < int(age) < 120 else None, country=str(a.get("country") or "")[:48],
               games=games, experience=str(a.get("experience") or "")[:1000], message=str(a.get("message") or "")[:2000],
               remote_id=rid, source="online", created_at=time.time(), answers=_answers(a.get("answers")),
               found_via=a.get("via") if a.get("via") in ("finder", "link") else "")
+    return True
 
 
 def _answers(rows):

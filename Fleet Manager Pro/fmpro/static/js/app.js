@@ -51,6 +51,17 @@
     if (conf && !confirm(conf.dataset.confirm)) { e.preventDefault(); e.stopImmediatePropagation(); }
   }, true);
 
+  // ---------- one send per click ----------
+  // A double click (or an impatient second click while the page loads) must not buy, pay or end something twice.
+  // Forms handled by their own script (they cancel the normal send) are left alone.
+  document.addEventListener("submit", (e) => {
+    const f = e.target;
+    if (e.defaultPrevented || (f.getAttribute("method") || "").toLowerCase() !== "post") return;
+    if (f.dataset.sending) { e.preventDefault(); return; }
+    f.dataset.sending = "1";
+    setTimeout(() => { delete f.dataset.sending; }, 4000);   // a download keeps the page: allow another try later
+  });
+
   // ---------- game picker (sets the units everywhere) ----------
   document.addEventListener("change", (e) => {
     if (e.target.id !== "game-pick") return;

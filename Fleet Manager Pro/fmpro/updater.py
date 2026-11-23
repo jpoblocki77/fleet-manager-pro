@@ -218,11 +218,15 @@ def install_now():
     Returns None when a restart has been scheduled, or a message string to show the user."""
     with _lock:
         m = dict(_manifest) if _manifest else None
+        # one install at a time: a second click, or the automatic update at the same moment, must not delete the
+        # files the first one is about to swap in
+        going = STATE["status"] == "downloading" or (STATE["status"] == "staged" and _flavor() is not None)
+        if m and not going:
+            STATE.update(status="downloading", error=None)
+    if going:
+        return "The update is already being installed. Fleet Manager Pro will restart by itself in a moment."
     if not m:
         return "No update is ready. Check for updates first."
-
-    with _lock:
-        STATE.update(status="downloading", error=None)
     build = licensing.BUILD_TAG or ""
     import urllib.parse
     path = "/v1/update/file?" + urllib.parse.urlencode({"build": build, "name": m["file"]})

@@ -369,6 +369,10 @@ def main():
     check(abs(co - feco.balance() - fl_["fuel"]["cost"] - fl_["adblue"]["cost"]) < 0.01 and fbank.balance(pu) == 0 and fbank.pending(pu) == 0
           and db.val("SELECT COUNT(*) FROM ledger WHERE user_id=? AND account!='company'", (pu,), 0) == 0, "the company pays for the diesel and the AdBlue, the driver pays nothing")
     check(abs(fp.last_paid(pu) - colo) < 1e-6 and fp.last_paid(987654) == db.setting_f("fuel_price"), "a job's fuel is costed at what the driver last paid")
+    _fx = db.insert("fuel_fills", user_id=pu, t=_time.time() + 5, game="ets2", kind="fuel", litres=100, price=9.99, cost=999, place="Germany")
+    check(abs(fp.last_paid(pu, "ats") - colo) < 1e-6 and fp.last_paid(pu, "ets2") == 9.99,
+          "a job is costed at the last diesel price paid in its own game")
+    db.ex("DELETE FROM fuel_fills WHERE id=?", (_fx,))
     tt = fp.totals(pu, 3600)
     check((tt["refuels"], tt["topups"]) == (1, 1) and tt["fuel_cost"] == fl_["fuel"]["cost"], "and the totals match")
     n9 = len(fp.fills(pu, 9e9))
@@ -928,6 +932,10 @@ def main():
           "buy out a lease early: the truck is ours")
     check(abs(db.val("SELECT SUM(amount) FROM ledger WHERE account='company'") - (bal2 - l3["payment"] * l3["weeks"] - l3["residual"])) < 0.05,
           "buyout costs the payments left plus the end value")
+    _b3 = db.val("SELECT SUM(amount) FROM ledger WHERE account='company'")
+    check(leasing.finish(l3, "buyout", 1)[1] == "This lease had already ended."
+          and db.val("SELECT SUM(amount) FROM ledger WHERE account='company'") == _b3,
+          "a lease that was already bought out (a second click) isn't bought or charged again")
     post("/leasing/plans/save", {"name": "Test Plan", "weeks": "8", "allowed": "10000", "down_pct": "0", "apr": "9.9",
                                  "residual_pct": "80", "excess_rate": "0.50", "early_fee_pct": "50"})
     tp_ = db.one("SELECT * FROM lease_plans WHERE name='Test Plan'")
@@ -1423,6 +1431,16 @@ def main():
     with updater._lock:
         updater.STATE.update(status="staged")
     check(updater.auto_install() == "none" and calls == ["install"], "an update already being installed isn't started twice")
+    _fetch = sys.modules["fmpro.licensing"].fetch
+    sys.modules["fmpro.licensing"].fetch = lambda *a, **k: calls.append("download") or b""
+    try:
+        for st_ in ("staged", "downloading"):
+            with updater._lock:
+                updater.STATE.update(status=st_)
+            check("already being installed" in saved[4]() and "download" not in calls,
+                  f"pressing Update now again while it is {st_} doesn't download or unpack it a second time")
+    finally:
+        sys.modules["fmpro.licensing"].fetch = _fetch
     page = c.get("/updates").get_data(as_text=True)
     check("Turn off automatic updates" in page and "Update now" in page and "99.0" in page,
           "the Updates page shows the waiting update and automatic updates on")
@@ -2431,6 +2449,9 @@ def main():
     check(st == 400 and "at least 16" in page, "applicants under 16 are refused online")
     st, _ = web(f"/apply/{code}", {"name": "No Age", "contact": "n#0010"})
     check(st == 400, "the online form needs an age")
+    n_before = db.val("SELECT COUNT(*) FROM applications", (), 0)
+    check(recruit._store({"age": "15", "name": "Old Server Olly", "contact": "o#1"}, 55555) is False
+          and db.val("SELECT COUNT(*) FROM applications", (), 0) == n_before, "an under-16 application from an older server is dropped and not counted")
     srv.apply_hits.pop("127.0.0.1", None)              # those two count towards the hourly limit
     new, err = recruit.sync()
     ra = db.one("SELECT * FROM applications WHERE remote_id IS NOT NULL ORDER BY id DESC LIMIT 1")

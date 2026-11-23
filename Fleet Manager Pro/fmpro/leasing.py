@@ -113,7 +113,7 @@ def start(truck_id, plan, price, user_id, now=None):
     return lid
 
 
-def process(now=None):
+def _process(now=None):
     """Weekly lease payments (called from the same background loop as loans)."""
     now = now or time.time()
     for l in db.q("SELECT * FROM leases WHERE status='active' AND next_due <= ? AND payments_made < weeks", (now,)):
@@ -128,7 +128,7 @@ def process(now=None):
                           f"/fleet/lease/{l['id']}", "warning")
 
 
-def finish(lease, action, user_id, new_plan=None, now=None):
+def _finish(lease, action, user_id, new_plan=None, now=None):
     """End a lease: 'buyout', 'return' (also early), or 'renew' onto new_plan. Returns (cost, message)."""
     now = now or time.time()
     st = status(lease, now)
@@ -165,3 +165,20 @@ def finish(lease, action, user_id, new_plan=None, now=None):
     db.update("leases", lease["id"], status="bought" if action == "buyout" else "returned", ended_at=now,
               end_reason=("early " if early else "") + action, end_cost=cost)
     return cost, msg
+
+
+def process(now=None):
+    """Weekly payments, never at the same moment as a lease being ended."""
+    from . import bank
+    with bank.lock:
+        _process(now)
+
+
+def finish(lease, action, user_id, new_plan=None, now=None):
+    """End a lease once: a second click (or two managers at once) finds it already ended. Returns (cost, message)."""
+    from . import bank
+    with bank.lock:
+        fresh = db.one("SELECT * FROM leases WHERE id=? AND status IN ('active','matured')", (lease["id"],))
+        if not fresh:
+            return 0.0, "This lease had already ended."
+        return _finish(fresh, action, user_id, new_plan, now)

@@ -103,9 +103,11 @@ def adblue():
     return db.setting_f("adblue_price", 1.2)
 
 
-def last_paid(uid):
-    """What this driver last paid for a litre of diesel: the fuel they are burning."""
-    p = db.val("SELECT price FROM fuel_fills WHERE user_id=? AND kind='fuel' ORDER BY t DESC LIMIT 1", (uid,))
+def last_paid(uid, game=None):
+    """What this driver last paid for a litre of diesel in this game: the fuel they are burning. Fill-ups from before
+    the game was recorded count for either game."""
+    p = db.val("SELECT price FROM fuel_fills WHERE user_id=? AND kind='fuel' AND (? IS NULL OR game=? OR game='') "
+               "ORDER BY t DESC LIMIT 1", (uid, game, game))
     return db.setting_f("fuel_price", 1.25) if p is None else p
 
 

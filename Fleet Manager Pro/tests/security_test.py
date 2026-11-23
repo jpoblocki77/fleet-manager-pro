@@ -520,6 +520,24 @@ def main():
     check(db.val("SELECT status FROM jobs WHERE id=?", (cj["id"],)) == "rejected" and
           db.val("SELECT COUNT(*) FROM ledger WHERE job_id=? AND category IN ('freight','driver pay','earnings','contract bonus')", (cj["id"],), 0) == 0,
           "manager rejects it; nothing is ever paid")
+    import threading as _th
+    from fmpro import economy as _eco
+    row = {k: v for k, v in cj.items() if k != "id"}
+    row.update(status="pending_review", cargo="Twice")
+    jt = db.insert("jobs", **row)
+    _settle = _eco.settle_job
+    def _slow(jid):                    # widen the gap a second click would fall into
+        time.sleep(0.3)
+        _settle(jid)
+    _eco.settle_job = _slow
+    try:
+        ts = [_th.Thread(target=b.post, args=(f"/jobs/{jt}/review", {"action": "approve"})) for b in (boss, mgr)]
+        [t.start() for t in ts]
+        [t.join() for t in ts]
+    finally:
+        _eco.settle_job = _settle
+    check(db.val("SELECT COUNT(*) FROM ledger WHERE job_id=? AND category='freight'", (jt,), 0) == 1,
+          "approving the same job twice at once pays it once")
     db.set_setting("agent_jobs_need_approval", "1")
     class _Clock:                      # one second per frame, so the short drive counts as observed
         t = time.time()

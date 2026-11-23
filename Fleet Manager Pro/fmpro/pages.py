@@ -383,9 +383,14 @@ def job_review(jid):
         abort(404)
     action = request.form.get("action")
     if action == "approve" and j["status"] == "pending_review":
-        db.update("jobs", jid, status="delivered", reviewed_by=user()["id"])
-        economy.settle_job(jid)
-        db.notify(j["user_id"], f"Your job #{jid} was approved.", f"/jobs/{jid}", "success")
+        from . import bank
+        with bank.lock:                 # a double click or two managers at once must not pay the job twice
+            again = db.val("SELECT status FROM jobs WHERE id=?", (jid,)) == "pending_review"
+            if again:
+                db.update("jobs", jid, status="delivered", reviewed_by=user()["id"])
+                economy.settle_job(jid)
+        if again:
+            db.notify(j["user_id"], f"Your job #{jid} was approved.", f"/jobs/{jid}", "success")
     elif action == "reject" and j["status"] == "pending_review":
         db.update("jobs", jid, status="rejected", reviewed_by=user()["id"])
         db.notify(j["user_id"], f"Your job #{jid} was rejected.", f"/jobs/{jid}", "error")
@@ -833,26 +838,33 @@ def finance_loan():
     amount = num("amount", 0, 5_000_000)
     if plan not in economy.LOAN_PLANS or amount < 10_000:
         flash("Choose a plan and an amount of at least 10,000.", "error")
-    elif db.val("SELECT COUNT(*) FROM loans WHERE status='active'", (), 0) >= 3:
-        flash("You already have 3 active loans.", "error")
     else:
-        economy.take_loan(plan, amount)
-        flash("Loan approved and paid into the company account.", "success")
+        from . import bank
+        with bank.lock:                 # the limit holds even when the form is sent twice at once
+            full = db.val("SELECT COUNT(*) FROM loans WHERE status='active'", (), 0) >= 3
+            if not full:
+                economy.take_loan(plan, amount)
+        if full:
+            flash("You already have 3 active loans.", "error")
+        else:
+            flash("Loan approved and paid into the company account.", "success")
     return redirect(url_for("pages.finance"))
 
 
 @bp.route("/finance/loan/<int:lid>/payoff", methods=["POST"])
 @login_required(role="owner")
 def loan_payoff(lid):
-    loan = db.one("SELECT * FROM loans WHERE id=? AND status='active'", (lid,))
-    if not loan:
-        abort(404)
-    if economy.balance() < loan["balance"]:
-        flash("Not enough money in the company account.", "error")
-    else:
-        economy.post("loan repayment", -loan["balance"], f"Loan #{lid} paid off early")
-        db.update("loans", lid, balance=0, status="paid")
-        flash("Loan paid off.", "success")
+    from . import bank
+    with bank.lock:                     # paid off once, even when the button is pressed twice
+        loan = db.one("SELECT * FROM loans WHERE id=? AND status='active'", (lid,))
+        if not loan:
+            flash("That loan is already paid off.", "info")
+        elif economy.balance() < loan["balance"]:
+            flash("Not enough money in the company account.", "error")
+        else:
+            economy.post("loan repayment", -loan["balance"], f"Loan #{lid} paid off early")
+            db.update("loans", lid, balance=0, status="paid")
+            flash("Loan paid off.", "success")
     return redirect(url_for("pages.finance"))
 
 

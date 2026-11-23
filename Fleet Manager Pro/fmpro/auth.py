@@ -6,6 +6,7 @@ import logging
 import os
 import secrets
 import socket
+import threading
 import time
 
 from flask import Blueprint, abort, flash, g, redirect, render_template, request, session, url_for
@@ -52,6 +53,9 @@ def safe_next(target, default):
         return t
     return default
 
+
+_changes = threading.RLock()
+_UNQUEUED = {"api.agent_frame", "pages.update_action"}
 
 _LOCAL_NAMES = {"localhost", socket.gethostname().lower(), socket.getfqdn().lower()}
 
@@ -164,6 +168,20 @@ def install(app):
         u = user()
         if u and (not u["last_seen"] or time.time() - u["last_seen"] > 60):
             db.update("users", u["id"], last_seen=time.time())
+
+    # Changes are made one at a time: a double click, or two managers pressing the same button, finds the first
+    # change already made instead of paying, buying or ending something twice. The driver agent's telemetry and a
+    # long update download don't wait in this queue.
+    @app.before_request
+    def _one_change_at_a_time():
+        if request.method == "POST" and request.endpoint not in _UNQUEUED:
+            _changes.acquire()
+            g.queued = True
+
+    @app.teardown_request
+    def _release(_exc=None):
+        if g.pop("queued", False):
+            _changes.release()
 
     @app.after_request
     def _headers(resp):

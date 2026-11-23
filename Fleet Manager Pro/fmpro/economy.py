@@ -101,7 +101,7 @@ def settle_job(job_id):
     km = job["driven_km"] or job["planned_km"] or 0
     revenue = job["revenue"] or job["income"] or 0
     from . import bank, fuel_prices
-    fuel_cost = round(job["fuel_used"] * fuel_prices.last_paid(job["user_id"]), 2)
+    fuel_cost = round(job["fuel_used"] * fuel_prices.last_paid(job["user_id"], job["game"]), 2)
     pay_rate = db.val("SELECT pay_per_km FROM users WHERE id=?", (job["user_id"],))
     if pay_rate is None:
         pay_rate = db.setting_f("driver_pay_per_km", 0.4)
@@ -176,12 +176,14 @@ def take_loan(plan, principal):
 
 def process_loans(now=None):
     now = now or time.time()
-    for loan in db.q("SELECT * FROM loans WHERE status='active' AND next_due <= ?", (now,)):
-        pay = min(loan["installment"], loan["balance"])
-        post("loan repayment", -pay, f"Loan #{loan['id']} instalment {loan['payments_made'] + 1}/{loan['weeks']}")
-        bal = round(loan["balance"] - pay, 2)
-        db.update("loans", loan["id"], balance=bal, payments_made=loan["payments_made"] + 1,
-                  next_due=loan["next_due"] + WEEK, status="paid" if bal <= 0.01 else "active")
+    from . import bank
+    with bank.lock:                     # never while the same loan is being paid off
+        for loan in db.q("SELECT * FROM loans WHERE status='active' AND next_due <= ?", (now,)):
+            pay = min(loan["installment"], loan["balance"])
+            post("loan repayment", -pay, f"Loan #{loan['id']} instalment {loan['payments_made'] + 1}/{loan['weeks']}")
+            bal = round(loan["balance"] - pay, 2)
+            db.update("loans", loan["id"], balance=bal, payments_made=loan["payments_made"] + 1,
+                      next_due=loan["next_due"] + WEEK, status="paid" if bal <= 0.01 else "active")
 
 
 def process_upkeep(now=None):
