@@ -162,7 +162,7 @@ def _when(s):
 BUILD_TAG = PAGES_CHECK = None
 SEALED_PAGES = {}
 PAGES_LOCKED = ("This copy of Fleet Manager Pro still needs its pages unlocked by the licence server. Connect to the "
-                "internet and restart Fleet Manager Pro (if it keeps happening, ask the seller).")
+                "internet and restart Fleet Manager Pro (if it keeps happening, ask whoever gave you your licence key).")
 
 
 def load_build():
@@ -247,7 +247,7 @@ def lease_problem(lease, machine, key=None):
     if lease.get("machine") != machine:
         return "That licence belongs to another PC."
     if key and lease.get("purchase") != key:
-        return "That licence belongs to a different purchase key."
+        return "That licence was issued for a different key."
     try:
         if _when(lease["expires"]) <= _now():
             return "The licence must be checked online again (the 7-day offline period has ended)."
@@ -464,7 +464,7 @@ class Licence:
         """Returns None on success, else a message for the user."""
         key = (key or "").strip().upper().replace(" ", "")
         if not key:
-            return "Type your purchase key."
+            return "Type your licence key."
         if key.startswith("FM-"):
             return "That's a key for the original Fleet Manager. Fleet Manager Pro keys start with FMP-."
         with self.lock:
@@ -478,7 +478,7 @@ class Licence:
                 log.warning("activation refused: %s (%s)", e.message, e.code)
                 if e.code == "bad_product" or (e.code == "bad_key" and key.startswith("FMP-")):
                     return ("The licence server hasn't been updated for Fleet Manager Pro yet. "
-                            "Ask the seller to update it.")
+                            "Ask whoever gave you your licence key to update it.")
                 return e.message
             except ConnectionError as e:
                 self.online = False

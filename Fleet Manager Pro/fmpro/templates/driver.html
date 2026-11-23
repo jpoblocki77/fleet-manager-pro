@@ -39,7 +39,7 @@
       <dt>Pay rate</dt><dd>{{ (rate_km * 1.609344 if imp else rate_km)|money(2) }}/{{ 'mi' if imp else 'km' }}</dd></dl></div>
     {% if can_token %}
     <div class="card accent"><h2>Remote telemetry</h2>
-      <p class="small muted">To log jobs from {{ 'your' if is_self else 'their' }} own PC, run this there in the Fleet Manager Pro folder (installed on or copied to that PC; no purchase key needed):</p>
+      <p class="small muted">To log jobs from {{ 'your' if is_self else 'their' }} own PC, run this there in the Fleet Manager Pro folder (installed on or copied to that PC; no licence key needed):</p>
       {% if agent_line %}<pre class="mono small" style="white-space:pre-wrap;word-break:break-all;background:var(--panel-2);padding:8px;border-radius:8px">{{ agent_line }}</pre>
       {% if agent_where == 'home' %}<p class="small muted">This line only works on the same network as this PC. {% if can('admin') %}To connect from anywhere, set your internet address on <a href="/drivers/connect?driver={{ p.id }}">Connect a Driver</a>.{% else %}To connect from anywhere, ask the Owner or a Manager to set the internet address.{% endif %}</p>{% endif %}
       {% else %}<p class="small muted">{% if can('admin') %}This PC isn't letting other PCs in yet. Do step 1 on <a href="/drivers/connect?driver={{ p.id }}">Connect a Driver</a> to get {{ 'your' if is_self else 'their' }} connection line.{% else %}The company's PC isn't letting other PCs in yet. Ask the Owner or a Manager to turn it on, then your connection line appears here.{% endif %}</p>{% endif %}

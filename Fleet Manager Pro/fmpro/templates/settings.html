@@ -187,7 +187,7 @@
   <dl class="kv">
     <dt>Product</dt><dd>Fleet Manager Pro {{ VERSION }}</dd>
     <dt>Licensed to</dt><dd>{{ lic.name or '—' }}{% if lic.email %} <span class="muted small">{{ lic.email }}</span>{% endif %}</dd>
-    <dt>Purchase key</dt><dd class="mono">{% if not lic.key %}—{% elif can('owner') %}{{ lic.key }}{% else %}{{ lic.key[:8] }}-····-····-···· <span class="faint small">(owner only)</span>{% endif %}</dd>
+    <dt>Licence key</dt><dd class="mono">{% if not lic.key %}—{% elif can('owner') %}{{ lic.key }}{% else %}{{ lic.key[:8] }}-····-····-···· <span class="faint small">(owner only)</span>{% endif %}</dd>
     <dt>This PC</dt><dd>{% if lic.slot %}PC {{ lic.slot }} of {{ lic.slots }}{% else %}—{% endif %}</dd>
     <dt>Machine ID</dt><dd class="mono">{{ lic.machine_id }}</dd>
     <dt>Last online check</dt><dd>{{ lic.last_check|replace('T', ' ') if lic.last_check else 'never' }}{% if lic.online == false %} <span class="badge warn">offline</span>{% endif %}</dd>
@@ -202,7 +202,7 @@
 </div>
 <div class="card"><h2>Moving to another PC</h2>
   <p class="muted">Each purchase works on 2 PCs. To move, click <b>Deactivate this PC</b> here, then activate on the new PC with the same key.
-  If the old PC is gone (broken, reinstalled, sold), ask the seller to release it.</p>
+  If the old PC is gone (broken, reinstalled, sold), ask whoever gave you your licence key to release it.</p>
   <p class="muted">Your company data lives in the <code>data</code> folder — copy it to the new PC to keep everything.</p>
 </div>
 <div class="card"><div class="card-head"><h2>Updates</h2></div>

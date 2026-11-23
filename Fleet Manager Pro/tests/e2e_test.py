@@ -3815,7 +3815,7 @@ def main():
             return c2.post(url, data=dict(data, csrf=tok))
 
         r = c2.get("/activate")
-        check(r.status_code == 200 and b"purchase key" in r.data.lower(), "the activate screen works before unlocking")
+        check(r.status_code == 200 and b"licence key" in r.data.lower(), "the activate screen works before unlocking")
         check(c2.get("/licence-agreement").status_code == 200, "the licence agreement can be read before unlocking")
         # a crack that skips the licence check still has no pages
         licensing.licensed = lambda: True

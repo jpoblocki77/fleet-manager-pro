@@ -13,7 +13,7 @@ Everything the program does, in as much detail as is safe to write down:
   * messages from the web server and the other libraries the program uses
   * a line when the program shuts down
 
-The file rolls over at 10 MB and keeps 10 old files (about 100 MB at most). Purchase keys, passwords, tokens and
+The file rolls over at 10 MB and keeps 10 old files (about 100 MB at most). Licence keys, passwords, tokens and
 cookies are masked before anything is written (see logs.redact), so a buyer can safely send the logs folder.
 """
 import atexit

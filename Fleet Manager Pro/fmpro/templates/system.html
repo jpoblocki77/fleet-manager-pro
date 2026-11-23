@@ -36,7 +36,7 @@
     <form method="get" class="right row" style="gap:6px">
       <select name="log">{% for f in files %}<option value="{{ f.name }}" {{ 'selected' if f.name == sel }}>{{ f.name }} ({{ size(f.size) }})</option>{% endfor %}</select>
       <input name="q" value="{{ q }}" placeholder="Filter lines" style="width:160px"><button class="btn sm">Filter</button></form></div>
-  <p class="small muted" style="padding:0 18px">Newest first, last 400 lines. Passwords, tokens and purchase keys are hidden in every log, so you can safely send them for support.</p>
+  <p class="small muted" style="padding:0 18px">Newest first, last 400 lines. Passwords, tokens and licence keys are hidden in every log, so you can safely send them for support.</p>
   <pre class="logview">{% for ln in lines %}<span class="{{ 'lv-err' if ' ERROR ' in ln or ' CRITICAL ' in ln else 'lv-warn' if ' WARNING ' in ln else 'lv-dbg' if ' DEBUG ' in ln else '' }}">{{ ln }}</span>
 {% else %}<span class="faint">Nothing to show.</span>{% endfor %}</pre>
 </div>

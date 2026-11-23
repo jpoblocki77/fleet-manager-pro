@@ -118,7 +118,7 @@ def build():
     A(table([["Item", "Details"],
              ["Windows PC", "Windows 10 or 11, 64-bit. Fleet Manager Pro runs on the same PC as the game (or any PC on your network)."],
              ["The game", "American Truck Simulator and/or Euro Truck Simulator 2 (Steam)."],
-             ["Your purchase key", "Looks like <b>FMP-XXXX-XXXX-XXXX-XXXX</b>. It activates Fleet Manager Pro on up to <b>2 PCs</b>."],
+             ["Your licence key", "Looks like <b>FMP-XXXX-XXXX-XXXX-XXXX</b>. It activates Fleet Manager Pro on up to <b>2 PCs</b>."],
              ["Internet", "Needed to activate, then checked every few hours. Without internet it keeps working for 7 days."],
              ["A web browser", "Edge, Chrome or Firefox. Fleet Manager Pro opens in your browser."]],
             [1.6 * inch, 5.3 * inch]))
@@ -147,19 +147,19 @@ def build():
              "<b>Exclusions</b> &gt; <b>Add or remove exclusions</b> &gt; <b>Add an exclusion</b> &gt; <b>Folder</b>, and pick "
              "<b>%LOCALAPPDATA%\\Programs\\Fleet Manager Pro</b> (only that folder).",
              "Start Fleet Manager Pro again. If it still does not start, run <b>Fleet Manager Pro Setup.exe</b> again."]))
-    A(Paragraph("Only do this for the Fleet Manager Pro folder you got from the seller, never for other programs or whole drives. "
+    A(Paragraph("Only do this for the Fleet Manager Pro folder you were given, never for other programs or whole drives. "
                 "When you install a signed version later, remove the exclusion again (same place, click it &gt; <b>Remove</b>). "
                 "Other antivirus programs (Norton, Avast, Bitdefender...) have the same options under <i>Quarantine</i> and "
-                "<i>Exceptions</i>. If it keeps happening, contact the seller.", SMALL))
+                "<i>Exceptions</i>. If it keeps happening, contact whoever gave you your licence key.", SMALL))
 
     A(Paragraph("2. Activate", H1))
-    A(steps(["On the <b>Activate</b> screen, type your purchase key, tick <b>I have read and agree to the licence agreement</b> "
+    A(steps(["On the <b>Activate</b> screen, type your licence key, tick <b>I have read and agree to the licence agreement</b> "
              "(the link opens it) and click <b>Activate this PC</b>.",
              "That is it. The key is remembered; you will not be asked again on this PC."]))
     A(Spacer(1, 8))
     A(table([["If you see...", "What to do"],
              ["Can't reach the licence server", "Check your internet connection and try again. A firewall or VPN can block it: allow Fleet Manager Pro."],
-             ["This purchase is already active on 2 PCs", "Deactivate it on a PC you no longer use (Settings > Licence > Deactivate this PC), or ask the seller to release one."],
+             ["This purchase is already active on 2 PCs", "Deactivate it on a PC you no longer use (Settings > Licence > Deactivate this PC), or ask whoever gave you your licence key to release one."],
              ["That purchase key doesn't exist", "Check for typing mistakes. Keys use letters A-Z and digits 2-7 only (no 0, 1, 8 or 9)."],
              ["That's a key for the original Fleet Manager", "Fleet Manager Pro keys start with FMP-. Keys starting with FM- are for the older app."]],
             [2.5 * inch, 4.4 * inch]))
@@ -207,7 +207,7 @@ def build():
     A(Paragraph('"Fleet Manager Pro.exe" agent --server https://HOST-PC:8760 --token TOKEN --pin FINGERPRINT', CODE))
     A(Paragraph("Press <b>Windows + R</b>, type <b>%LOCALAPPDATA%\\Programs\\Fleet Manager Pro</b> and press Enter. Click the folder's "
                 "address bar, type <b>cmd</b>, press Enter and paste the command.", SMALL))
-    A(Paragraph("They do not need their own purchase key for this: only the main PC is activated.", SMALL))
+    A(Paragraph("They do not need their own licence key for this: only the main PC is activated.", SMALL))
 
     A(Paragraph("7. Finding your way around", H1))
     A(table([["Page", "What it is for"],
@@ -270,7 +270,7 @@ def build():
                 "send at most 5 applications an hour, bots are filtered out, and at most 300 applications can wait at once - "
                 "so open Fleet Manager Pro regularly.", SMALL))
     A(Paragraph("<b>No link, or \"Last check failed\"?</b> The PC needs internet access and an activated copy. Press "
-                "<b>Check now</b>; if it still fails, contact the seller.", SMALL))
+                "<b>Check now</b>; if it still fails, contact whoever gave you your licence key.", SMALL))
 
     A(Paragraph("9. Lease trucks", H1))
     A(Paragraph("Instead of paying for a truck all at once, the company can lease it: a small down payment, then a fixed weekly "
@@ -300,7 +300,7 @@ def build():
                "<b>%LOCALAPPDATA%\\Programs\\Fleet Manager Pro</b> before starting the installed one.",
                "<b>Update to a new version:</b> open <b>Updates</b>, press <b>Check for updates</b>, then <b>Update now</b>. The app "
                "closes and reopens by itself and your data is not touched.",
-               "<b>Update by hand</b> (if the seller sends you a new Setup file): close Fleet Manager Pro and run it. Your data is kept.",
+               "<b>Update by hand</b> (if you are sent a new Setup file): close Fleet Manager Pro and run it. Your data is kept.",
                "<b>Step by step:</b> <b>READ ME - Your Data.txt</b>, in the program folder and the Start menu, covers moving your "
                "data, backing up and going back to a backup.",
                "<b>Uninstall:</b> Windows Settings &gt; Apps. Your <b>data</b> folder stays; delete it yourself if you no longer want it."]))
@@ -317,7 +317,7 @@ def build():
              ["Fleet Manager Pro is missing, or Defender says it's a threat", "A temporary false positive until the program is signed. "
                                                     "Restore and allow it - see <i>If Microsoft Defender blocks or removes Fleet Manager Pro</i> in section 1."],
              ["\"Too many wrong passwords\"", "Wait five minutes and try again. A manager can reset a driver's password on their profile page."],
-             ["Forgot the owner password", "Contact the seller: it cannot be read back, only reset."],
+             ["Forgot the owner password", "Contact whoever gave you your licence key: it cannot be read back, only reset."],
              ["Port 8760 is already in use", "Another copy is still running (check Task Manager for Fleet Manager Pro). "
                                              "Close it, or start on another port from a Command Prompt in its folder (section 6 shows how to open it): "
                                              "\"Fleet Manager Pro.exe\" --port 8770"],
