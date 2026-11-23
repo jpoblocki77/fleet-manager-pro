@@ -2,7 +2,7 @@
 
 Everything for Fleet Manager Pro in one place: the development copy, the Fleet Manager server, the build scripts and
 every guide. Fleet Manager Pro is **free**: one public copy for everyone, no licence keys, no activation. This folder
-is `D:\Fleet Manager Pro\Fleet Manager Pro RC 1.5.28-beta\Development`. **Never share this folder.** Full
+is `D:\Fleet Manager Pro\Fleet Manager Pro RC 1.5.29-beta\Development`. **Never share this folder.** Full
 instructions: **Guides\Fleet Manager Pro - Author Guide.pdf**.
 
 | Here | What it is | Share it? |
@@ -49,7 +49,7 @@ A version with a serious bug: `python update_notice.py 1.5.30-beta "message"` in
 
 ## The packaged release on D:
 
-`D:\Fleet Manager Pro\Fleet Manager Pro RC 1.5.28-beta\` holds this Development folder, `Build Output\`, the guides,
+`D:\Fleet Manager Pro\Fleet Manager Pro RC 1.5.29-beta\` holds this Development folder, `Build Output\`, the guides,
 database backups and a private backup of the server folder. Its `READ ME FIRST.txt` explains each folder. The source
 code is here and in the private GitHub repo. The website is `D:\Fleet Manager Pro\Website`.
 
