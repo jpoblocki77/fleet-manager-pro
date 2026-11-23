@@ -7,6 +7,7 @@ import re
 import shutil
 import sys
 import tempfile
+import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -3893,6 +3894,58 @@ def main():
         licensing.load_build()
         licensing.LICENCE = lic
     check(not os.path.exists(emb_) and licensing.BUILD_TAG is None, "the developer copy is left unsealed")
+
+    print("Public build (one build for everyone, pages not sealed, one update channel)")
+    with srv.hits_lock:
+        srv.hits.clear()
+    pub_tag = seal_pages.build_tag(master_, seal_pages.PUBLIC_BUILD)
+    tmp3 = tempfile.mkdtemp(prefix="fmp-public-")
+    pub_dir = os.path.join(srv.updates_dir(), pub_tag)
+    try:
+        n_open = seal_pages.open_templates(fm_, pub_tag)
+        importlib.invalidate_caches()
+        sys.modules.pop("fmpro._embedded_templates", None)
+        n_all = sum(len(fs) for _d, _s, fs in os.walk(os.path.join(fm_, "templates")))
+        check(n_open == n_all and "SEALED = {}" in open(emb_, encoding="utf-8").read(),
+              f"the public build carries all {n_open} pages unsealed")
+        check(re.fullmatch(r"FMPB(-[A-Z2-7]{4}){4}", pub_tag) and pub_tag != seal_pages.build_tag(master_, "STOCK"),
+              f"the public build has its own valid build tag ({pub_tag})")
+        app3 = create_app(tmp3, start_telemetry=False, check_licence=False)
+        app3.testing = True
+        c3 = app3.test_client()
+        lic3p = licensing.LICENCE
+        check(licensing.BUILD_TAG == pub_tag and not licensing.SEALED_PAGES, "the public copy knows its update channel")
+        check(app3.jinja_env.get_template("dashboard.html") is not None, "every page is there without any page key")
+        check(c3.get("/activate").status_code == 200, "the public copy opens on the activate screen")
+        with c3.session_transaction() as s_:
+            tok3 = s_.get("csrf")
+        k_pub = srv.store.new_purchase("Public User", "", product="Fleet Manager Pro")
+        r3 = c3.post("/activate", data={"key": k_pub, "agree": "1", "csrf": tok3})
+        check(lic3p.ok and lic3p.reason is None,
+              f"a public copy activates without being locked out for page keys ({lic3p.reason} / {r3.status_code})")
+        # updates: one folder serves every public copy, whoever's key it was activated with
+        os.makedirs(pub_dir, exist_ok=True)
+        with zipfile.ZipFile(os.path.join(pub_dir, "Fleet Manager Pro 99.0.0.zip"), "w") as z_:
+            z_.writestr("Fleet Manager Pro/VERSION", "99.0.0")
+        offer = srv.update_manifest(pub_tag, "1.0.0")
+        check(offer.get("update") and offer["manifest"]["build"] == pub_tag and offer["manifest"]["version"] == "99.0.0",
+              "the licence server offers the public update to a public copy")
+        check(not srv.update_manifest(tag_, "1.0.0").get("update"), "a buyer's own copy isn't offered the public build")
+    finally:
+        shutil.rmtree(pub_dir, ignore_errors=True)
+        if os.path.exists(emb_):
+            os.remove(emb_)
+        for f_ in os.listdir(os.path.join(fm_, "__pycache__")) if os.path.isdir(os.path.join(fm_, "__pycache__")) else []:
+            if f_.startswith("_embedded_templates"):
+                os.remove(os.path.join(fm_, "__pycache__", f_))
+        sys.modules.pop("fmpro._embedded_templates", None)
+        import fmpro as _fmpro
+        if hasattr(_fmpro, "_embedded_templates"):
+            delattr(_fmpro, "_embedded_templates")
+        licensing.load_build()
+        licensing.LICENCE = lic
+        shutil.rmtree(tmp3, ignore_errors=True)
+    check(not os.path.exists(emb_) and licensing.BUILD_TAG is None, "the developer copy is left without a build tag")
 
     db.close_all()
     shutil.rmtree(tmp2, ignore_errors=True)

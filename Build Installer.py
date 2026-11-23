@@ -2,8 +2,10 @@ r"""Make the one-file installer for buyer copies that are already built.
 
     python "Build Installer.py" FMP-AAAA-...          one or more buyers
     python "Build Installer.py" --all                 every "For Buyer - FMP-..." folder in Build Output
+    python "Build Installer.py" --public              the public build (For Everyone)
 
 Out:  Build Output\Installers\<purchase key>\Fleet Manager Pro Setup.exe    (send each buyer only their own)
+      Build Output\Installers\Public\Fleet Manager Pro Setup.exe            (the public build: for anyone)
 Needs Inno Setup 6. Run it after the copies are built: it packs the finished folder, so the copy stays sealed to its key.
 """
 import argparse
@@ -20,8 +22,11 @@ ISCC = [os.path.join(os.environ.get(v, ""), *p, "Inno Setup 6", "ISCC.exe")
         for v, p in (("LOCALAPPDATA", ("Programs",)), ("ProgramFiles(x86)", ()), ("ProgramFiles", ()))]
 
 
+PUBLIC = "Public"
+
+
 def build(key, output=OUTPUT, out=None):
-    src = os.path.join(output, f"For Buyer - {key}")
+    src = os.path.join(output, "For Everyone" if key == PUBLIC else f"For Buyer - {key}")
     for need in ("Fleet Manager Pro.exe", "VERSION", "Licence Agreement.txt", "Installation Guide.pdf", "READ ME - Your Data.txt"):
         if not os.path.isfile(os.path.join(src, need)):
             sys.exit(f"{src}: no {need} - build this copy first")
@@ -46,6 +51,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("keys", nargs="*")
     ap.add_argument("--all", action="store_true")
+    ap.add_argument("--public", action="store_true", help="the public build (For Everyone)")
     ap.add_argument("--output", default=OUTPUT, help="the Build Output folder")
     ap.add_argument("--out", help="write the installer here (one key only)")
     a = ap.parse_args()
@@ -53,7 +59,7 @@ if __name__ == "__main__":
     if a.all:
         keys = sorted(d[len("For Buyer - "):] for d in os.listdir(a.output)
                       if d.startswith("For Buyer - ") and os.path.isdir(os.path.join(a.output, d)))
-    if not keys or any(not KEY_RX.fullmatch(k) for k in keys) or (a.out and len(keys) != 1):
-        ap.error("name one or more purchase keys, or use --all")
-    for k in keys:
+    if (not keys and not a.public) or any(not KEY_RX.fullmatch(k) for k in keys) or (a.out and len(keys) + a.public != 1):
+        ap.error("name one or more purchase keys, or use --all / --public")
+    for k in keys + ([PUBLIC] if a.public else []):
         build(k, a.output, a.out)

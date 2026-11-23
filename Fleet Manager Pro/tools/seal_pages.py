@@ -67,3 +67,22 @@ def seal_templates(fmpro_dir, master, tag):
     with open(os.path.join(fmpro_dir, "_embedded_templates.py"), "w", encoding="utf-8", newline="\n") as fh:
         fh.write(f"BUILD = {tag!r}\nCHECK = {lic.pages_check(key)!r}\nTEMPLATES = {plain!r}\nSEALED = {sealed!r}\n")
     return len(plain), len(sealed)
+
+
+PUBLIC_BUILD = "PUBLIC"   # the one build everyone downloads: its tag is build_tag(master, PUBLIC_BUILD)
+
+
+def open_templates(fmpro_dir, tag):
+    """Write fmpro/_embedded_templates.py for the public build: every page in plain text, nothing sealed.
+    The copy still carries a build tag so the licence server knows which update channel it is on."""
+    tdir = os.path.join(fmpro_dir, "templates")
+    plain = {}
+    for root, _d, files in os.walk(tdir):
+        for f in files:
+            full = os.path.join(root, f)
+            plain[os.path.relpath(full, tdir).replace(os.sep, "/")] = open(full, encoding="utf-8").read()
+    if len(plain) < 10 or not PUBLIC_PAGES <= set(plain):
+        raise SystemExit("Couldn't find the page templates")
+    with open(os.path.join(fmpro_dir, "_embedded_templates.py"), "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(f"BUILD = {tag!r}\nCHECK = None\nTEMPLATES = {plain!r}\nSEALED = {{}}\n")
+    return len(plain)

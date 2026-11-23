@@ -6,6 +6,7 @@ copy asks, so there is no signing step here to get wrong.
 
     python publish_update.py --zip "...\Build Output\For Buyer - FMP-XXXX....zip" --key FMP-XXXX-XXXX-XXXX-XXXX
     python publish_update.py --zip "...\Build Output\For Buyer.zip" --stock
+    python publish_update.py --zip "...\Build Output\For Everyone.zip" --public
     python publish_update.py --zip "...package 1.4.zip" --tag FMPB-XXXX-XXXX-XXXX-XXXX --notes "Fixes the map."
 
 * --key    the buyer's purchase key (the folder is found from it, exactly as the build does)
@@ -55,6 +56,7 @@ def main():
     g.add_argument("--key", help="the buyer's purchase key (FMP-XXXX-XXXX-XXXX-XXXX)")
     g.add_argument("--tag", help="the copy's build tag (FMPB-XXXX-XXXX-XXXX-XXXX)")
     g.add_argument("--stock", action="store_true", help="a stock copy (no buyer)")
+    g.add_argument("--public", action="store_true", help="the public build everyone downloads (one update channel)")
     g.add_argument("--generic", action="store_true", help="the unsealed developer/seller copy")
     ap.add_argument("--notes", default="", help="short release notes shown to the buyer")
     ap.add_argument("--version", default="", help="override the version (otherwise read from the zip name or VERSION)")
@@ -77,6 +79,8 @@ def main():
 
     if a.stock:
         folder = "STOCK"
+    elif a.public:
+        folder = tag_for_key("PUBLIC")              # updates/<the public build's tag>: no server change needed
     elif a.generic:
         folder = "GENERIC"
     elif a.tag:

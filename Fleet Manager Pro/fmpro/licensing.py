@@ -159,6 +159,7 @@ def _when(s):
 # ---------------------------------------------------------------------------------------------- sealed pages
 # A buyer copy carries a hidden build tag, and its pages are encrypted with a key for that tag which only the licence
 # server can hand out (inside the signed lease). The developer copy and the seller's own copy have no sealed pages.
+# The public build carries a build tag (its update channel) but ships every page unsealed.
 BUILD_TAG = PAGES_CHECK = None
 SEALED_PAGES = {}
 PAGES_LOCKED = ("This copy of Fleet Manager Pro still needs its pages unlocked by the licence server. Connect to the "
@@ -432,7 +433,7 @@ class Licence:
                     else now.isoformat(timespec="seconds")
             except ValueError:
                 self.seen = now.isoformat(timespec="seconds")
-        if why is None and BUILD_TAG and not lease_page_key(self.lease, self.machine):
+        if why is None and SEALED_PAGES and not lease_page_key(self.lease, self.machine):
             why = PAGES_LOCKED                     # genuine licence, but no key for this copy's pages
         self.ok, self.reason = why is None, why
 

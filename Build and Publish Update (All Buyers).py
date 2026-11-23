@@ -7,6 +7,8 @@ licence server's update folder, so each buyer's app then shows "Update available
     python "Build and Publish Update (All Buyers).py"                 every active buyer on the licence server
     python "Build and Publish Update (All Buyers).py" --from-csv      ...or the old local Buyer Builds (PRIVATE).csv
     python "Build and Publish Update (All Buyers).py" --stock         ...and a fresh stock copy too
+    python "Build and Publish Update (All Buyers).py" --public        ...and the public build (For Everyone)
+    python "Build and Publish Update (All Buyers).py" --public --only-public   just the public build
     python "Build and Publish Update (All Buyers).py" --keys FMP-AAAA-... FMP-BBBB-...   just these buyers
     python "Build and Publish Update (All Buyers).py" --notes "Fixes the map." --dry-run
 
@@ -27,6 +29,7 @@ BUILD_SCRIPT = os.path.join(DEV, "Build Pro Buyer Copy.py")
 FLAVORS = (
     ("exe", BUILD_SCRIPT, "For Buyer - {key}.zip", "For Buyer.zip"),
 )
+PUBLIC_ZIP = "For Everyone.zip"
 HOST = os.path.join(DEV, "Fleet Manager License Host")
 PUBLISH = os.path.join(HOST, "publish_update.py")
 CSV_PATH = os.path.join(DEV, "Buyer Builds (PRIVATE).csv")
@@ -74,8 +77,11 @@ def run(cmd, cwd):
     return subprocess.run(cmd, cwd=cwd).returncode  # nosec B603  # fixed argument list, no shell
 
 
-def _build_one(flavor, script, zip_path, notes, key=None, stock=False):
-    if stock:
+def _build_one(flavor, script, zip_path, notes, key=None, stock=False, public=False):
+    if public:
+        rc = run([sys.executable, script, "--public"], DEV)
+        pub = [sys.executable, PUBLISH, "--zip", zip_path, "--public", "--flavor", flavor]
+    elif stock:
         rc = run([sys.executable, script], DEV)
         pub = [sys.executable, PUBLISH, "--zip", zip_path, "--stock", "--flavor", flavor]
     else:
@@ -91,13 +97,14 @@ def _build_one(flavor, script, zip_path, notes, key=None, stock=False):
     return None if rc == 0 else f"{flavor} publish failed (exit {rc})"
 
 
-def build_and_publish(key, notes, stock=False):
+def build_and_publish(key, notes, stock=False, public=False):
     """Build and publish this buyer's .exe copy. Returns None when it published, else a summary of what failed."""
     errs = []
     for flavor, script, buyer_tmpl, stock_name in FLAVORS:
-        name = stock_name if stock else buyer_tmpl.format(key=key)
+        name = PUBLIC_ZIP if public else stock_name if stock else buyer_tmpl.format(key=key)
         zip_path = os.path.join(BUILD_OUTPUT, name)
-        err = _build_one(flavor, script, zip_path, notes, key=None if stock else key, stock=stock)
+        err = _build_one(flavor, script, zip_path, notes, key=None if stock or public else key, stock=stock,
+                         public=public)
         if err:
             errs.append(err)
     return "; ".join(errs) if errs else None
@@ -108,13 +115,19 @@ def main():
     ap.add_argument("--keys", nargs="*", help="only these purchase keys (default: every active key on the licence server)")
     ap.add_argument("--from-csv", action="store_true", help="use the old local Buyer Builds (PRIVATE).csv instead of the server")
     ap.add_argument("--stock", action="store_true", help="also build + publish a stock copy")
+    ap.add_argument("--public", action="store_true", help="also build + publish the public build (For Everyone)")
+    ap.add_argument("--only-public", action="store_true", help="with --public: skip the buyers' own copies")
     ap.add_argument("--notes", default="", help="release notes shown to every buyer")
     ap.add_argument("--dry-run", action="store_true", help="list what would be built, do nothing")
     ap.add_argument("--yes", action="store_true", help="don't ask before starting")
     a = ap.parse_args()
 
     ver = version()
-    if a.keys:
+    if a.only_public and not a.public:
+        sys.exit("--only-public goes with --public")
+    if a.only_public:
+        keys, source = [], "--only-public"
+    elif a.keys:
         keys, source = [k.strip().upper() for k in a.keys], "--keys"
     elif a.from_csv:
         keys, source = buyers_from_csv(), os.path.basename(CSV_PATH)
@@ -127,29 +140,31 @@ def main():
     bad = [k for k in keys if not KEY_RX.match(k)]
     if bad:
         sys.exit(f"Not purchase keys: {bad}")
-    if not keys and not a.stock:
+    if not keys and not a.stock and not a.public:
         sys.exit(f"No buyers found ({source}). Sell a copy first, or pass --keys / --stock.")
 
     print(f"Version to ship: Fleet Manager Pro {ver}")
-    print(f"Buyers to update: {len(keys)}  (from {source})" + ("  (+ stock copy)" if a.stock else ""))
+    print(f"Buyers to update: {len(keys)}  (from {source})" + ("  (+ stock copy)" if a.stock else "")
+          + ("  (+ public build)" if a.public else ""))
     for k in keys:
         print("  -", k)
     if a.dry_run:
         print("\n(dry run - nothing built)")
         return
     if not a.yes:
-        ans = input(f"\nBuild and publish {len(keys) + (1 if a.stock else 0)} copies? Each takes a few minutes. [y/N] ")
+        ans = input(f"\nBuild and publish {len(keys) + a.stock + a.public} copies? Each takes a few minutes. [y/N] ")
         if ans.strip().lower() not in ("y", "yes"):
             print("Cancelled.")
             return
 
     results = []
-    todo = [(k, False) for k in keys] + ([("STOCK", True)] if a.stock else [])
-    for i, (key, stock) in enumerate(todo, 1):
-        who = "stock copy" if stock else key
+    todo = ([(k, "") for k in keys] + ([("STOCK", "stock")] if a.stock else [])
+            + ([("PUBLIC", "public")] if a.public else []))
+    for i, (key, kind) in enumerate(todo, 1):
+        who = {"stock": "stock copy", "public": "public build"}.get(kind, key)
         print(f"\n[{i}/{len(todo)}] {who}")
         try:
-            err = build_and_publish(key, a.notes, stock=stock)
+            err = build_and_publish(key, a.notes, stock=kind == "stock", public=kind == "public")
         except Exception as e:  # keep going for the other buyers
             err = f"error: {e}"
         results.append((who, err))
