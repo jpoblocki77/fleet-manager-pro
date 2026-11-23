@@ -41,7 +41,8 @@ _lock = threading.RLock()
 _manifest = None                 # the verified manifest we're offering, if any
 _started = False
 STATE = {"available": False, "version": None, "notes": "", "size": 0,
-         "status": "idle", "error": None, "checked": None, "staged": None}
+         "status": "idle", "error": None, "checked": None, "staged": None,
+         "notice": None}             # the server's "please update" message for this version, if any
 
 
 # ---------------------------------------------------------------------------------------------- helpers
@@ -151,6 +152,12 @@ def check():
         with _lock:
             STATE.update(checked=time.time())
         return state()
+
+    notice = " ".join(str(d.get("notice") or "").split())[:300] if isinstance(d, dict) else ""
+    with _lock:
+        STATE.update(notice=notice or None)     # kept only while the server still says so
+    if notice:
+        log.warning("the server asks this version (%s) to update: %s", cur, notice)
 
     if not isinstance(d, dict) or not d.get("update"):
         with _lock:

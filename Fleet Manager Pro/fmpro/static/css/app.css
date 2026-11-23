@@ -443,6 +443,9 @@ td.empty { padding: 28px 12px; text-align: center; color: var(--muted); }
 .app-banner { border-color: color-mix(in srgb, #2f7fd6 50%, transparent);
   background: linear-gradient(90deg, color-mix(in srgb, #2f7fd6 20%, var(--card, #111a2e)), var(--card, #111a2e)); }
 .app-banner .ub-tag { background: #2f7fd6; }
+.notice-banner { border-color: color-mix(in srgb, #c8102e 55%, transparent);
+  background: linear-gradient(90deg, color-mix(in srgb, #c8102e 20%, var(--card, #111a2e)), var(--card, #111a2e)); }
+.notice-banner .ub-tag { background: #c8102e; }
 .update-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; background: #2fb67c;
   color: #fff !important; font-size: 12px; font-weight: 700; text-decoration: none; white-space: nowrap; animation: fmp-pulse 2.4s ease-in-out infinite; }
 .update-chip svg { width: 14px; height: 14px; }

@@ -1464,6 +1464,65 @@ def main():
     from fmpro.telemetry.service import HUB as _HUB
     check(updater.busy() is None or bool(_HUB.all_live()), "busy() reports live drivers only")
 
+    # "Please update" notices for bad versions (server side: updates/notices.json, set with update_notice.py)
+    import contextlib
+    import io
+    import update_notice
+    update_notice.PATH = os.path.join(srv.updates_dir(), "notices.json")
+    with contextlib.redirect_stdout(io.StringIO()):
+        update_notice.main([])
+    updater.check()
+    check(updater.state()["notice"] is None and "Please update" not in c.get("/").get_data(as_text=True),
+          "no notice and no red banner while no version is marked bad")
+    with contextlib.redirect_stdout(io.StringIO()):
+        update_notice.main([VERSION, "Jobs can be <b>paid twice</b> in this version."])
+        update_notice.main(["<1.0", "Far too old."])
+    check(json.load(open(update_notice.PATH, encoding="utf-8")) == {VERSION: "Jobs can be <b>paid twice</b> in this version.", "<1.0": "Far too old."},
+          "update_notice.py marks a version bad")
+    updater.check()
+    page = c.get("/").get_data(as_text=True)
+    check(updater.state()["notice"] == "Jobs can be <b>paid twice</b> in this version." and "notice-banner" in page
+          and "Please update" in page and "&lt;b&gt;paid twice&lt;/b&gt;" in page and "<b>paid twice</b>" not in page,
+          "a copy on a bad version shows the red Please update banner, with the message escaped")
+    check('class="update-banner"' not in page, "and not the green one as well")
+    page = uc.get("/").get_data(as_text=True)
+    check("Please update" in page and 'value="install"' not in page, "drivers see the notice, without an install button")
+    check(srv.update_notice("0.9.1") == "Far too old." and srv.update_notice("1.0") is None and srv.update_notice("") is None,
+          '"<1.0" matches every older version, not 1.0 itself')
+    v_ = VERSION.split("-")[0]
+    check(srv.update_notice(v_) == srv.update_notice(VERSION + "x") == "Jobs can be <b>paid twice</b> in this version.",
+          "1.5.29 and 1.5.29-beta are the same version")
+    with contextlib.redirect_stdout(io.StringIO()):
+        update_notice.main(["<99.0", "Everything older than 99."])
+    check(srv.update_notice(VERSION) == "Jobs can be <b>paid twice</b> in this version.", "an exact version wins over a '<' entry")
+    for bad in (["1.x", "m"], ["1.5.30"], ["1.5.30", "x" * 301]):
+        try:
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                update_notice.main(bad)
+            check(False, f"update_notice.py refuses {bad[0]!r} with {len(bad) - 1} message(s)")
+        except SystemExit as e:
+            check(e.code not in (0, None), f"update_notice.py refuses a bad version, a missing or too long message ({bad[0]})")
+    with open(update_notice.PATH, "w", encoding="utf-8") as fh:
+        fh.write("{broken")
+    check(srv.update_notice(VERSION) is None, "a broken notices.json is ignored, never fatal")
+    os.utime(update_notice.PATH, None)
+    with contextlib.redirect_stdout(io.StringIO()):
+        update_notice.main(["--clear-all"])
+    updater.check()
+    check(updater.state()["notice"] is None and "notice-banner" not in c.get("/").get_data(as_text=True),
+          "clearing the notice removes the banner at the next check, with no server restart")
+    real_ = os.environ["FMP_LICENSE_SERVER"]
+    with contextlib.redirect_stdout(io.StringIO()):
+        update_notice.main([VERSION, "Bad."])
+    updater.check()
+    os.environ["FMP_LICENSE_SERVER"] = "http://127.0.0.1:9"
+    updater.check()
+    check(updater.state()["notice"] == "Bad.", "the notice stays while the server can't be reached")
+    os.environ["FMP_LICENSE_SERVER"] = real_
+    with contextlib.redirect_stdout(io.StringIO()):
+        update_notice.main(["--clear-all"])
+    updater.check()
+
     # Connect a Tablet: QR code -> one-time sign-in link
     import re as _re
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

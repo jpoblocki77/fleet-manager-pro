@@ -1096,6 +1096,48 @@ class Server:
                 best = (ver, name, folder)
         return best
 
+    NOTICE_MAX = 300
+
+    def notices(self):
+        """updates/notices.json: {"1.5.29-beta": "message", "<1.5.30": "message", ...}. A key is one version, or
+        "<" and a version for every version older than it. Re-read whenever the file changes, so marking a version
+        bad needs no restart. A broken file is ignored (logged), never fatal."""
+        path = os.path.join(self.updates_dir(), "notices.json")
+        try:
+            st = os.stat(path)
+        except OSError:
+            return {}
+        key = (st.st_mtime_ns, st.st_size)
+        cached = getattr(self, "_notices", None)
+        if cached and cached[0] == key:
+            return cached[1]
+        try:
+            with open(path, encoding="utf-8") as fh:
+                d = json.load(fh)
+            if not isinstance(d, dict):
+                raise ValueError("not an object")
+            d = {str(k).strip(): " ".join(str(v).split())[:self.NOTICE_MAX] for k, v in d.items()
+                 if str(k).strip() and str(v).strip()}
+        except (OSError, ValueError) as e:
+            self.log.warning("updates/notices.json ignored: %s", e)
+            d = {}
+        self._notices = (key, d)
+        return d
+
+    def update_notice(self, client_version):
+        """The "please update" message for this copy's version, or None. An exact version wins over a "<" entry."""
+        v = vtuple(client_version)
+        if not client_version or v == (0,):
+            return None
+        below = None
+        for k, msg in self.notices().items():
+            if k.startswith("<"):
+                if v < vtuple(k[1:]) and below is None:
+                    below = msg
+            elif vtuple(k) == v:
+                return msg
+        return below
+
     def update_manifest(self, build, client_version, flavor="exe"):
         """Signed offer of the newest build for this copy's flavour (or {'update': False} when it's current)."""
         best = self.latest_update(build, flavor)
@@ -1456,7 +1498,11 @@ class Server:
                 raise LicenceError("bad_product", "This licence server only serves Fleet Manager Pro updates.")
             build = str(body.get("build") or "").strip().upper()
             build = build if BUILD_RX.match(build) else ""
-            return self.update_manifest(build, str(body.get("version") or ""), str(body.get("flavor") or "exe"))
+            r = self.update_manifest(build, str(body.get("version") or ""), str(body.get("flavor") or "exe"))
+            notice = self.update_notice(str(body.get("version") or ""))
+            if notice:
+                r["notice"] = notice       # not signed: plain text over the pinned TLS channel, shown escaped
+            return r
         if path.startswith("/v1/admin/"):
             if peer is not None and not admin_peer_ok(peer):
                 # Straight from the internet (no HTTPS): the admin token must never travel that way.
