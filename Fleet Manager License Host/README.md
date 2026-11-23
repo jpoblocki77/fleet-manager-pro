@@ -1,55 +1,39 @@
-# Fleet Manager Pro — Licence server + License Manager (seller only)
+# Fleet Manager Pro — Fleet Manager server + License Manager (author only)
 
 **Never send this folder to anyone.** `host_key.json` is your private signing key, `server_config.json` holds
-your admin token, `licenses.db` is your list of purchases and `tls_key.pem` is the server's secret encryption key.
+your admin token, `licenses.db` is the server's database and `tls_key.pem` is the server's secret encryption key.
 Back all four up.
 
-This server licenses **Fleet Manager Pro only**: it issues `FMP-` keys and refuses any other product.
+Fleet Manager Pro is **free**: no licence keys and no activation. This server gives every copy its **updates** and
+hosts the **online features**: each company's Apply page, the Global Leaderboard and the VTC Finder. It still answers
+copies sold before 1.5.29 (with `FMP-` keys) so they can update and hand their online data over.
 
 | File | What it is |
 |---|---|
-| `License Server.bat` / `license-server.sh` / `license_server.py` | the online licence server (port 8750). Must be running and reachable. It also hosts each company's online **Apply** page for recruitment. |
-| `License Manager.bat` / `license-manager.sh` / `license_tool.py` | your admin tool: set up, new purchases, list PCs, release, revoke, reset |
-| `Reset Licences.bat` / `reset_licences.py` | wipes every purchase (backs up `licenses.db` first, you type RESET) - only for starting over |
-| `host_key.json` | private signing key (secret) |
-| `server_config.json` | admin token, port, lease length (7 days), public address |
-| `licenses.db` | purchases and the PCs activated on each (max 2), plus waiting online job applications |
+| `License Server.bat` / `license-server.sh` / `license_server.py` | the Fleet Manager server (port 8750). Must be running and reachable. |
+| `License Manager.bat` / `license-manager.sh` / `license_tool.py` | your admin tool: block or unblock a company, VTC Finder listings, the old purchases |
+| `publish_update.py` | puts a built package into `updates\` (Ship Update.bat in the Development folder runs it for you) |
+| `update_notice.py` | marks a version bad, so copies on it show a red **Please update** banner (see UPDATES.md) |
+| `Reset Licences.bat` / `reset_licences.py` | wipes every old purchase (backs up `licenses.db` first, you type RESET) |
+| `host_key.json` | private signing key (secret): signs every update |
+| `server_config.json` | admin token, port, public address |
+| `licenses.db` | companies' online IDs, Apply pages and waiting applications, the leaderboard, VTC Finder profiles, old purchases |
 | `tls_cert.pem` / `tls_key.pem` | the server's certificate and its **secret** key (encryption, valid until 2046) |
+| `updates\` | one folder per update channel (the public one and one per older buyer copy), and `notices.json` |
 | `deploy\` | ready-made files to put the server on Kamatera: Prepare Upload.bat, then `install.sh` (see `deploy\README.md`) |
 
-## Selling a copy
+## How companies are known online
 
-1. Build the buyer copy (in the folder above this one): `Build Buyer Copy.bat`, or
-   `python "Build Pro Buyer Copy.py" --buyer FMP-...`, makes `For Buyer - FMP-....zip` (a single `Fleet Manager Pro.exe`).
-   It is compiled (no readable source), contains no data and no secrets, checks
-   `https://fleetmanager.servehttp.com:8750` pinned to `tls_cert.pem`, and can't be pointed at another licence server.
-2. **License Manager → 2) New purchase**: type the buyer's name (email optional). You get a key `FMP-XXXX-XXXX-XXXX-XXXX`
-   that works on 2 PCs. Command line: `python license_tool.py new "Name" [email]`.
-3. Send the buyer the zip and the key. They unzip it, double-click **Start Fleet Manager Pro.bat** and type the key on the
-   **Activate** screen. The Installation Guide PDF is inside the zip.
+The first time a company uses the Apply page, Global Leaderboard or VTC Finder, its copy makes a random **company ID**
+(`FMC-XXXX-XXXX-XXXX-XXXX`) and a secret, kept in its own database, and registers them here (at most 20 new
+companies per internet address a day). Every sync proves it with the secret. A copy that was activated with a key
+before 1.5.29 also sends that key once, and its Apply page, leaderboard entry and VTC Finder profile move to the
+company ID.
 
-## How online licensing works
-
-1. The buyer types the key on Fleet Manager Pro's **Activate** screen. It sends key + Machine ID to the licence server,
-   which allows **at most 2 PCs per purchase** and returns a lease signed with your private key.
-2. Fleet Manager Pro re-checks online at start-up and every 6 hours. If you **revoke** the purchase or **release** a PC,
-   that PC locks at its next check. If the server is unreachable it keeps working on its last lease for up to 7 days,
-   then locks until it can check again. Setting the PC clock back also locks it.
-3. Buyers can free a PC themselves: Settings → Licence → **Deactivate this PC**.
-4. If a buyer **can't** deactivate (PC died, Windows reinstalled, PC sold): License Manager → **7) Reset a purchase's
-   uses**. It shows which PCs are in use, asks you to type YES, then frees every PC on that purchase. Old PCs lock at
-   their next check. Each reset is counted and shown in **3) List purchases** (e.g. "reset 2x"), so you can spot abuse.
-   Command line: `python license_tool.py reset FMP-XXXX-…`. To free just one known PC, use **4) Release a PC**.
-5. A key for any other product, or a wrong key, is refused **before** it uses a PC slot.
-6. **Delete a purchase** for good (License Manager → **8) Delete a purchase**, active or revoked; type DELETE). Its PCs,
-   its online Apply page and any waiting applications go too; copies using the key lock at their next check and the
-   key never works again. **9) Delete ALL revoked purchases** clears out every revoked one at once. Before anything is
-   deleted, a copy is appended to `deleted_purchases.jsonl` (private: it has buyers' names and emails). Command line:
-   `python license_tool.py delete FMP-XXXX-…` or `python license_tool.py delete-revoked`. To block a key but keep its
-   record, use **5) Revoke** instead.
-
-Leases are signed with your private key and Fleet Manager Pro only trusts your public key, so a fake server can't
-unlock it.
+* **Block a company** (License Manager → **5**): type its company ID, or an old purchase key to block every company
+  that came from it. It loses the online features; the app itself keeps working. **6** unblocks.
+* **VTC Finder listings** (License Manager → **11**): hide or show a company, or forget its reports.
+* The old purchase options (2, 3, 4, 7, 8, 9, 10) only matter for copies sold before Fleet Manager Pro went free.
 
 ## Your setup (cloud server)
 
@@ -58,7 +42,7 @@ unlock it.
 | Server | cloud box, reached over **AnyDesk / Remote Utilities**; runs **License Server.bat** (keep its window open) |
 | Internet address | `fleetmanager.servehttp.com` (free No-IP name pointing at the cloud box) |
 | Port | inbound **TCP 8750** open on the cloud box's firewall |
-| Buyer copies check | `https://fleetmanager.servehttp.com:8750`, pinned to `tls_cert.pem` |
+| Every copy checks | `https://fleetmanager.servehttp.com:8750`, pinned to `tls_cert.pem` |
 | Admin (License Manager) | runs **on the cloud box itself** — `admin_url` is `http://127.0.0.1:8750` |
 
 **Updating the server:** copy `license_server.py`, `license_tool.py`, `reset_licences.py`, the `.bat` files and this
@@ -72,7 +56,7 @@ To move to a cloud server later: **Guides\Kamatera Hosting Guide.pdf** and `depl
 
 ## Encryption (HTTPS on port 8750)
 
-With `tls_cert.pem` and `tls_key.pem` in this folder, the licence server speaks HTTPS on port 8750. Buyer copies are
+With `tls_cert.pem` and `tls_key.pem` in this folder, the licence server speaks HTTPS on port 8750. Copies are
 *pinned* to this exact certificate, so nobody in between can read purchase keys or fake the server.
 
 - `tls_key.pem` is secret: back it up with `host_key.json`. If you lose it, new copies need a new certificate.
@@ -105,13 +89,3 @@ python license_tool.py reset KEY                         free ALL PCs on a purch
 python license_tool.py setup --app "PATH" --url URL      signing key + admin token; point a Fleet Manager Pro folder at URL
 ```
 
-## Buyer copies are sealed to their buyer
-
-Buyer copies are built per purchase (`Build Buyer Copy.bat` in the Development folder). Each copy has a hidden build
-tag and its pages are encrypted; on activation and every check this server returns the page key inside the signed
-lease (wrapped to the PC). **The server PC must run this version of `license_server.py`, or new copies stay locked.**
-The page keys come from `host_key.json`, so nothing else needs copying.
-
-* **3) List** shows `! LEAK?` under a PC that runs a copy built for a different purchase.
-* **10) Identify a copy** (or `python license_tool.py whose FMPB-...`) tells you whose copy a build tag is. Get the tag
-  from a copy with `"Fleet Manager Pro.exe" --build-tag` or `runtime\python.exe app\run.pyc --build-tag`.

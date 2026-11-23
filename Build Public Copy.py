@@ -1,6 +1,6 @@
 """Build the copy of Fleet Manager Pro that everyone downloads (it's free: no licence key, no activation).
 
-    python "Build Pro Buyer Copy.py"            (or double-click  Build Buyer Copy.bat )
+    python "Build Public Copy.py"            (or double-click  Build Public Copy.bat )
 
 Makes  ..\\Build Output\\For Everyone\\  (a compiled program: Fleet Manager Pro.exe, no Python source, no Python needed)
 and  ..\\Build Output\\For Everyone.zip  from the development copy in  Fleet Manager Pro\\ . The copy carries the public

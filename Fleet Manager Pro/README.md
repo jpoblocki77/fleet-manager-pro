@@ -100,13 +100,14 @@ Settings → Compliance turns each part on/off and sets the rules and fines.
 
 ## Start
 
-This is the source version (your own copy and the development copy). Buyers get the compiled program instead:
-see **Fleet Manager Pro - Installation Guide.pdf**.
+Fleet Manager Pro is free: no key, no activation, no account. Most people install the compiled program
+(**Fleet Manager Pro Setup.exe** from <http://fleetmanager.servehttp.com:8080>): see
+**Fleet Manager Pro - Installation Guide.pdf**. The steps below are for the source version.
 
 1. Install Python 3.10+ from python.org (tick *Add to PATH*).
 2. Double-click **Start Fleet Manager Pro.bat**. First run installs Flask, Waitress and cryptography, then opens
    <http://127.0.0.1:8760>.
-3. Type your purchase key (`FMP-...`) on the **Activate** screen.
+3. Read and accept the licence agreement (**Agree and continue**). No key is needed.
 4. Create your company and owner account (password: at least 8 characters).
 5. **Settings → Telemetry → Game plugin → Install** (or copy `plugin\scs-telemetry.dll` into
    `<game>\bin\win_x64\plugins\`). Start the game and click OK on the "advanced SDK features" message.
@@ -151,9 +152,10 @@ HUD (for OBS: `/overlay?key=YOUR_TOKEN&solid`) are built on the same feed.
 run.py                    launcher (Waitress), LAN / HTTPS mode, remote agent
 fmpro/__init__.py         app factory, template filters, paths for the compiled build
 fmpro/db.py               SQLite schema, upgrades of older databases, helpers
-fmpro/auth.py             accounts, roles, sessions, CSRF, host check, login throttling, game choice, setup, activation
-fmpro/licensing.py        online licence (activation, 6-hourly checks, signed leases, certificate pin)
-fmpro/EULA.txt            the licence agreement buyers agree to when they activate
+fmpro/auth.py             accounts, roles, sessions, CSRF, host check, login throttling, game choice, setup, agreement
+fmpro/licensing.py        the pinned TLS channel to the Fleet Manager server, signature checks, build tag
+fmpro/online_id.py        the company's own online ID for the Apply page, Global Leaderboard and VTC Finder
+fmpro/EULA.txt            the licence agreement everyone accepts on first start
 fmpro/pages.py            pages and forms: dashboard, logbook, dispatch, fleet, finance, drivers, events, settings...
 fmpro/compliance.py       Hours of Service rules and clocks, DVIR, roadside inspections, dispatch holds
 fmpro/compliance_views.py the ELD & Compliance pages
@@ -173,27 +175,23 @@ fmpro/static/map/         Fleet Map borders and cities per game (built by tools/
 fmpro/templates, static   UI (no external libraries or CDNs)
 plugin/                   scs-telemetry.dll + its MIT licence
 tools/                    build_cargo.py · build_map.py · make_install_guide.py (developer tools, not shipped)
-tests/e2e_test.py         end-to-end test (throw-away data and licence server)
+tests/e2e_test.py         end-to-end test (throw-away data and Fleet Manager server)
 tests/security_test.py    security test
 ```
 
 ## Licence
 
-Fleet Manager Pro is © 2026 Jeff Poblocki. All rights reserved. Buyers use it under the licence agreement in
-`fmpro/EULA.txt` (shipped as **Licence Agreement.txt** in both buyer copies and readable in the app at
-`/licence-agreement`, linked from every page). Activation needs the **I agree** box ticked; the time and key are
-recorded (setting `eula_accepted` and the audit log).
+Fleet Manager Pro is © 2026 Jeff Poblocki. All rights reserved. It is **free**: everyone uses it under the licence
+agreement in `fmpro/EULA.txt` (shipped as **Licence Agreement.txt** and readable in the app at `/licence-agreement`,
+linked from every page). The first start shows the agreement; nothing else opens until **I agree** is ticked, and
+the time is recorded (setting `eula_accepted` and the audit log).
 
-Fleet Manager Pro is activated online with a **Pro purchase key** (`FMP-XXXX-XXXX-XXXX-XXXX`), sold separately from
-the original Fleet Manager (whose `FM-` keys don't unlock Pro, and vice versa).
-
-* First start shows **Activate**: type the key. It works on **2 PCs** per purchase.
-* It re-checks at start-up and every 6 hours; without internet it keeps working for **7 days** after the last check.
-* **Settings → Licence** shows the licence, *Check now* and *Deactivate this PC* (to move to another PC).
-* Leases are signed with the seller's Ed25519 key and the connection is pinned to the server's certificate, so a
-  fake server can't unlock it. Setting the PC clock back locks it until the clock is right.
-* The client is `fmpro/licensing.py`; License Manager → *Set up* writes the server address, public key and
-  certificate pin into it for a buyer copy.
+* No licence key and no activation; it works fully offline.
+* Updates and the online features (Apply page, Global Leaderboard, VTC Finder) use the Fleet Manager server over a
+  certificate-pinned connection; updates are signed with the server's Ed25519 key.
+* Online features identify the company by its own random ID and secret (`online_id.py`, kept in the database), not
+  by anything personal. Copies that were activated with a key before 1.5.29 hand their online data over once.
+* **Settings → About** shows the version, when the agreement was accepted and the company's online ID.
 
 ## Roles
 
@@ -222,13 +220,12 @@ manager) and RSVP to events. Only the owner takes loans or promotes managers.
   can hold every remote driver's delivery for approval. The server still can't see the game itself, so a patient
   cheat who fakes a plausible drive in real time is not caught: managers should glance at remote drivers' logs.
 * Roles are enforced on the server for every action; maintenance costs, fleet and finance are manager-only; only the
-  owner sees the purchase key, takes loans or deactivates the licence; managers can't edit, remove or read the agent
+  owner takes loans; managers can't edit, remove or read the agent
   token of anyone at or above their own rank.
 * CSV exports neutralise spreadsheet formulas; all numbers are range-checked; the plugin installer only works from a
   browser on the server PC itself.
-* **Buyer copies are compiled** (`Build Pro Buyer Copy.py` → `Fleet Manager Pro.exe`, no Python source), so the
-  licence check can't be removed with a text editor. A skilled reverse-engineer can still defeat any offline program;
-  revoking a leaked key on the licence server remains the real control.
+* **The public program is compiled** (`Build Pro Buyer Copy.py` → `Fleet Manager Pro.exe`, no Python source) and
+  only installs updates signed by the Fleet Manager server.
 
 ## Tests
 
@@ -238,8 +235,8 @@ python tests\security_test.py
 python tests\fuzz_test.py      # every page and form, every role, hostile input
 ```
 
-It starts its own throw-away licence server (needs the `Fleet Manager License Host` folder next to this one) and
-never touches your data, your licence or your real server.
+It starts its own throw-away Fleet Manager server (needs the `Fleet Manager License Host` folder next to this one) and
+never touches your data or your real server.
 
 ## Feature status — 1.3-alpha
 
@@ -279,12 +276,12 @@ Dispatch — Rhys Moult; Drivers / Driver Performance — Bhargav Panchal.
 ## Recruitment — how drivers join
 
 Fleet Manager Pro only listens on your own PC, so drivers apply on your **online Apply page**, which lives on the
-licence server (always online). Recruitment shows your link, e.g. `http://fleetmanager.servehttp.com:8750/apply/abcd2345`,
+Fleet Manager server (always online). Recruitment shows your link, e.g. `http://fleetmanager.servehttp.com:8750/apply/abcd2345`,
 with a **Copy** button: share it on Discord, TruckersMP or your socials.
 
 1. A driver opens the link and fills in name, contact (Discord / email), age, country, game, experience and a message.
 2. Within about 10 minutes (or when you press **Check now**) the application appears on **Recruitment**; managers get a
-   notification and, with a Discord webhook, a message. The licence server deletes it once it's collected.
+   notification and, with a Discord webhook, a message. The server deletes it once it's collected.
 3. **Accept** creates the driver's account (optionally in a division) — give them their username and password.
    **Interview** / **Reject** keep track of the rest.
 

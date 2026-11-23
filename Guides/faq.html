@@ -47,13 +47,13 @@ footer{text-align:center;color:var(--muted);font-size:14px;padding:0 20px 34px}
 <a href="#install">Install steps</a>
 <a href="#first">First checks when something is wrong</a>
 <a href="#t-install">Fix: installing and starting</a>
-<a href="#t-licence">Fix: activation</a>
+<a href="#t-online">Fix: online features</a>
 <a href="#t-game">Fix: the game and jobs</a>
 <a href="#t-drivers">Fix: drivers and other PCs</a>
 <a href="#t-data">Fix: data and updates</a>
 <a href="#q-general">Questions: general</a>
 <a href="#q-data">Questions: data and updates</a>
-<a href="#q-licence">Questions: your key</a>
+<a href="#q-licence">Questions: free and online</a>
 <a href="#q-drivers">Questions: drivers</a>
 <a href="#q-company">Questions: running the company</a>
 <a href="#q-privacy">Questions: privacy</a>
@@ -67,12 +67,12 @@ footer{text-align:center;color:var(--muted);font-size:14px;padding:0 20px 34px}
 <p id="found" role="status"></p></div>
 
 <h2 id="install">Install steps</h2>
-<p>You need Windows 10 or 11 (64-bit), American Truck Simulator or Euro Truck Simulator 2 on Steam, your licence key, and internet to activate. The <a href="install.html">installation guide</a> shows every step in full.</p>
+<p>Fleet Manager Pro is free: no key, no activation, no account. You need Windows 10 or 11 (64-bit) and American Truck Simulator or Euro Truck Simulator 2 on Steam. Download <b>Fleet Manager Pro Setup.exe</b> from <a href="http://fleetmanager.servehttp.com:8080">the Fleet Manager Pro website</a>. The <a href="install.html">installation guide</a> shows every step in full.</p>
 <ol>
 <li>Double-click <b>Fleet Manager Pro Setup.exe</b>. If Windows shows a blue "Windows protected your PC" box, click <b>More info</b>, then <b>Run anyway</b>.</li>
 <li>Accept the licence agreement, click <b>Install</b>, then <b>Finish</b>. No administrator password is needed.</li>
 <li>A black window opens: leave it open. Your browser opens <code>http://127.0.0.1:8760</code>. If it doesn't, type that address yourself.</li>
-<li>Type your licence key (<code>FMP-XXXX-XXXX-XXXX-XXXX</code>), tick the licence agreement box and click <b>Activate this PC</b>.</li>
+<li>Read the licence agreement, tick <b>I have read and agree to the licence agreement</b> and click <b>Agree and continue</b>.</li>
 <li>Name your company, create the owner account (password of at least 8 characters) and click <b>Create company</b>.</li>
 <li>Close the game. Open <b>Settings &gt; Telemetry</b> and, under <b>Game plugin</b>, click <b>Install</b> next to each game.</li>
 <li>Start the game and click <b>OK</b> on the "advanced SDK features" message.</li>
@@ -112,15 +112,14 @@ footer{text-align:center;color:var(--muted);font-size:14px;padding:0 20px 34px}
 <p>Another copy is running. Close it in Task Manager. Or start on another port: press <b>Windows + R</b>, paste <code>%LOCALAPPDATA%\Programs\Fleet Manager Pro</code>, press Enter, click the address bar, type <b>cmd</b>, press Enter and run:</p>
 <pre><code>"Fleet Manager Pro.exe" --port 8770</code></pre></div></details>
 
-<h2 id="t-licence">Fix: activation</h2>
-<details><summary>"Can't reach the licence server"</summary><div>
-<ol><li>Check your internet connection and try again.</li><li>Turn off your VPN for a moment.</li><li>Allow Fleet Manager Pro in your firewall or antivirus.</li><li>Still no? Wait a while and try again, then contact whoever gave you your licence key.</li></ol></div></details>
-<details><summary>"This purchase is already active on 2 PCs"</summary><div>
-<p>On a PC you no longer use, open <b>Settings &gt; Licence &gt; Deactivate this PC</b>. If that PC is gone, ask whoever gave you your licence key to release it.</p></div></details>
-<details><summary>"That purchase key doesn't exist"</summary><div>
-<p>Check for typing mistakes. Keys start with <b>FMP-</b> and use only letters A-Z and digits 2-7 (no 0, 1, 8 or 9). Keys starting with <b>FM-</b> are for the older app.</p></div></details>
-<details><summary>It worked before and now asks to be activated</summary><div>
-<p>Connect to the internet: without it, Fleet Manager Pro works for 7 days. If you moved the program to another PC, activate there with the same key.</p></div></details>
+<h2 id="t-online">Fix: online features</h2>
+<details><summary>"Can't reach the Fleet Manager server"</summary><div>
+<p>Only updates and the online features (Apply page, Global Leaderboard, VTC Finder) need the server: everything else keeps working.</p>
+<ol><li>Check your internet connection and try again.</li><li>Turn off your VPN for a moment.</li><li>Allow Fleet Manager Pro in your firewall or antivirus.</li><li>Still no? Wait a while and try again.</li></ol></div></details>
+<details><summary>It asked me for a licence key or to activate</summary><div>
+<p>That's an older version. Open <b>Updates</b> and press <b>Update now</b>, or download the newest Setup file from the website and run it. Your data is kept.</p></div></details>
+<details><summary>A red "Please update" banner appeared</summary><div>
+<p>The version you have has a known problem. Install the newest version from <b>Updates</b>. Your data is kept.</p></div></details>
 
 <h2 id="t-game">Fix: the game and jobs</h2>
 <details><summary>The top bar says "waiting for game"</summary><div>
@@ -148,7 +147,7 @@ footer{text-align:center;color:var(--muted);font-size:14px;padding:0 20px 34px}
 <details><summary>A remote driver's jobs don't show up</summary><div>
 <ol><li>Their connection window must stay open while they drive.</li><li>The game plugin must be installed on <i>their</i> PC.</li><li>Make sure they use their own file or command from <b>Connect a driver</b>. If the token was changed, send a new one.</li></ol></div></details>
 <details><summary>"Too many wrong passwords"</summary><div><p>Wait five minutes and try again. A manager can reset a driver's password on the driver's profile page.</p></div></details>
-<details><summary>I forgot the owner password</summary><div><p>Contact whoever gave you your licence key. It can't be read back, only reset.</p></div></details>
+<details><summary>I forgot the owner password</summary><div><p>It can't be read back. Get in touch through <a href="http://fleetmanager.servehttp.com:8080">the Fleet Manager Pro website</a>.</p></div></details>
 <details><summary>The tablet won't connect</summary><div><p>Turn on tablet access on the <b>Tablet</b> page, keep the tablet on the same Wi-Fi as the PC, scan the code, and choose to continue if it warns about the certificate.</p></div></details>
 
 <h2 id="t-data">Fix: data and updates</h2>
@@ -160,7 +159,7 @@ footer{text-align:center;color:var(--muted);font-size:14px;padding:0 20px 34px}
 <ol><li>Close Fleet Manager Pro and copy the whole <b>data</b> folder somewhere safe.</li>
 <li>In <b>data</b>, rename <code>fleet.db</code> to <code>fleet-old.db</code>, and move <code>fleet.db-wal</code> and <code>fleet.db-shm</code> out of the folder if they are there.</li>
 <li>Copy the backup you want from <code>data\backups</code> into <b>data</b> and rename it to <code>fleet.db</code>.</li><li>Start the app.</li></ol></div></details>
-<details><summary>The Global Leaderboard isn't updating</summary><div><p>It updates every 10 minutes while the app runs. You can press <b>Update now</b>, but not more than once every 30 seconds. You need internet and an activated copy.</p></div></details>
+<details><summary>The Global Leaderboard isn't updating</summary><div><p>It updates every 10 minutes while the app runs. You can press <b>Update now</b>, but not more than once every 30 seconds. You need internet.</p></div></details>
 
 <h2 id="q-general">Questions: general</h2>
 <details><summary>What is Fleet Manager Pro?</summary><div><p>A company manager for virtual trucking. It logs your deliveries from the game and runs the rest: drivers, dispatch, trucks, money, driving hours, recruitment, events and leaderboards.</p></div></details>
@@ -182,15 +181,16 @@ footer{text-align:center;color:var(--muted);font-size:14px;padding:0 20px 34px}
 <details><summary>How do I move from the zip version to the installed version?</summary><div>
 <ol><li>Close the old copy.</li><li>Run Setup, and untick <b>Start Fleet Manager Pro</b> at the end.</li><li>Copy the <b>data</b> folder from your old folder into <code>%LOCALAPPDATA%\Programs\Fleet Manager Pro</code>.</li><li>Start it from the Start menu and check your company is there.</li></ol></div></details>
 <details><summary>How do I move to another PC?</summary><div>
-<ol><li>Old PC: <b>Settings &gt; Licence &gt; Deactivate this PC</b>, then close the app.</li><li>Copy the whole <b>data</b> folder to the new PC.</li><li>Run Setup on the new PC without starting the app, and put <b>data</b> next to <b>Fleet Manager Pro.exe</b>.</li><li>Start it, activate with the same key, and install the game plugin.</li></ol></div></details>
+<ol><li>Close the app on the old PC.</li><li>Copy the whole <b>data</b> folder to the new PC.</li><li>Run Setup on the new PC without starting the app, and put <b>data</b> next to <b>Fleet Manager Pro.exe</b>.</li><li>Start it and install the game plugin. Run the company on one PC at a time.</li></ol></div></details>
 <details><summary>How do I back up?</summary><div><p>Close the app and copy the <b>data</b> folder. While it's running, <b>System &amp; Backups &gt; Back up now</b> saves the company database. It also makes one each day and keeps the newest 14.</p></div></details>
 <details><summary>Does uninstalling delete my company?</summary><div><p>No. The <b>data</b> folder stays until you delete it yourself.</p></div></details>
 
-<h2 id="q-licence">Questions: your key</h2>
-<details><summary>How many PCs can I use?</summary><div><p>Two. Deactivate one to move to another.</p></div></details>
-<details><summary>Do my drivers need a key?</summary><div><p>No. Only the main PC is activated.</p></div></details>
-<details><summary>Does it work offline?</summary><div><p>You need internet to activate. After that it works for 7 days without it.</p></div></details>
-<details><summary>Can I share my copy?</summary><div><p>No. Each copy is made for one licence key and is licensed to you. Keep your key private.</p></div></details>
+<h2 id="q-licence">Questions: free and online</h2>
+<details><summary>Is it really free?</summary><div><p>Yes. No key, no activation, no account and nothing to pay.</p></div></details>
+<details><summary>How many PCs can I use?</summary><div><p>As many as you like. Run one company on one PC at a time, and copy its <b>data</b> folder to move it.</p></div></details>
+<details><summary>Do my drivers need anything?</summary><div><p>Only Fleet Manager Pro and the game plugin if they log their own game. They don't set up a company.</p></div></details>
+<details><summary>Does it work offline?</summary><div><p>Yes. Only updates and the online features need internet.</p></div></details>
+<details><summary>Can I share my copy?</summary><div><p>Yes, if it's unchanged and free of charge. Better still, send people to the website for the newest version.</p></div></details>
 
 <h2 id="q-drivers">Questions: drivers</h2>
 <details><summary>How do I add a driver?</summary><div><p><b>Drivers &gt; Add member</b>. Or share your Apply link from <b>Recruitment</b> and accept applications there; the link works even when your PC is off.</p></div></details>
@@ -222,9 +222,9 @@ footer{text-align:center;color:var(--muted);font-size:14px;padding:0 20px 34px}
 <details><summary>Can people on the internet reach my PC?</summary><div><p>Not unless you allow it. By default only your own PC can open it. <b>Let other PCs in</b> opens it to your network, encrypted, and only opening a port on your router lets the internet in.</p></div></details>
 
 <h2 id="help">Still stuck?</h2>
-<p>Contact whoever gave you your licence key. Include:</p>
+<p>Get in touch through <a href="http://fleetmanager.servehttp.com:8080">the Fleet Manager Pro website</a>. Include:</p>
 <ul><li>your version (shown on the <b>Updates</b> page),</li><li>what you were doing and the exact message,</li><li>a screenshot,</li><li>the log from <b>System &amp; Backups &gt; Logs</b>.</li></ul>
-<p class="note"><b>Never send</b> your password, your <b>data</b> folder, a driver's token or connection file, or post your licence key in public.</p>
+<p class="note"><b>Never send</b> your password, your <b>data</b> folder, or a driver's token or connection file.</p>
 </main>
 </div>
 <footer>Fleet Manager Pro is (c) 2026 Jeff Poblocki. American Truck Simulator and Euro Truck Simulator 2 are trademarks of SCS Software, which is not affiliated with Fleet Manager Pro.</footer>

@@ -142,7 +142,7 @@ def build(out=OUT):
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Installation Guide - Fleet Manager Pro</title>
-<meta name="description" content="How to install, activate and set up Fleet Manager Pro for American Truck Simulator and Euro Truck Simulator 2.">
+<meta name="description" content="How to install and set up Fleet Manager Pro (free) for American Truck Simulator and Euro Truck Simulator 2.">
 <style>{CSS}</style>
 </head>
 <body>

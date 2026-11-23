@@ -60,9 +60,9 @@ def table(rows, widths, head=True):
 def flow_diagram():
     W, H = 6.9 * inch, 1.35 * inch
     d = Drawing(W, H)
-    boxes = [("1.  YOU", "Publish once to your", "licence server (one click)"),
-             ("2.  BUYER'S APP", "Checks every day and shows", 'an “Update available” banner'),
-             ("3.  BUYER", "Clicks Update now – it", "downloads and installs itself")]
+    boxes = [("1.  YOU", "Ship Update.bat, then upload", "one zip to the server"),
+             ("2.  EVERY COPY", "Checks every day and shows", 'an “Update available” banner'),
+             ("3.  THE USER", "Clicks Update now – it", "downloads and installs itself")]
     bw, bh = 2.05 * inch, 1.0 * inch
     gap = (W - 3 * bw) / 2
     y = (H - bh) / 2
@@ -109,7 +109,7 @@ def card_mock():
                fillColor=colors.HexColor("#fde7b4"), strokeColor=colors.HexColor("#dcb24a")))
     d.add(String(W - bw / 2 - 0.2 * inch, H - 0.34 * inch, "update ready", fontSize=8,
                  fillColor=colors.HexColor("#6b4e00"), textAnchor="middle"))
-    rows = [("Installed", "Fleet Manager Pro 1.3", False), ("Available", "1.4   (35 MB)", True)]
+    rows = [("Installed", "Fleet Manager Pro 1.3", False), ("Available", "1.4   (28 MB)", True)]
     ry = H - 0.78 * inch
     for label, value, bold in rows:
         d.add(String(0.22 * inch, ry, label, fontSize=9.5, fillColor=MUTED))
@@ -177,7 +177,7 @@ def cover(canvas, doc):
     canvas.drawCentredString(w / 2, h * 0.49, SUBTITLE)
     canvas.setFillColor(colors.HexColor("#8fa8cc"))
     canvas.setFont("Helvetica", 12)
-    canvas.drawCentredString(w / 2, h * 0.42, "How a new version reaches everyone who bought a copy")
+    canvas.drawCentredString(w / 2, h * 0.42, "How a new version reaches everyone who uses Fleet Manager Pro")
     canvas.drawCentredString(w / 2, h * 0.2, f"Version {VERSION}")
     canvas.restoreState()
 
@@ -189,116 +189,96 @@ def build():
     s = [PageBreak()]
     a = s.append
 
-    a(Paragraph("How updates reach your buyers", H1))
-    a(Paragraph("Fleet Manager Pro updates itself. You publish a new version <b>once</b> to your own licence "
-                "server, and every buyer's app downloads it from there by itself. After the first sale you never "
-                "send a buyer a file again.", P))
+    a(Paragraph("How updates reach everyone", H1))
+    a(Paragraph("Fleet Manager Pro updates itself. You build a new version <b>once</b>, put it on the Fleet Manager "
+                "server, and every copy downloads it from there by itself. Nobody needs to be sent a file.", P))
     a(Spacer(1, 6))
     a(flow_diagram())
     a(Spacer(1, 6))
-    a(Paragraph("Each buyer's copy has its pages sealed to that buyer, so a new version is still built for each "
-                "buyer – but you never do that by hand. One tool rebuilds and publishes for everyone.", SMALL))
+    a(Paragraph("There is one build for everyone (the public copy). Copies sold before Fleet Manager Pro went free each "
+                "have their own update channel; the same package is published to those channels too, and once they "
+                "install it they are on the public channel like everyone else.", SMALL))
 
-    a(Paragraph("The easy way: one command for everyone", H1))
-    a(steps(["<b>Bump the version.</b> Open <font face='Courier'>Fleet Manager Pro\\VERSION</font> and raise it "
-             "(for example <b>1.3</b> to <b>1.4</b>). The server only offers a version <i>higher</i> than what a "
-             "buyer is running, so this is what makes an update “new”.",
-             "<b>Make sure the licence server is running</b> (<font face='Courier'>license_server.py</font> on the "
-             "cloud box, reached over AnyDesk / Remote Utilities).",
-             "<b>Double-click</b> <font face='Courier'>Build and Publish Update (All Buyers).bat</font> in the "
-             "Development folder and type optional release notes."]))
-    a(Paragraph("It rebuilds every buyer's sealed copy and publishes each one to your server. Each buyer then sees "
-                "an <b>Update available</b> banner the next time their app checks (at start-up, or within a day).", P))
-    a(Paragraph("From a terminal you can also run:", P))
-    a(Paragraph('python "Build and Publish Update (All Buyers).py" --notes "Adds X, fixes Y"<br/>'
-                'python "Build and Publish Update (All Buyers).py" --keys FMP-AAAA-... FMP-BBBB-...   (only these)<br/>'
-                'python "Build and Publish Update (All Buyers).py" --dry-run   (just list who would be updated)', CODE))
-    a(Paragraph("<b>Tip:</b> the list of buyers comes from your private ledger "
-                "(<font face='Courier'>Buyer Builds (PRIVATE).csv</font>). Add <font face='Courier'>--stock</font> to "
-                "also refresh a stock copy.", TIP))
+    a(Paragraph("Shipping a new version", H1))
+    a(steps(["<b>Run the tests</b> in the development copy: <font face='Courier'>tests\\e2e_test.py</font>, "
+             "<font face='Courier'>security_test.py</font> and <font face='Courier'>fuzz_test.py</font> must all say "
+             "<b>ALL PASSED</b>.",
+             "<b>Bump the version.</b> Open <font face='Courier'>Fleet Manager Pro\\VERSION</font> and raise it "
+             "(for example <b>1.5.29-beta</b> to <b>1.5.30-beta</b>). The server only offers a version <i>higher</i> "
+             "than what a copy runs.",
+             "<b>Double-click</b> <font face='Courier'>Ship Update.bat</font> in the Development folder and type one "
+             "line saying what's new. In about 10 minutes it builds the copy, publishes it to every channel, makes the "
+             "installer (and copies it into the website's <font face='Courier'>download</font> folder) and packs "
+             "<font face='Courier'>Build Output\\updates-for-cloud-&lt;version&gt;-&lt;date&gt;.zip</font>.",
+             "<b>Upload the zip</b> to the cloud server (AnyDesk / Remote Utilities) and unzip it into the "
+             "<font face='Courier'>Fleet Manager License Host</font> folder there. It only adds files under "
+             "<font face='Courier'>updates\\</font>. No restart is needed.",
+             "<b>Upload the website</b> if you want the new Setup file on the download button, then commit the release "
+             "notes and push."]))
+    a(Paragraph("From a terminal:", P))
+    a(Paragraph('python "Ship Update.py" --notes "Adds X, fixes Y"<br/>'
+                'python "Ship Update.py" --dry-run        (just show what it would do)<br/>'
+                'python "Ship Update.py" --only-public    (skip the older buyer channels)', CODE))
+    a(Paragraph("<b>Tip:</b> the older buyer channels come from the server when License Manager can reach it, "
+                "otherwise from <font face='Courier'>Buyer Builds (PRIVATE).csv</font>.", TIP))
 
     a(PageBreak())
-    a(Paragraph("Where the update files live on your server", H1))
-    a(Paragraph("Your licence server hands out updates from a folder called <font face='Courier'>updates</font> "
-                "that sits <b>right next to <font face='Courier'>license_server.py</font></b> on the PC that runs "
-                "the server. Inside it there is one folder per buyer, named by that copy's hidden build tag, plus an "
-                "optional <font face='Courier'>STOCK</font> folder for stock copies:", P))
+    a(Paragraph("Where the update files live on the server", H1))
+    a(Paragraph("The server hands out updates from the <font face='Courier'>updates</font> folder "
+                "<b>right next to <font face='Courier'>license_server.py</font></b>. There is one folder per update "
+                "channel, named by its build tag, and an optional list of bad versions:", P))
     a(Paragraph("Fleet Manager License Host\\<br/>"
                 "&nbsp;&nbsp;license_server.py<br/>"
                 "&nbsp;&nbsp;updates\\<br/>"
-                "&nbsp;&nbsp;&nbsp;&nbsp;FMPB-XXXX-XXXX-XXXX-XXXX\\&nbsp;&nbsp;&lt;- one folder per buyer<br/>"
-                "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Fleet Manager Pro 1.4.zip<br/>"
-                "&nbsp;&nbsp;&nbsp;&nbsp;STOCK\\&nbsp;&nbsp;&lt;- for stock copies<br/>"
-                "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Fleet Manager Pro 1.4.zip", CODE))
-    a(Paragraph("The publish tools above <b>create and fill these folders for you</b> – you never build them by "
-                "hand or rename the zip. You only need to know this folder exists because of <i>where</i> the tools "
-                "put it.", P))
-    a(Paragraph("Building on the same PC as the server? You're done.", H2))
-    a(Paragraph("If you build and publish on the very PC that runs <font face='Courier'>license_server.py</font>, "
-                "the zips drop straight into the right place and buyers can download them right away. Nothing else "
-                "to do.", P))
-    a(Paragraph("Building on a different PC from the server?", H2))
-    a(Paragraph("The publish tools write to the <font face='Courier'>updates</font> folder <b>on whatever PC you "
-                "run them on</b>. So if you build on this PC and the server runs on the cloud box, the new zips will "
-                "not reach the server on their own. Do one of these:", P))
-    a(bullets(["<b>Copy it across.</b> After publishing, zip the whole "
-               "<font face='Courier'>Fleet Manager License Host\\updates</font> folder and transfer it to the cloud "
-               "box (AnyDesk / Remote Utilities file transfer), into its own "
-               "<font face='Courier'>Fleet Manager License Host</font> folder (next to "
-               "<font face='Courier'>license_server.py</font>). Choose “replace the files in the destination” when "
-               "asked.",
-               "<b>Run the publishing on the cloud box</b> instead, if it has the project folder and Python."]))
-    a(Paragraph("<b>Check this first:</b> a buyer can only download an update when the server is running <i>and</i> "
-                "<font face='Courier'>fleetmanager.servehttp.com:8750</font> still points to the server PC's current "
-                "address. If you have changed networks or PCs, confirm that before you publish.", NOTE))
+                "&nbsp;&nbsp;&nbsp;&nbsp;FMPB-ARM3-W2HW-T3FS-TGY3\\&nbsp;&nbsp;&lt;- the public channel<br/>"
+                "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Fleet Manager Pro 1.5.30-beta.zip<br/>"
+                "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;notes-1.5.30.txt<br/>"
+                "&nbsp;&nbsp;&nbsp;&nbsp;FMPB-....\\&nbsp;&nbsp;&lt;- one per older buyer copy<br/>"
+                "&nbsp;&nbsp;&nbsp;&nbsp;notices.json&nbsp;&nbsp;&lt;- \"please update\" messages (optional)", CODE))
+    a(Paragraph("Ship Update fills these folders on this PC and packs them into the upload zip, so you never build them "
+                "by hand. Until the zip is unpacked on the cloud server, nobody is offered the new version.", P))
+
+    a(Paragraph("Telling a bad version to update", H1))
+    a(Paragraph("If a version turns out to have a serious bug, every copy still on it can be told to update. It sees a "
+                "red <b>Please update</b> banner on every page, with <b>Update now</b> for the Owner and Managers. "
+                "Nothing is locked or switched off: it is only a message. In the License Host folder:", P))
+    a(Paragraph('python update_notice.py 1.5.30-beta "Jobs can be paid twice in this version. Please update now."<br/>'
+                'python update_notice.py "&lt;1.5.30" "This version is too old. Please update."<br/>'
+                'python update_notice.py              (list them)<br/>'
+                'python update_notice.py --clear 1.5.30-beta      --clear-all', CODE))
+    a(Paragraph("It writes <font face='Courier'>updates\\notices.json</font>; upload that file to the same place on the "
+                "cloud server (the next upload zip carries it too). Copies see it at their next check. Versions before "
+                "1.5.30 don't show the banner.", SMALL))
 
     a(PageBreak())
-    a(Paragraph("What your buyer sees", H1))
-    a(Paragraph("After you publish, a banner appears at the top of the buyer's app, and "
-                "<b>Settings &gt; Licence &gt; Updates</b> shows the same with a <b>Check for updates</b> button. "
-                "When they click <b>Update now</b>, the app downloads the new version from your server, checks its "
-                "digital signature and checksum, then closes and reopens on the new version. Their company data is "
-                "never touched.", P))
+    a(Paragraph("What people see", H1))
+    a(Paragraph("A banner appears at the top of the app and the <b>Updates</b> page shows the same with a "
+                "<b>Check for updates</b> button. <b>Update now</b> downloads the new version from the server, checks "
+                "its digital signature and checksum, then closes and reopens on the new version. The company's data is "
+                "never touched. With <b>Install updates automatically</b> on, it installs as soon as nobody is driving.", P))
     a(Spacer(1, 8))
     a(Paragraph("The banner every page shows:", H2))
     a(banner_mock())
     a(Spacer(1, 12))
-    a(Paragraph("The Settings &gt; Licence &gt; Updates panel:", H2))
+    a(Paragraph("The Updates page:", H2))
     a(card_mock())
-
-    a(PageBreak())
-    a(Paragraph("Updating just one buyer", H1))
-    a(Paragraph("If you only need to update a single buyer:", P))
-    a(steps(["Bump <font face='Courier'>Fleet Manager Pro\\VERSION</font>.",
-             "Build that buyer's copy with <font face='Courier'>Build Buyer Copy.bat</font> – enter their "
-             "purchase key and choose <b>Single program (.exe)</b>.",
-             "Publish it to your server:"]))
-    a(Paragraph('python publish_update.py --zip "...\\Build Output\\For Buyer - FMP-XXXX-XXXX-XXXX-XXXX.zip" '
-                '--key FMP-XXXX-XXXX-XXXX-XXXX', CODE))
-    a(bullets(["<font face='Courier'>--stock</font> for a stock copy (no buyer).",
-               "<font face='Courier'>--tag FMPB-...</font> to target a build tag from the build output.",
-               "<font face='Courier'>--notes \"...\"</font> for release notes the buyer sees."]))
-    a(Paragraph("<b>publish_update.py</b> lives in the <b>Fleet Manager License Host</b> folder, next to "
-                "<font face='Courier'>license_server.py</font>.", SMALL))
 
     a(Paragraph("If something goes wrong", H1))
     a(table([["Problem", "What to check"],
-             ["A buyer doesn't see the update",
-              "Did you raise <font face='Courier'>VERSION</font> above what they run? Is "
-              "<font face='Courier'>license_server.py</font> running? They can force a check with "
-              "<b>Settings &gt; Updates &gt; Check for updates</b>, or by restarting the app."],
+             ["Nobody sees the update",
+              "Did you raise <font face='Courier'>VERSION</font>? Did you unzip the upload zip into the License Host "
+              "folder on the cloud server? Is <font face='Courier'>license_server.py</font> running? A copy can force a "
+              "check with <b>Updates &gt; Check for updates</b>, or by restarting."],
              ["“Update available” but Update now fails",
-              "Their PC couldn't reach your server. Check the server is running and that "
+              "The PC couldn't reach the server. Check the server is running and that "
               "<font face='Courier'>fleetmanager.servehttp.com:8750</font> is reachable from outside."],
              ["Where are the logs?",
               "The app writes to its <font face='Courier'>data\\logs</font> folder "
-              "(<font face='Courier'>fleetmanager.log</font>, <font face='Courier'>errors.log</font>, "
-              "<font face='Courier'>access.log</font>). The licence server writes "
-              "<font face='Courier'>logs\\server.log</font> next to it. Ask the buyer to send "
-              "<font face='Courier'>fleetmanager.log</font> and <font face='Courier'>errors.log</font>."]],
+              "(<font face='Courier'>fleetmanager.log</font>, <font face='Courier'>errors.log</font>). The server writes "
+              "<font face='Courier'>logs\\server.log</font> next to it."]],
             [1.9 * inch, 4.9 * inch]))
-    a(Paragraph("<b>Keep <font face='Courier'>host_key.json</font> private.</b> It signs both licences and "
-                "updates – anyone who has it could issue either.", NOTE))
+    a(Paragraph("<b>Keep <font face='Courier'>host_key.json</font> private.</b> It signs every update: anyone who has it "
+                "could make one that every copy would install.", NOTE))
 
     doc.build(s, onFirstPage=cover, onLaterPages=page)
     print("Wrote", OUT)

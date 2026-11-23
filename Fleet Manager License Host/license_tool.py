@@ -188,8 +188,8 @@ def menu():
         except LicenceError:
             admin = None
             print("Not set up yet - choose 1.")
-        print(" 1) Set up / change server address (and point Fleet Manager Pro at it)\n 2) New purchase (FMP- key)\n 3) List purchases + PCs\n"
-              " 4) Release a PC (buyer replaced a PC)\n 5) Revoke a purchase\n 6) Restore a revoked purchase\n"
+        print(" 1) Set up / change server address (and point Fleet Manager Pro at it)\n 2) New purchase (FMP- key, older copies only)\n 3) List purchases + PCs\n"
+              " 4) Release a PC (buyer replaced a PC)\n 5) Block a company from the online features\n 6) Unblock a company\n"
               " 7) Reset a purchase's uses (frees all PCs - buyer couldn't deactivate)\n"
               " 8) Delete a purchase (active or revoked)\n 9) Delete ALL revoked purchases\n"
               "10) Identify a copy (whose is it? - by its build tag)\n11) VTC Finder listings and reports (hide or show a company)\n 0) Quit")
@@ -254,7 +254,7 @@ def menu():
                 _print_vtc(admin)
                 if not admin.vtc():
                     continue
-                key = input("  Purchase key to change (Enter = none): ").strip().upper()
+                key = input("  Company ID (FMC-...) or old purchase key to change (Enter = none): ").strip().upper()
                 if not key:
                     continue
                 what = input("  H) hide it   S) show it again   C) forget its reports: ").strip().lower()
@@ -277,8 +277,9 @@ def menu():
                     continue
                 print(f"  Deleted {len(admin.delete_revoked())} revoked purchase(s). (Copies saved to deleted_purchases.jsonl.)")
             elif admin and c in ("5", "6"):
-                admin.revoke(input("  Purchase key: "), c == "5")
-                print("  Revoked - those PCs lock at their next check." if c == "5" else "  Restored.")
+                admin.revoke(input("  Company ID (FMC-...) or old purchase key: ").strip().upper(), c == "5")
+                print("  Blocked from the Apply page, Global Leaderboard and VTC Finder (the app itself keeps working)."
+                      if c == "5" else "  Unblocked.")
             elif c in ("0", "q", ""):
                 return
         except LicenceError as e:

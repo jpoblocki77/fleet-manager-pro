@@ -12,7 +12,7 @@ echo  licence key. This builds it (Build Output\For Everyone and its .zip),
 echo  then makes the installer (Build Output\Installers\Public).
 echo.
 echo  To ship it to everyone as an update, use
-echo  "Build and Publish Update (All Buyers).bat" instead.
+echo  "Ship Update.bat" instead.
 echo.
 
 where python >nul 2>nul

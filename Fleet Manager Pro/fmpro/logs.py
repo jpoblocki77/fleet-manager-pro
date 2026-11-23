@@ -9,7 +9,7 @@ Writes detailed, human-readable logs to a `logs` folder inside the data folder:
 Each line reads:  2026-11-15 17:25:04  INFO    fmpro.licence    licence check ok (expires 2026-11-22)
 
 Files roll over at ~2 MB and keep 10 back, so they never fill the disk. Licence keys and anything that looks
-like a secret are masked automatically before anything is written, so a buyer can safely send you their logs.
+like a secret are masked automatically before anything is written, so people can safely send you their logs.
 
 Use it like:
     from . import logs

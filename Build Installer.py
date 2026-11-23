@@ -3,7 +3,7 @@ r"""Make the one-file installer for the public copy once it's built.
     python "Build Installer.py"            (--public is still accepted; it's the only kind now)
 
 Out:  Build Output\Installers\Public\Fleet Manager Pro Setup.exe    (anyone can have it: Fleet Manager Pro is free)
-Needs Inno Setup 6. Run it after  Build Pro Buyer Copy.py : it packs the finished  Build Output\For Everyone  folder.
+Needs Inno Setup 6. Run it after  Build Public Copy.py : it packs the finished  Build Output\For Everyone  folder.
 """
 import argparse
 import os
@@ -22,7 +22,7 @@ def build(output=OUTPUT, out=None):
     src = os.path.join(output, "For Everyone")
     for need in ("Fleet Manager Pro.exe", "VERSION", "Licence Agreement.txt", "Installation Guide.pdf", "READ ME - Your Data.txt"):
         if not os.path.isfile(os.path.join(src, need)):
-            sys.exit(f"{src}: no {need} - build the copy first (Build Pro Buyer Copy.py)")
+            sys.exit(f"{src}: no {need} - build the copy first (Build Public Copy.py)")
     if os.path.exists(os.path.join(src, "data")):
         sys.exit(f"{src} has a data folder (it has been run). Build the copy again first; data must never be shipped.")
     with open(os.path.join(src, "VERSION"), encoding="utf-8") as fh:
