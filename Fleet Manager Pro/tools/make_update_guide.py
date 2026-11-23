@@ -208,7 +208,7 @@ def build():
              "than what a copy runs.",
              "<b>Double-click</b> <font face='Courier'>Ship Update.bat</font> in the Development folder and type one "
              "line saying what's new. In about 10 minutes it builds the copy, publishes it to every channel, makes the "
-             "installer (and copies it into the website's <font face='Courier'>download</font> folder) and packs "
+             "installer (and copies it into the website's <font face='Courier'>downloads</font> folder) and packs "
              "<font face='Courier'>Build Output\\updates-for-cloud-&lt;version&gt;-&lt;date&gt;.zip</font>.",
              "<b>Upload the zip</b> to the cloud server (AnyDesk / Remote Utilities) and unzip it into the "
              "<font face='Courier'>Fleet Manager License Host</font> folder there. It only adds files under "

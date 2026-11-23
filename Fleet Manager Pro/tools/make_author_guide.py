@@ -58,7 +58,7 @@ def build():
              ["...\\Build Output\\Installers\\Public\\Fleet Manager Pro Setup.exe", "<b>The download</b>: the one-file installer everyone gets.", "Yes, anyone"],
              ["...\\Build Output\\For Everyone.zip", "The same copy as a zip (no installer).", "Yes, anyone"],
              ["...\\Build Output\\updates-for-cloud-....zip", "What you upload to the cloud server after shipping.", "No"],
-             ["D:\\Fleet Manager Pro\\Website", "The website (index.html, screens, download\\).", "It's public"],
+             ["D:\\Fleet Manager Pro\\Website", "The website (index.html, screens, downloads\\).", "It's public"],
              ["...\\License Host (PRIVATE - never share)", "Backup of your server folder with its secrets.", "<b>Never</b>"]],
             [2.6 * inch, 3.6 * inch, 0.7 * inch]))
 
@@ -67,11 +67,11 @@ def build():
              "<b>fuzz_test.py</b> must all end with <b>ALL PASSED</b>.",
              "Raise <b>Fleet Manager Pro\\VERSION</b> (for example 1.5.29-beta to 1.5.30-beta).",
              "Double-click <b>Development\\Ship Update.bat</b> and type one line saying what's new. It builds the copy once, "
-             "publishes it to everyone, makes the installer (and copies it to the website's download folder) and packs "
+             "publishes it to everyone, makes the installer (and copies it to the website's downloads folder) and packs "
              "<b>Build Output\\updates-for-cloud-&lt;version&gt;-&lt;date&gt;.zip</b>. About 10 minutes.",
              "Upload that zip to the cloud server and unzip it into its <b>Fleet Manager License Host</b> folder. Every copy "
              "sees <b>Update available</b> at its next check (start-up or within a day).",
-             "Upload the website's <b>download\\Fleet Manager Pro Setup.exe</b>, refresh the guides "
+             "Upload the website's <b>downloads\\Fleet Manager Pro Setup.exe</b>, refresh the guides "
              "(<b>python tools\\make_install_guide.py</b>, <b>make_install_page.py</b>, <b>make_features_page.py</b>), "
              "commit and push."]))
     A(Paragraph("<b>Publishing an Update.pdf</b> has the details and pictures. After a game update or new DLC: "
@@ -89,7 +89,7 @@ def build():
 
     A(Paragraph("4. The website and the download", H1))
     A(bullets([f"The website is <b>{SITE}</b>, from the <b>D:\\Fleet Manager Pro\\Website</b> folder. Its <b>Download</b> "
-               "button points to <b>download/Fleet Manager Pro Setup.exe</b>.",
+               "button points to <b>downloads/Fleet Manager Pro Setup.exe</b> (an alias folder on the web server).",
                "Ship Update copies the new Setup file into that folder; upload the website afterwards.",
                "The install guide, features page and FAQ are made from the development copy (Guides folder)."]))
 

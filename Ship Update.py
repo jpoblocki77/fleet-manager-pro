@@ -4,7 +4,7 @@ Fleet Manager Pro is free, so there is one build: the public copy. This
   1. builds it once at the current Fleet Manager Pro\VERSION,
   2. publishes it to the public update channel AND to every older buyer copy's channel (so they move over),
   3. makes the installer (Build Output\Installers\Public\Fleet Manager Pro Setup.exe) and puts a copy in the
-     website's download folder (..\..\Website\download) when that folder is there,
+     website's downloads folder (..\..\Website\downloads) when that folder is there,
   4. packs  Build Output\updates-for-cloud-<version>-<date>.zip  - everything the cloud server needs.
 Then upload that zip's updates\ folder to the server's License Host folder (and the website, for the new download).
 
@@ -38,7 +38,7 @@ UPDATES = os.path.join(HOST, "updates")
 PUBLISH = os.path.join(HOST, "publish_update.py")
 CSV_PATH = os.path.join(DEV, "Buyer Builds (PRIVATE).csv")
 SETUP = os.path.join(BUILD_OUTPUT, "Installers", "Public", "Fleet Manager Pro Setup.exe")
-WEBSITE_DOWNLOAD = os.path.join(os.path.dirname(os.path.dirname(DEV)), "Website", "download")
+WEBSITE_DOWNLOAD = os.path.join(os.path.dirname(os.path.dirname(DEV)), "Website", "downloads")
 KEY_RX = re.compile(r"^FMP-[A-Z2-7]{4}(-[A-Z2-7]{4}){3}$")
 
 
@@ -200,7 +200,7 @@ def main():
         print(f"   1. Upload {os.path.basename(cloud)} to the cloud server and unzip it into the")
         print("      License Host folder there (it only adds files under updates\\).")
     if setup_ok and os.path.isdir(WEBSITE_DOWNLOAD):
-        print("   2. Upload the website's download\\Fleet Manager Pro Setup.exe (the new download for new users).")
+        print("   2. Upload the website's downloads\\Fleet Manager Pro Setup.exe (the new download for new users).")
     print("   3. Commit the release notes (Fleet Manager License Host\\updates\\...\\notes-*.txt) and push.")
     if failed or setup_ok is False:
         sys.exit(1)

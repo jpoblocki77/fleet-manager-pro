@@ -9,7 +9,7 @@ instructions: **Guides\Fleet Manager Pro - Author Guide.pdf**.
 |---|---|---|
 | `Fleet Manager Pro\` | **Development copy**: source (`fmpro\`), tests (`tests\`), tools (`tools\`). Change and test here. | **No** |
 | `Fleet Manager License Host\` | **Fleet Manager server + License Manager** with your signing key (`host_key.json`), admin token (`server_config.json`), database (`licenses.db`) and certificate key (`tls_key.pem`). See its README. | **Never** |
-| `Ship Update.bat` | **Ships a new version to everyone in one go**: builds the public copy once, publishes it to every update channel, makes the installer (and copies it to the website's `download` folder) and packs `..\Build Output\updates-for-cloud-<version>-<date>.zip` to upload to the cloud server. | No |
+| `Ship Update.bat` | **Ships a new version to everyone in one go**: builds the public copy once, publishes it to every update channel, makes the installer (and copies it to the website's `downloads` folder) and packs `..\Build Output\updates-for-cloud-<version>-<date>.zip` to upload to the cloud server. | No |
 | `Build Public Copy.bat` | Just builds the public copy and its installer, without publishing anything. | No |
 | `Build Public Copy.py` | Builds `..\Build Output\For Everyone\` and `For Everyone.zip`: a single `Fleet Manager Pro.exe` (Nuitka). | No |
 | `Build Installer.py` | Makes `..\Build Output\Installers\Public\Fleet Manager Pro Setup.exe` from the built copy. Needs Inno Setup 6. | No |
@@ -40,7 +40,7 @@ python tests\fuzz_test.py
 
 All three must say **ALL PASSED**. Then bump `Fleet Manager Pro\VERSION`, double-click `Ship Update.bat`, upload the
 `updates-for-cloud-...zip` it makes to the cloud server (unzip into its License Host folder), upload the website's new
-`download\Fleet Manager Pro Setup.exe`, refresh the guides (`python tools\make_install_guide.py`,
+`downloads\Fleet Manager Pro Setup.exe`, refresh the guides (`python tools\make_install_guide.py`,
 `make_install_page.py`, `make_features_page.py`, `make_author_guide.py`), commit and push.
 After a game update or new DLC run `python tools\build_cargo.py`.
 
