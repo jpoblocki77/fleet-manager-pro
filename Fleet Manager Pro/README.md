@@ -101,7 +101,8 @@ Settings → Compliance turns each part on/off and sets the rules and fines.
 ## Start
 
 Fleet Manager Pro is free: no key, no activation, no account. Most people install the compiled program
-(**Fleet Manager Pro Setup.exe** from <http://fleetmanager.servehttp.com:8080>): see
+(**Fleet-Manager-Pro-Windows.zip** from <https://github.com/jpoblocki77/fleet-manager-pro/releases>, or the website
+<http://fleetmanager.servehttp.com:8080>): see
 **Fleet Manager Pro - Installation Guide.pdf**. The steps below are for the source version.
 
 1. Install Python 3.10+ from python.org (tick *Add to PATH*).

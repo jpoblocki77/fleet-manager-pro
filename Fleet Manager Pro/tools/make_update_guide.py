@@ -213,7 +213,8 @@ def build():
              "<b>Upload the zip</b> to the cloud server (AnyDesk / Remote Utilities) and unzip it into the "
              "<font face='Courier'>Fleet Manager License Host</font> folder there. It only adds files under "
              "<font face='Courier'>updates\\</font>. No restart is needed.",
-             "<b>Upload the website</b> if you want the new Setup file on the download button, then commit the release "
+             "<b>Publish the new GitHub release</b> (the zip named Fleet-Manager-Pro-Windows.zip, so the website's download "
+             "button gets it) and upload the website's index.html, then commit the release "
              "notes and push."]))
     a(Paragraph("From a terminal:", P))
     a(Paragraph('python "Ship Update.py" --notes "Adds X, fixes Y"<br/>'

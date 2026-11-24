@@ -55,7 +55,7 @@ def build():
     A(table([["Folder", "What it is", "Share?"],
              ["D:\\Fleet Manager Pro\\Fleet Manager Pro RC ...\\Development\\Fleet Manager Pro", "Development copy: source, tests, tools. Change and test here.", "No"],
              ["...\\Development\\Fleet Manager License Host", "Fleet Manager server + License Manager WITH your signing key, admin token, old purchases and certificate key.", "<b>Never</b>"],
-             ["...\\Build Output\\Installers\\Public\\Fleet Manager Pro Setup.exe", "<b>The download</b>: the one-file installer everyone gets.", "Yes, anyone"],
+             ["...\\Build Output\\Installers\\Public\\Fleet Manager Pro Setup.exe", "<b>The installer</b>: it goes in the release zip on GitHub.", "Yes, anyone"],
              ["...\\Build Output\\For Everyone.zip", "The same copy as a zip (no installer).", "Yes, anyone"],
              ["...\\Build Output\\updates-for-cloud-....zip", "What you upload to the cloud server after shipping.", "No"],
              ["D:\\Fleet Manager Pro\\Website", "The website (index.html, screens, downloads\\).", "It's public"],
@@ -71,7 +71,8 @@ def build():
              "<b>Build Output\\updates-for-cloud-&lt;version&gt;-&lt;date&gt;.zip</b>. About 10 minutes.",
              "Upload that zip to the cloud server and unzip it into its <b>Fleet Manager License Host</b> folder. Every copy "
              "sees <b>Update available</b> at its next check (start-up or within a day).",
-             "Upload the website's <b>downloads\\Fleet Manager Pro Setup.exe</b>, refresh the guides "
+             "Make the release zip (Setup, Installation Guide, READ ME with the new SHA-256) and publish it as a GitHub release "
+             "named <b>v&lt;version&gt;</b> with the zip as <b>Fleet-Manager-Pro-Windows.zip</b>; refresh the guides "
              "(<b>python tools\\make_install_guide.py</b>, <b>make_install_page.py</b>, <b>make_features_page.py</b>), "
              "commit and push."]))
     A(Paragraph("<b>Publishing an Update.pdf</b> has the details and pictures. After a game update or new DLC: "
@@ -89,8 +90,11 @@ def build():
 
     A(Paragraph("4. The website and the download", H1))
     A(bullets([f"The website is <b>{SITE}</b>, from the <b>D:\\Fleet Manager Pro\\Website</b> folder. Its <b>Download</b> "
-               "button points to <b>downloads/Fleet Manager Pro Setup.exe</b> (an alias folder on the web server).",
-               "Ship Update copies the new Setup file into that folder; upload the website afterwards.",
+               "button points to the newest GitHub release: <b>https://github.com/jpoblocki77/fleet-manager-pro/releases/latest/download/Fleet-Manager-Pro-Windows.zip</b>. It always gives the latest release, so "
+               "the link never changes; the asset must keep the name <b>Fleet-Manager-Pro-Windows.zip</b>.",
+               "The repository <b>github.com/jpoblocki77/fleet-manager-pro</b> is public: never commit secrets "
+               "(.gitignore keeps them out). Ship Update still copies the Setup into the website's downloads folder "
+               "as a spare copy and writes its version, size and SHA-256 into index.html; upload the website afterwards.",
                "The install guide, features page and FAQ are made from the development copy (Guides folder)."]))
 
     A(Paragraph("5. Looking after the online features", H1))

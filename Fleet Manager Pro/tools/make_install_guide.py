@@ -121,11 +121,12 @@ def build():
              ["Internet", "Not needed to run it. Used for updates and the online features (Apply page, Global Leaderboard, VTC Finder)."],
              ["A web browser", "Edge, Chrome or Firefox. Fleet Manager Pro opens in your browser."]],
             [1.6 * inch, 5.3 * inch]))
-    A(Paragraph("Fleet Manager Pro is <b>free</b>: no licence key, no activation, no account. Download one file, "
-                "<b>Fleet Manager Pro Setup.exe</b>, from <b>http://fleetmanager.servehttp.com:8080</b>. Nothing else needs installing: no Python, no database.", SMALL))
+    A(Paragraph("Fleet Manager Pro is <b>free</b>: no licence key, no activation, no account. Download <b>Fleet-Manager-Pro-Windows.zip</b> "
+                "from <b>https://github.com/jpoblocki77/fleet-manager-pro/releases</b> (or the Download button on http://fleetmanager.servehttp.com:8080) and unzip it. "
+                "Nothing else needs installing: no Python, no database.", SMALL))
 
     A(Paragraph("1. Install", H1))
-    A(steps(["Double-click <b>Fleet Manager Pro Setup.exe</b>.",
+    A(steps(["Unzip the download, then double-click <b>Fleet Manager Pro Setup.exe</b> inside it.",
              "Accept the licence agreement, choose whether you want a desktop shortcut, and click <b>Install</b>. "
              "Windows does not ask for an administrator password.",
              "Leave <b>Start Fleet Manager Pro</b> ticked and click <b>Finish</b>. Later, start it from the Start menu or the desktop shortcut.",
@@ -293,7 +294,7 @@ def build():
                "<b>%LOCALAPPDATA%\\Programs\\Fleet Manager Pro</b> before starting the installed one.",
                "<b>Update to a new version:</b> open <b>Updates</b>, press <b>Check for updates</b>, then <b>Update now</b>. The app "
                "closes and reopens by itself and your data is not touched.",
-               "<b>Update by hand:</b> download the newest Setup file from http://fleetmanager.servehttp.com:8080, close Fleet Manager Pro and run it. Your data is kept.",
+               "<b>Update by hand:</b> download the newest zip from https://github.com/jpoblocki77/fleet-manager-pro/releases, unzip it, close Fleet Manager Pro and run the Setup inside. Your data is kept.",
                "<b>Step by step:</b> <b>READ ME - Your Data.txt</b>, in the program folder and the Start menu, covers moving your "
                "data, backing up and going back to a backup.",
                "<b>Uninstall:</b> Windows Settings &gt; Apps. Your <b>data</b> folder stays; delete it yourself if you no longer want it."]))
