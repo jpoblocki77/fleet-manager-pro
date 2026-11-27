@@ -28,11 +28,12 @@
   </div>
 </div>
 
-{% if loans or (mine and lending) %}<div class="card" id="loans" style="margin-bottom:16px;scroll-margin-top:72px"><div class="card-head"><h2>Personal loans</h2>{% if mine and lending %}<button class="btn primary sm right" data-open="dlg-loan">Take a loan</button>{% endif %}</div>
+{% if loans or (mine and lending) %}<div class="card" id="loans" style="margin-bottom:16px;scroll-margin-top:72px"><div class="card-head"><h2>Personal loans</h2>{% if mine and lending %}<button class="btn primary sm right" data-open="dlg-loan">Take a loan</button>{% endif %}</div>{% for cat, m in get_flashed_messages(with_categories=true) if cat.startswith('loan-') %}<div class="flash {{ cat[5:] }}" role="alert" style="margin:10px 0 4px">{{ m }}</div>{% endfor %}
   {% for l in loans %}<div style="padding:8px 0;border-bottom:1px solid var(--line-soft)"><div class="between"><b>#{{ l.id }} · {{ l.principal|money }} @ {{ l.apr }}%</b>{{ status(l.status) }}</div>
     <div class="small muted">{{ l.installment|money(2) }} every Friday · {{ l.payments_made }}/{{ l.weeks }} paid · owed {{ l.balance|money(2) }}{% if l.status == 'active' %} · next {{ l.next_due|dt('%b %d') }}{% endif %}</div>
     <div class="bar navy" style="margin-top:4px"><i style="width:{{ 100 if l.status == 'paid' else l.payments_made / l.weeks * 100 }}%"></i></div>
-    {% if l.status == 'active' and mine %}<form method="post" action="/bank/loan/{{ l.id }}/payoff" style="margin-top:6px">{{ csrf() }}<button class="btn sm" data-confirm="Pay off {{ l.balance|money(2) }} now?">Pay off now</button></form>{% endif %}</div>
+    {% if l.status == 'active' %}<div class="small" style="margin-top:6px">Pay off today: <b>{{ l.payoff|money(2) }}</b>{% if l.saves >= 0.01 %} <span class="muted">· saves {{ l.saves|money(2) }} interest</span>{% endif %}</div>{% endif %}
+    {% if l.status == 'active' and mine %}{% set short = l.payoff - balance %}<form method="post" action="/bank/loan/{{ l.id }}/payoff" style="margin-top:6px">{{ csrf() }}<button class="btn sm"{% if short > 0 %} disabled{% endif %} data-confirm="Pay off loan #{{ l.id }} for {{ l.payoff|money(2) }} now?">Pay off now</button>{% if short > 0 %} <span class="small neg">Your bank account is {{ short|money(2) }} short.</span>{% endif %}</form>{% endif %}</div>
   {% else %}<p class="muted">No loans. The money goes into your own bank account and has nothing to do with the company's.</p>{% endfor %}</div>{% endif %}
 {% if mine and lending %}<dialog id="dlg-loan"><form method="post" action="/bank/loan">{{ csrf() }}
   <div class="dhead"><h2>Personal loan</h2><button type="button" class="btn ghost sm" data-close aria-label="Close">✕</button></div>

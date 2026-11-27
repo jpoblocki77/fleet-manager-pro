@@ -36,7 +36,8 @@ def enabled():
 
 
 def loans(uid):
-    return db.q("SELECT * FROM personal_loans WHERE user_id=? ORDER BY status='paid', id DESC LIMIT 20", (uid,))
+    return economy.with_payoff(db.q("SELECT * FROM personal_loans WHERE user_id=? ORDER BY status='paid', id DESC LIMIT 20",
+                                    (uid,)))
 
 
 def installment(principal, plan):
@@ -71,12 +72,17 @@ def payoff(uid, lid):
         loan = db.one("SELECT * FROM personal_loans WHERE id=? AND user_id=? AND status='active'", (lid, uid))
         if not loan:
             return False, "That loan is already paid off."
-        if bank.balance(uid) < loan["balance"]:
-            return False, "Not enough money in your bank account to pay it off."
-        economy.post("loan repayment", -loan["balance"], f"Loan #{lid} paid off early", account="driver", user_id=uid)
+        cur = db.setting("currency", "$")
+        amount, have = economy.payoff_amount(loan), bank.balance(uid)
+        if have < amount:
+            return False, (f"Not enough money to pay off loan #{lid}: it takes {cur}{amount:,.2f} and your bank account has "
+                           f"{cur}{have:,.2f} ({cur}{amount - have:,.2f} short).")
+        saved = round(loan["balance"] - amount, 2)
+        economy.post("loan repayment", -amount, f"Loan #{lid} paid off early", account="driver", user_id=uid)
         db.update("personal_loans", lid, balance=0, status="paid")
-        db.audit(uid, "personal loan", f"#{lid} paid off early")
-    return True, "Loan paid off."
+        db.audit(uid, "personal loan", f"#{lid} paid off early: {amount:.2f}, {saved:.2f} interest saved")
+    return True, f"Loan #{lid} paid off: {cur}{amount:,.2f}." + (f" Paying early saved {cur}{saved:,.2f} of interest."
+                                                               if saved >= 0.01 else "")
 
 
 def process(now=None):

@@ -32,11 +32,12 @@
       <td class="num {{ 'pos' if e.amount > 0 else 'neg' }}">{{ e.amount|money(2) }}</td></tr>
     {% else %}<tr><td colspan="4" class="empty">No transactions.</td></tr>{% endfor %}</tbody></table></div></div>
   <div class="stack">
-    <div class="card"><div class="card-head"><h2>Loans</h2></div>
+    <div class="card" id="loans" style="scroll-margin-top:72px"><div class="card-head"><h2>Loans</h2></div>{% for cat, m in get_flashed_messages(with_categories=true) if cat.startswith('loan-') %}<div class="flash {{ cat[5:] }}" role="alert" style="margin:10px 0 4px">{{ m }}</div>{% endfor %}
       {% for l in loans %}<div style="padding:8px 0;border-bottom:1px solid var(--line-soft)"><div class="between"><b>#{{ l.id }} · {{ l.principal|money }} @ {{ l.apr }}%</b>{{ status(l.status) }}</div>
         <div class="small muted">{{ l.installment|money(2) }} weekly · {{ l.payments_made }}/{{ l.weeks }} paid · owed {{ l.balance|money }}{% if l.status == 'active' %} · next {{ l.next_due|ago }}{% endif %}</div>
         <div class="bar navy" style="margin-top:4px"><i style="width:{{ l.payments_made / l.weeks * 100 }}%"></i></div>
-        {% if l.status == 'active' and can('owner') %}<form method="post" action="/finance/loan/{{ l.id }}/payoff" style="margin-top:6px">{{ csrf() }}<button class="btn sm" data-confirm="Pay off {{ l.balance|money }} now?">Pay off now</button></form>{% endif %}</div>
+        {% if l.status == 'active' %}<div class="small" style="margin-top:6px">Pay off today: <b>{{ l.payoff|money(2) }}</b>{% if l.saves >= 0.01 %} <span class="muted">· saves {{ l.saves|money(2) }} interest</span>{% endif %}</div>{% endif %}
+        {% if l.status == 'active' and can('owner') %}{% set short = l.payoff - balance %}<form method="post" action="/finance/loan/{{ l.id }}/payoff" style="margin-top:6px">{{ csrf() }}<button class="btn sm"{% if short > 0 %} disabled{% endif %} data-confirm="Pay off loan #{{ l.id }} for {{ l.payoff|money(2) }} now?">Pay off now</button>{% if short > 0 %} <span class="small neg">The company account is {{ short|money(2) }} short.</span>{% endif %}</form>{% endif %}</div>
       {% else %}<p class="muted">No loans. Owners can borrow to expand the fleet.</p>{% endfor %}</div>
     <div class="card"><div class="card-head"><h2>Driver earnings</h2><span class="right small muted">period</span></div>
       <p class="small muted">Waiting for Friday's payday: <b>{{ payroll_due|money }}</b>, already taken out of the company account.</p>

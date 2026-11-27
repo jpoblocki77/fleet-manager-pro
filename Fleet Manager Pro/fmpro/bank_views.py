@@ -40,7 +40,7 @@ def page():
 
 
 def _done(ok, text):
-    flash(text, "success" if ok else "error")
+    flash(text, "loan-success" if ok else "loan-error")       # loan-*: shown on the loans card, by the buttons
     return redirect(url_for("bank.page") + "#loans")
 
 

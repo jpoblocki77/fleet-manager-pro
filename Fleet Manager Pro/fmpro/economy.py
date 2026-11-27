@@ -174,6 +174,28 @@ def take_loan(plan, principal):
     return lid
 
 
+def payoff_amount(loan, now=None):
+    """What paying a loan off today costs: what's left of the money borrowed, plus interest for the days since the last
+    instalment. Interest for the weeks still to come isn't charged (no penalty for paying early), and it is never more
+    than the instalments left. Works for company loans and drivers' personal loans."""
+    now = now or time.time()
+    r = (loan["apr"] or 0) / 100 / 52
+    k, inst, principal = loan["payments_made"], loan["installment"], loan["principal"]
+    left = principal - inst * k if r <= 0 else principal * (1 + r) ** k - inst * ((1 + r) ** k - 1) / r
+    start = max(loan["created_at"], loan["next_due"] - WEEK)       # the last instalment, or the day it was taken
+    left *= 1 + r * min(1.0, max(0.0, (now - start) / WEEK))
+    return round(max(0.0, min(left, loan["balance"])), 2)
+
+
+def with_payoff(loans, now=None):
+    """Loan rows with `payoff` (today's pay-off amount) and `saves` (interest not charged) added to the active ones."""
+    for loan in loans:
+        if loan["status"] == "active":
+            loan["payoff"] = payoff_amount(loan, now)
+            loan["saves"] = round(loan["balance"] - loan["payoff"], 2)
+    return loans
+
+
 def process_loans(now=None):
     now = now or time.time()
     from . import bank

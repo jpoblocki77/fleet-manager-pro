@@ -807,7 +807,7 @@ def finance():
                     SUM(CASE WHEN amount>0 THEN amount ELSE 0 END) inc, SUM(CASE WHEN amount<0 THEN -amount ELSE 0 END) exp
                     FROM ledger WHERE account='company' AND created_at>=? AND category NOT IN ('capital','loan')
                     GROUP BY d ORDER BY d""", (time.time() - 30 * DAY,))
-    loans = db.q("SELECT * FROM loans ORDER BY status='paid', created_at DESC")
+    loans = economy.with_payoff(db.q("SELECT * FROM loans ORDER BY status='paid', created_at DESC"))
     payroll = db.q("""SELECT u.id, u.display_name, u.color, COALESCE(SUM(l.amount),0) earned FROM users u
                       LEFT JOIN ledger l ON l.user_id=u.id AND l.category='earnings' AND l.created_at>=?
                       WHERE u.status!='removed' GROUP BY u.id ORDER BY earned DESC""", (since,))
@@ -857,15 +857,22 @@ def loan_payoff(lid):
     from . import bank
     with bank.lock:                     # paid off once, even when the button is pressed twice
         loan = db.one("SELECT * FROM loans WHERE id=? AND status='active'", (lid,))
+        cur = db.setting("currency", "$")
         if not loan:
-            flash("That loan is already paid off.", "info")
-        elif economy.balance() < loan["balance"]:
-            flash("Not enough money in the company account.", "error")
+            flash("That loan is already paid off.", "loan-info")       # loan-*: shown on the Loans card, by the button
         else:
-            economy.post("loan repayment", -loan["balance"], f"Loan #{lid} paid off early")
-            db.update("loans", lid, balance=0, status="paid")
-            flash("Loan paid off.", "success")
-    return redirect(url_for("pages.finance"))
+            amount, have = economy.payoff_amount(loan), economy.balance()
+            if have < amount:
+                flash(f"Not enough money to pay off loan #{lid}: it takes {cur}{amount:,.2f} and the company account "
+                      f"has {cur}{have:,.2f} ({cur}{amount - have:,.2f} short).", "loan-error")
+            else:
+                saved = round(loan["balance"] - amount, 2)
+                economy.post("loan repayment", -amount, f"Loan #{lid} paid off early")
+                db.update("loans", lid, balance=0, status="paid")
+                db.audit(user()["id"], "loan", f"#{lid} paid off early: {amount:.2f}, {saved:.2f} interest saved")
+                flash(f"Loan #{lid} paid off: {cur}{amount:,.2f}." + (f" Paying early saved {cur}{saved:,.2f} of interest."
+                                                                     if saved >= 0.01 else ""), "loan-success")
+    return redirect(url_for("pages.finance") + "#loans")
 
 
 # ------------------------------------------------------------------ drivers

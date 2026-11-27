@@ -862,6 +862,29 @@ def main():
     economy.process_loans(now=__import__("time").time() + 8 * 86400)
     check(db.val("SELECT payments_made FROM loans", (), 0) == 1, "loan instalment collected")
     check(db.val("SELECT SUM(amount) FROM ledger WHERE account='company'") < bal, "instalment debited")
+    ln_ = db.one("SELECT * FROM loans")
+    r_, now_ = ln_["apr"] / 100 / 52, __import__("time").time()
+    pay_ = economy.payoff_amount(ln_)
+    check(abs(pay_ - round(100000 * (1 + r_) - ln_["installment"], 2)) < 0.02 and pay_ < ln_["balance"] - 1000,
+          f"paying off early costs what's left of the loan ({pay_}), not the interest still to come ({ln_['balance']})")
+    fresh_ = dict(ln_, payments_made=0, created_at=now_ - 3.5 * 86400, next_due=now_ + 3.5 * 86400,
+                  balance=round(ln_["installment"] * ln_["weeks"], 2))
+    check(abs(economy.payoff_amount(fresh_, now_) - 100000 * (1 + r_ / 2)) < 0.02,
+          "half a week into a loan: the money borrowed plus half a week's interest")
+    have_ = economy.balance()
+    economy.post("adjustment", -(have_ - 10), "test: almost empty")
+    page_ = post(f"/finance/loan/{ln_['id']}/payoff", {}, follow_redirects=True).get_data(as_text=True)
+    card_ = page_[page_.find('id="loans"'):]
+    check(db.val("SELECT status FROM loans WHERE id=?", (ln_["id"],)) == "active" and page_.count("Not enough money to pay off loan") == 1
+          and "Not enough money to pay off loan" in card_ and "short.</span>" in card_ and " disabled data-confirm" in card_,
+          "short of money: refused, and the reason shows on the Loans card next to a greyed-out button")
+    economy.post("adjustment", have_ - 10, "test: refilled")
+    b0_, pay_ = economy.balance(), economy.payoff_amount(db.one("SELECT * FROM loans"))
+    page_ = post(f"/finance/loan/{ln_['id']}/payoff", {}, follow_redirects=True).get_data(as_text=True)
+    card_ = page_[page_.find('id="loans"'):]
+    check(db.val("SELECT status FROM loans WHERE id=?", (ln_["id"],)) == "paid" and abs(economy.balance() - (b0_ - pay_)) < 0.01
+          and f"Loan #{ln_['id']} paid off" in card_ and "of interest" in card_,
+          f"paid off for {pay_}, with the interest saved shown on the Loans card")
 
     print("Truck leasing")
     import time as _lt
@@ -3554,7 +3577,7 @@ def main():
     clock.t += 1
     b0 = bank.balance(bu)
     feed(bw, dict(bv, fined=True, fine_amount=702, wear_chassis=0.02))
-    check(bank.balance(bu) == b0 - 200 and economy.balance() == co - 702, "set to company pays: the fine is the company's, the ticket the driver's")
+    check(bank.balance(bu) == b0 - 200 and abs(economy.balance() - (co - 702)) < 0.005, "set to company pays: the fine is the company's, the ticket the driver's")
     db.set_setting("drivers_pay_fines", "1")
     db.set_setting("licence_enabled", "0")
     service.time = _time
@@ -3597,9 +3620,11 @@ def main():
     bank.process(pl.loans(lu)[0]["next_due"])
     check(pl.loans(lu)[0]["payments_made"] == 5 and bank.balance(lu) < 0, "an instalment is taken even when it overdraws the account")
     economy.post("earnings", 9000, "test", account="driver", user_id=lu)
-    b0, owed = bank.balance(lu), pl.loans(lu)[0]["balance"]
+    b0, ln = bank.balance(lu), pl.loans(lu)[0]
+    owed = ln["payoff"]
+    check(owed < ln["balance"] - 1, f"a personal loan paid off early skips the interest still to come ({owed} < {ln['balance']})")
     check(pl.payoff(lu, ln["id"])[0] and not pl.payoff(lu, ln["id"])[0] and abs(bank.balance(lu) - (b0 - owed)) < 0.01
-          and pl.loans(lu)[0]["status"] == "paid", "paid off early, once")
+          and pl.loans(lu)[0]["status"] == "paid", f"paid off early, once, for what's left ({owed} of {ln['balance']} owed)")
     for plan, n in (("short", 4), ("extended", 52)):
         pl.take(lu, plan, 2000)
         ln = pl.loans(lu)[0]
@@ -3619,8 +3644,11 @@ def main():
     for bad in ("nan", "inf", "-5", "", "x", "1e99"):
         post("/bank/loan", {"plan": "short", "amount": bad})
     check(len(pl.loans(uid)) == n0 + 1, "odd amounts are refused")
+    check("Pay off today: <b>" in c.get("/bank").get_data(as_text=True), "the Bank page shows what paying off today costs")
     economy.post("earnings", 9000, "test", account="driver", user_id=uid)
-    post(f"/bank/loan/{ml[0]['id']}/payoff", {})
+    card_ = post(f"/bank/loan/{ml[0]['id']}/payoff", {}, follow_redirects=True).get_data(as_text=True)
+    card_ = card_[card_.find('id="loans"'):]
+    check(f"Loan #{ml[0]['id']} paid off" in card_, "the result shows on the loans card")
     check(pl.loans(uid)[0]["status"] == "paid" and "Personal loans" in c.get("/bank").get_data(as_text=True), "and paid off on the page")
 
     print("EU reduced daily rest and roadside inspection fines")
