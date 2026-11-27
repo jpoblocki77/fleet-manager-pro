@@ -1,0 +1,1 @@
+Paying off a loan early now costs only what's left of the loan plus interest up to today, not the interest for the weeks still to come. Each loan shows what paying it off today costs, and if the account is short the reason now shows right next to the button.
