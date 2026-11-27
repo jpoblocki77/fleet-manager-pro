@@ -105,10 +105,10 @@ def main():
     check(c.get("/api/live").status_code == 403, "the API too")
     check("/agree" in c.get("/activate").headers.get("Location", ""), "the old Activate address goes to the agreement")
     r = c.get("/licence-agreement")
-    check(r.status_code == 200 and b"Jeff Poblocki" in r.data and b"reverse engineer" in r.data,
-          "the licence agreement can be read first")
+    check(r.status_code == 200 and b"Jeff Poblocki" in r.data and b"Fleet Manager Pro repository on GitHub" in r.data
+          and b"reverse engineer" not in r.data, "the licence agreement can be read first (current wording)")
     page_ = c.get("/agree").data
-    check(b'name="agree"' in page_ and b"reverse engineer" in page_ and b'name="key"' not in page_
+    check(b'name="agree"' in page_ and b"published on GitHub so that it can be read" in page_ and b'name="key"' not in page_
           and b"Agree and continue" in page_, "the agreement screen shows the whole agreement and asks for no key")
     r = post("/agree", {})
     check(not db.setting("eula_accepted") and b"Tick the box" in r.data, "continuing without ticking I agree is refused")

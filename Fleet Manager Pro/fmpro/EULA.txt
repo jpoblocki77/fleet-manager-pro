@@ -21,8 +21,8 @@ or by installing or using the software, you agree to these terms. If you don't a
    Unless the law where you live allows it in spite of this agreement, you may not:
    a) sell, rent, lease or sub-license the software or any part of it, charge anyone for it, or bundle it with
       something you sell;
-   b) reverse engineer, decompile, disassemble or otherwise try to recover the software's source code, or help
-      anyone else do so;
+   b) copy, reuse or publish the software's source code, or any part of it, anywhere other than the official
+      Fleet Manager Pro repository on GitHub, except where GitHub's terms allow viewing and forking it there;
    c) change the software, share a changed copy, or make other programs based on it;
    d) remove, bypass or tamper with the software's update checks or other protections, or pass off a changed or
       unofficial copy as Fleet Manager Pro;
@@ -32,7 +32,8 @@ or by installing or using the software, you agree to these terms. If you don't a
 4. OWNERSHIP
    The software, including its code, design, pages, graphics and documentation, is owned by the author and is
    protected by copyright law and international treaties. All rights not expressly given to you are kept by the
-   author.
+   author. The source code is published on GitHub so that it can be read; that does not give anyone any rights
+   beyond this agreement.
 
 5. YOUR DATA
    Your company data (drivers, jobs, money, logs and so on) stays on your own computer, in the data folder, and

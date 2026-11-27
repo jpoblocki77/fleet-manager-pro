@@ -1,0 +1,1 @@
+The licence agreement is updated now that Fleet Manager Pro's source code is public on GitHub: you may read the code there, but not copy, reuse or publish it elsewhere. Nothing else changes: it is still free to use and to share unchanged.
