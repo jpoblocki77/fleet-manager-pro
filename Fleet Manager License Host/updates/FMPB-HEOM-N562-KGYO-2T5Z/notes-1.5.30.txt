@@ -1,0 +1,1 @@
+Hours of Service warnings now come 1 hour before a limit (drive time, on-duty window, break and weekly cycle) instead of 15 minutes. Fleet Manager Pro can now show a Please update notice if a version has a serious problem. The program and its installer now show their publisher and copyright in Windows.
