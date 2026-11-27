@@ -66,6 +66,8 @@ class JobTracker:
         self.jumps = 0               # position jumps without a ferry/train during the current job
         self._pos = None
         self.inspect_at = None       # fraction of the route where a planned roadside inspection happens
+        self.pretrip_due = None      # (job id, game-minute the load started, game): pre-trip report still to come
+        self._pretrip_t = 0
 
     # ------------------------------------------------------------ entry point
     def feed(self, frame):
@@ -328,15 +330,40 @@ class JobTracker:
         """Pre-trip DVIR and out-of-service defects are checked when a load is picked up."""
         g = v["game"] if v["game"] in ("ats", "ets2") else "ats"
         gm = compliance.log_min(self.user_id, g, v["game_time_abs"]) or None    # on the logbook clock
+        self.pretrip_due = None
         if db.setting("dvir_required") == "1" and not compliance.has_pretrip(self.user_id, self.truck_id, gm, g):
-            compliance.record_violation(self.user_id, "DVIR-PRE", f"job{self.job_id}", gm,
-                                        compliance.RULE_TEXT["DVIR-PRE"], fine=db.setting_f("dvir_fine", 250),
-                                        job_id=self.job_id, game=g)
+            if gm is not None and compliance.pretrip_grace() > 0:
+                self.pretrip_due = (self.job_id, gm, g)     # a report filed in the next few game-minutes still counts
+            else:
+                self._pretrip_missed(gm, g)
         if compliance.open_defects(self.truck_id):
             compliance.record_violation(self.user_id, "DEFECT-OOS", f"job{self.job_id}", gm,
                                         compliance.RULE_TEXT["DEFECT-OOS"], fine=db.setting_f("oos_fine", 1500),
                                         job_id=self.job_id, game=g)
         self.inspect_at = compliance.plan_inspection()
+
+    def _pretrip_missed(self, gm, g):
+        compliance.record_violation(self.user_id, "DVIR-PRE", f"job{self.job_id}", gm,
+                                    compliance.RULE_TEXT["DVIR-PRE"], fine=db.setting_f("dvir_fine", 250),
+                                    job_id=self.job_id, game=g)
+
+    def _check_pretrip(self, v, now):
+        """The grace period after a load starts: a pre-trip report filed in it counts; after it, the fine."""
+        job, start, g = self.pretrip_due
+        if job != self.job_id:
+            self.pretrip_due = None
+            return
+        if now - self._pretrip_t < 3:               # at most every 3 s
+            return
+        self._pretrip_t = now
+        grace = compliance.pretrip_grace()
+        if compliance.has_pretrip(self.user_id, self.truck_id, start, g, grace=grace):
+            self.pretrip_due = None
+            return
+        gm = compliance.log_min(self.user_id, g, v["game_time_abs"]) or None
+        if gm is not None and gm >= start + grace:
+            self.pretrip_due = None
+            self._pretrip_missed(start, g)
 
     def _load_acc(self):
         j = db.one("SELECT odo_start, max_speed, speeding_s, driving_s, fuel_used, cargo_damage, driven_km "
@@ -391,6 +418,8 @@ class JobTracker:
         if now - self.acc_flush >= 2:
             self.acc_flush = now
             self.flush(v["odometer"])
+        if self.pretrip_due:
+            self._check_pretrip(v, now)
         # planned roadside inspection: at the first stop after that point of the route
         if (self.inspect_at is not None and v["planned_distance_km"] and abs(v["speed"]) < 0.5
                 and a["driven_km"] >= self.inspect_at * v["planned_distance_km"]):

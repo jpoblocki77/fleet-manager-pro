@@ -219,7 +219,7 @@ DEFAULT_SETTINGS = {
     "starting_balance": str(STARTING_CAPITAL), "initialized": "0",
     # compliance (ELD / Hours of Service, DVIR, roadside inspections)
     "hos_enabled": "1", "hos_rules_ats": "us70", "hos_rules_ets2": "eu",
-    "hos_fine": "500", "dvir_required": "1", "dvir_fine": "250",
+    "hos_fine": "500", "dvir_required": "1", "dvir_fine": "250", "dvir_grace_min": "15",
     "inspections_enabled": "1", "inspection_chance_pct": "15", "oos_fine": "1500",
     # driver's licences (cdl.py): off until the Owner or a Manager turns them on
     "licence_enabled": "0", "licence_block": "1", "licence_tickets": "1", "licence_fine": "5000",

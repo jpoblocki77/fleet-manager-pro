@@ -3677,6 +3677,47 @@ def main():
     iid2 = compliance.inspect(eu, {"game": "ets2", "game_time_abs": 1475}, job_id=ejob2, truck_id=etr, level=3)
     check(db.val("SELECT fine FROM inspections WHERE id=?", (iid2,)) >= 250, "...but still fines it when it wasn't charged yet")
 
+    print("Pre-trip grace: quick jobs start with the truck already on the road")
+    _cu2("quickjob", "Quick Job", "quickjob12", role="driver")
+    qd = db.val("SELECT id FROM users WHERE username='quickjob'")
+    qtr = db.insert("trucks", brand="Volvo", model="VNL", plate="QJ1", game="ats", purchase_price=0, created_at=1)
+    qt = service.JobTracker(qd)
+    qt.truck_id = qtr
+    nviol = lambda j: db.val("SELECT COUNT(*) FROM hos_violations WHERE user_id=? AND rule='DVIR-PRE' AND period_key=?",
+                             (qd, f"ats:job{j}"), 0)
+
+    def qjob(start):
+        j = db.insert("jobs", user_id=qd, truck_id=qtr, game="ats", source="telemetry", status="in_progress", cargo="Q",
+                      started_at=1, game_time_start=start)
+        qt.job_id = j
+        qt._compliance_at_start({"game": "ats", "game_time_abs": start})
+        return j
+
+    def qtick(gm):
+        if qt.pretrip_due:
+            qt._pretrip_t = 0
+            qt._check_pretrip({"game_time_abs": gm}, 1e9)
+
+    check(compliance.pretrip_grace() == 15, "the pre-trip grace is 15 game-minutes to start with")
+    j1 = qjob(5000)
+    qtick(5010)
+    check(nviol(j1) == 0 and qt.pretrip_due, "no pre-trip at pickup: no fine yet, the grace period runs")
+    db.insert("dvirs", user_id=qd, truck_id=qtr, kind="pre", game="ats", items="{}", defects="", status="ok", game_min=5012,
+              created_at=1)
+    qtick(5013)
+    check(nviol(j1) == 0 and qt.pretrip_due is None, "a pre-trip filed 12 game-minutes after a quick job starts counts")
+    j2 = qjob(9000)
+    qtick(9014)
+    check(nviol(j2) == 0, "still inside the 15 game-minutes: no fine")
+    qtick(9016)
+    qtick(9030)
+    check(nviol(j2) == 1 and qt.pretrip_due is None, "no pre-trip 15 game-minutes into the load: fined once")
+    db.set_setting("dvir_grace_min", "0")
+    j3 = qjob(12000)
+    check(nviol(j3) == 1 and qt.pretrip_due is None, "grace set to 0: the fine comes at pickup, as before")
+    db.set_setting("dvir_grace_min", "15")
+    check('name="dvir_grace_min"' in c.get("/settings?tab=compliance").get_data(as_text=True), "the grace period is in Settings")
+
     print("Clear all data")
     from fmpro.auth import create_user as _cu
     _cu("cleartest", "Clear Test", "manager12", role="admin")

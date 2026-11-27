@@ -1664,7 +1664,7 @@ SETTING_FIELDS = {
     "webhook_applications": ("url", 300), "webhook_on_application": ("bool", None),
     "recruitment_open": ("bool", None), "recruitment_text": ("str", 1000),
     "hos_enabled": ("bool", None), "hos_rules_ats": ("choice", ("us70", "us60")), "hos_rules_ets2": ("choice", ("eu",)),
-    "hos_fine": ("num", (0, 1e6)), "dvir_required": ("bool", None), "dvir_fine": ("num", (0, 1e6)),
+    "hos_fine": ("num", (0, 1e6)), "dvir_required": ("bool", None), "dvir_fine": ("num", (0, 1e6)), "dvir_grace_min": ("num", (0, 1440)),
     "fluid_alerts": ("bool", None), "inspections_enabled": ("bool", None), "inspection_chance_pct": ("num", (0, 100)), "oos_fine": ("num", (0, 1e6)),
     "licence_enabled": ("bool", None), "licence_block": ("bool", None), "licence_tickets": ("bool", None),
     "licence_fine": ("num", (0, 1e6)), "licence_speed_min": ("num", (1, 120)), "licence_retest_hours": ("num", (0, 720)),

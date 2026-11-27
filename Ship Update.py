@@ -2,7 +2,7 @@ r"""Ship a new version of Fleet Manager Pro to everyone, in one run (or double-c
 
 Fleet Manager Pro is free, so there is one build: the public copy. This
   1. builds it once at the current Fleet Manager Pro\VERSION,
-  2. publishes it to the public update channel AND to every older buyer copy's channel (so they move over),
+  2. publishes it to the public update channel (older buyer copies moved to it with 1.5.29 or newer),
   3. makes the installer (Build Output\Installers\Public\Fleet Manager Pro Setup.exe) and puts a copy in the
      website's downloads folder (..\..\Website\downloads) when that folder is there, writes the new version,
      size and SHA-256 fingerprint into the website's index.html, and rebuilds Website.zip,
@@ -12,12 +12,10 @@ and send the new Setup to Microsoft (microsoft.com/wdsi/filesubmission) so Defen
 
     python "Ship Update.py" --notes "Fixes the map."          everything above
     python "Ship Update.py" --dry-run                          just show what it would do
-    python "Ship Update.py" --only-public                      skip the older buyer channels
-    python "Ship Update.py" --keys FMP-AAAA-... FMP-BBBB-...   public + just these older copies
+    python "Ship Update.py" --keys FMP-AAAA-...                public + an older copy's channel, by hand
     python "Ship Update.py" --no-installer                     skip step 3
 
-The older buyer channels come from the Fleet Manager server when License Manager can reach it, otherwise from
-Buyer Builds (PRIVATE).csv. Bump Fleet Manager Pro\VERSION FIRST, or nobody is offered the update.
+Bump Fleet Manager Pro\VERSION FIRST, or nobody is offered the update.
 """
 import argparse
 import csv
@@ -169,24 +167,22 @@ def main():
     a = ap.parse_args()
 
     ver = version()
-    if a.only_public:
-        keys, source = [], "--only-public"
-    elif a.keys:
+    # The public channel only. Older buyer copies moved to it when they installed 1.5.29 or newer, so their old
+    # channels are no longer published to (their folders are left as they are). --keys still adds one by hand.
+    if a.keys:
         keys, source = [k.strip().upper() for k in a.keys], "--keys"
-    elif a.from_csv:
-        keys, source = buyers_from_csv(), os.path.basename(CSV_PATH)
     else:
-        try:
-            keys, source = buyers_from_server(), "the Fleet Manager server"
-        except Exception as e:  # License Manager is local-only on the cloud box: fall back to the private list
-            keys, source = buyers_from_csv(), f"{os.path.basename(CSV_PATH)} (server not reachable from here: {e.__class__.__name__})"
+        keys, source = [], "public channel only"
+        if a.from_csv:
+            print("Note: --from-csv is no longer used - Ship Update publishes to the public channel only.")
     bad = [k for k in keys if not KEY_RX.match(k)]
     if bad:
         sys.exit(f"Not purchase keys: {bad}")
 
     todo = ["--public"] + (["--stock"] if a.stock else []) + keys
     print(f"Ship Fleet Manager Pro {ver}")
-    print(f"  Channels: public + {len(keys)} older buyer copies (from {source})" + ("  + stock" if a.stock else ""))
+    print(("  Channels: public only" if not keys else f"  Channels: public + {len(keys)} older buyer copies (from {source})")
+          + ("  + stock" if a.stock else ""))
     for k in keys:
         print(f"    - {k[:8]}...")
     print("  Then: " + ("the installer, " if not a.no_installer else "") + "the cloud upload zip")

@@ -388,13 +388,19 @@ def open_defects(truck_id):
     return db.q("SELECT * FROM dvirs WHERE truck_id=? AND status='defects' ORDER BY created_at DESC", (truck_id,))
 
 
-def has_pretrip(uid, truck_id, game_min, game="ats"):
+def pretrip_grace():
+    """Game-minutes after a load starts in which a pre-trip report still counts. Quick jobs start with the truck
+    already on the road, so there is no chance to inspect it before the load (Settings > Compliance, default 15)."""
+    return max(0.0, min(db.setting_f("dvir_grace_min", 15), 1440.0))
+
+
+def has_pretrip(uid, truck_id, game_min, game="ats", grace=5):
     if game_min is None:
         return bool(db.val("SELECT id FROM dvirs WHERE user_id=? AND kind='pre' AND created_at>?",
                            (uid, time.time() - 86400)))
     return bool(db.val("SELECT id FROM dvirs WHERE user_id=? AND kind='pre' AND (truck_id=? OR ? IS NULL) "
                        "AND COALESCE(game,'ats')=? AND game_min BETWEEN ? AND ?",
-                       (uid, truck_id, truck_id, game, game_min - 1440, game_min + 5)))
+                       (uid, truck_id, truck_id, game, game_min - 1440, game_min + grace)))
 
 
 # ------------------------------------------------------------------------------------------------ roadside inspection
