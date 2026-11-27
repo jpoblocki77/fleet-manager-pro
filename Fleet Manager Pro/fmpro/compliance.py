@@ -174,7 +174,7 @@ def _h(m):
     return f"{m // 60} h" if m % 60 == 0 else f"{m / 60:.1f} h"
 
 
-WARN_AHEAD = 15   # game-minutes before an HOS limit that the logbook warns the driver (shown on the overlay + bell)
+WARN_AHEAD = 60   # game-minutes before an HOS limit that the logbook warns the driver (shown on the overlay + bell)
 
 
 def _warn_near_limit(uid, game, key, period, text):
@@ -224,7 +224,7 @@ def check_hos(uid, game, now_min, job_id=None):
     if c["cycle"]["over"]:
         rv(uid, "HOS-CYCLE", f"c{c['cycle_key'] // 1440}", now_min, RULE_TEXT["HOS-CYCLE"].format(h=_h(r["cycle"])), job_id=job_id)
 
-    # 15 minutes before a limit: one heads-up pushed to the overlay and the bell, once per driving stint per limit.
+    # 1 hour (WARN_AHEAD) before a limit: one heads-up pushed to the overlay and the bell, once per driving stint per limit.
     near = (
         ("drive",  f"d{c['reset_key']}",          f"{c['drive']['left']} min of driving time left — find a rest stop."),
         ("window", f"w{c['reset_key']}",          f"{c['window']['left']} min left in your on-duty window — plan to park."),

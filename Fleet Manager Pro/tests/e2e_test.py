@@ -427,6 +427,10 @@ def main():
     hfeed(25.0, 200)                             # 8 h 20 driving, no break
     check(db.val("SELECT COUNT(*) FROM hos_violations WHERE user_id=? AND rule='HOS-BREAK'", (hid,), 0) == 1,
           "30-minute break violation after 8 h")
+    near_ = db.val("SELECT text FROM notifications WHERE user_id=? AND link LIKE '/compliance?near=ats:break:%'", (hid,), "")
+    m_ = re.match(r"Break due in (\d+) min", near_ or "")
+    check(compliance.WARN_AHEAD == 60 and m_ and 55 <= int(m_.group(1)) <= 60,
+          f"the break heads-up comes 1 hour before the limit, once ({near_!r})")
     hfeed(0.0, 35, parking_brake=True)           # break
     hfeed(25.0, 200)                             # past 11 h
     check(db.val("SELECT COUNT(*) FROM hos_violations WHERE user_id=? AND rule='HOS-DRIVE'", (hid,), 0) == 1,
