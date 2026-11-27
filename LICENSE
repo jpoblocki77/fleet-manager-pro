@@ -1,0 +1,26 @@
+Fleet Manager Pro
+Copyright (c) 2026 Jeff Poblocki. All rights reserved.
+
+This repository and everything in it - the source code, design, pages, graphics and documentation - is owned by
+Jeff Poblocki and is protected by copyright law and international treaties.
+
+The source code is published here so that it can be read. Publishing it does not give anyone a licence to copy,
+change, redistribute or reuse it, in whole or in part, or to use it in other projects. Apart from what GitHub's
+Terms of Service allow (viewing this repository and forking it on GitHub), all rights are reserved.
+
+Using Fleet Manager Pro is governed by the Fleet Manager Pro End User Licence Agreement:
+
+    Fleet Manager Pro/fmpro/EULA.txt
+
+The same agreement is shown when the program first starts. In short, it lets you install and use Fleet Manager Pro
+for free and give other people unchanged copies free of charge; it does not let you sell it, change it, or make
+other programs based on it. Where this file and the agreement differ, the agreement applies.
+
+Fleet Manager Pro includes components made by others (for example Python, Flask, Waitress, cryptography and the SCS
+telemetry plugin). Each comes with its own licence, and those licences apply to those parts.
+
+American Truck Simulator and Euro Truck Simulator 2 are trademarks of SCS Software. Fleet Manager Pro is not made,
+endorsed or supported by SCS Software.
+
+To ask about any use the agreement doesn't cover, contact the author through the Fleet Manager Pro website:
+http://fleetmanager.servehttp.com:8080
